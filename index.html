@@ -34,57 +34,21 @@
             height: 120px;
             border-radius: 50%;
             border: 3px solid var(--primary-color);
-            transition: transform 0.3s;
-        }
-
-        .avatar:hover {
-            transform: rotate(5deg);
-        }
-
-        .social-links {
-            display: flex;
-            justify-content: center;
-            gap: 1.5rem;
-            margin: 2rem 0;
-            flex-wrap: wrap;
-        }
-
-        .social-link {
-            color: var(--primary-color);
-            text-decoration: none;
-            padding: 0.8rem 1.2rem;
-            border: 2px solid;
-            border-radius: 25px;
             transition: all 0.3s;
         }
 
-        .social-link:hover {
-            background: var(--secondary-color);
-            color: white;
-            transform: translateY(-3px);
-        }
-
-        .article-preview {
-            background: white;
-            padding: 1.5rem;
-            border-radius: 10px;
-            box-shadow: 0 2px 5px rgba(0,0,0,0.1);
-            margin: 2rem 0;
-        }
-
-        @media (max-width: 600px) {
-            body {
-                padding: 10px;
-            }
-            .avatar {
-                width: 90px;
-                height: 90px;
-            }
+        .avatar:hover {
+            animation: rotate 2s linear infinite;
         }
 
         @keyframes fadeIn {
             from { opacity: 0; }
             to { opacity: 1; }
+        }
+        
+        @keyframes rotate {
+            from { transform: rotate(0deg); }
+            to { transform: rotate(360deg); }
         }
     </style>
 </head>
