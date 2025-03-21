@@ -62,18 +62,12 @@ p {
     display: flex;
     align-items: center;
     justify-content: center;
+    font-size: 24px;
     font-weight: bold;
     color: #776e65;
     /* 添加过渡效果 */
     transition: all 0.2s ease; 
 }
-
-/* 根据数字大小设置字体大小 */
-.grid-cell[data-value="2"] { font-size: 48px; }
-.grid-cell[data-value="4"] { font-size: 48px; }
-.grid-cell[data-value="8"] { font-size: 44px; }
-.grid-cell[data-value="16"] { font-size: 40px; }
-.grid-cell[data-value="32"] { font-size: 36px; }
 
 #gameover {
     display: none;

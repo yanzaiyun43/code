@@ -1,19 +1,6 @@
 const board = Array.from({ length: 4 }, () => Array(4).fill(0));
 let score = 0;
 
-// 新增：获取当前棋盘上的最大数字
-function getMaxNumber() {
-    let max = 0;
-    for (let i = 0; i < 4; i++) {
-        for (let j = 0; j < 4; j++) {
-            if (board[i][j] > max) {
-                max = board[i][j];
-            }
-        }
-    }
-    return max;
-}
-
 document.addEventListener('DOMContentLoaded', () => {
     document.getElementById('newGameButton').addEventListener('click', newGame);
     document.addEventListener('keydown', handleKeyPress);
@@ -45,12 +32,15 @@ function generateNewNumber() {
     }
     if (emptyCells.length === 0) return;
     const { x, y } = emptyCells[Math.floor(Math.random() * emptyCells.length)];
-    const max = getMaxNumber();
-    let possibleNumbers = [2, 4];
-    if (max >= 4) possibleNumbers.push(8);
-    if (max >= 8) possibleNumbers.push(16);
-    if (max >= 16) possibleNumbers.push(32);
-    board[x][y] = possibleNumbers[Math.floor(Math.random() * possibleNumbers.length)];
+    // 生成随机数，根据不同范围生成不同的值
+    const randomValue = Math.random();
+    if (randomValue < 0.7) {
+        board[x][y] = 2;
+    } else if (randomValue < 0.9) {
+        board[x][y] = 4;
+    } else {
+        board[x][y] = 8;
+    }
 }
 
 function updateBoard() {
@@ -60,7 +50,6 @@ function updateBoard() {
             const targetValue = board[i][j];
             cell.textContent = targetValue === 0 ? '' : targetValue;
             cell.style.backgroundColor = getBackgroundColor(targetValue);
-            cell.setAttribute('data-value', targetValue); // 添加 data-value 属性
             // 这里可以添加更复杂的动画逻辑，例如根据移动方向设置 transform
             // 目前简单实现，可根据实际需求完善
             cell.style.transform = 'scale(1)';
@@ -92,64 +81,97 @@ function getBackgroundColor(value) {
 }
 
 function handleKeyPress(event) {
+    let hasMoved = false;
     switch (event.key) {
         case 'ArrowUp':
-            moveUp();
+            hasMoved = moveUp();
             break;
         case 'ArrowDown':
-            moveDown();
+            hasMoved = moveDown();
             break;
         case 'ArrowLeft':
-            moveLeft();
+            hasMoved = moveLeft();
             break;
         case 'ArrowRight':
-            moveRight();
+            hasMoved = moveRight();
             break;
     }
-    generateNewNumber();
-    updateBoard();
-    if (isGameOver()) {
-        document.getElementById('gameover').style.display = 'block';
+    if (hasMoved) {
+        generateNewNumber();
+        updateBoard();
+        if (isGameOver()) {
+            document.getElementById('gameover').style.display = 'block';
+        }
     }
 }
 
 function moveUp() {
+    let hasMoved = false;
     for (let j = 0; j < 4; j++) {
-        let compressed = compress(board.map(row => row[j]));
+        let originalColumn = board.map(row => row[j]);
+        let newColumn = compress(originalColumn);
+        if (JSON.stringify(originalColumn) !== JSON.stringify(newColumn)) {
+            hasMoved = true;
+        }
         for (let i = 0; i < 4; i++) {
-            board[i][j] = compressed[i];
+            board[i][j] = newColumn[i];
         }
     }
+    return hasMoved;
 }
 
 function moveDown() {
+    let hasMoved = false;
     for (let j = 0; j < 4; j++) {
-        let compressed = compress(board.map(row => row[j]).reverse()).reverse();
+        let originalColumn = board.map(row => row[j]).reverse();
+        let newColumn = compress(originalColumn).reverse();
+        if (JSON.stringify(originalColumn) !== JSON.stringify(newColumn)) {
+            hasMoved = true;
+        }
         for (let i = 0; i < 4; i++) {
-            board[i][j] = compressed[i];
+            board[i][j] = newColumn[i];
         }
     }
+    return hasMoved;
 }
 
 function moveLeft() {
+    let hasMoved = false;
     for (let i = 0; i < 4; i++) {
-        board[i] = compress(board[i]);
+        let originalRow = [...board[i]];
+        let newRow = compress(originalRow);
+        if (JSON.stringify(originalRow) !== JSON.stringify(newRow)) {
+            hasMoved = true;
+        }
+        board[i] = newRow;
     }
+    return hasMoved;
 }
 
 function moveRight() {
+    let hasMoved = false;
     for (let i = 0; i < 4; i++) {
-        board[i] = compress(board[i].reverse()).reverse();
+        let originalRow = [...board[i]].reverse();
+        let newRow = compress(originalRow).reverse();
+        if (JSON.stringify(originalRow) !== JSON.stringify(newRow)) {
+            hasMoved = true;
+        }
+        board[i] = newRow;
     }
+    return hasMoved;
 }
 
 function compress(row) {
     let newRow = row.filter(val => val !== 0);
+    let merged = false;
     for (let i = 0; i < newRow.length - 1; i++) {
-        if (newRow[i] === newRow[i + 1]) {
+        if (newRow[i] === newRow[i + 1] && !merged) {
             newRow[i] *= 2;
             score += newRow[i];
             newRow[i + 1] = 0;
+            merged = true;
+        } else {
+            merged = false;
         }
     }
     newRow = newRow.filter(val => val !== 0);
