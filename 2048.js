@@ -1,6 +1,19 @@
 const board = Array.from({ length: 4 }, () => Array(4).fill(0));
 let score = 0;
 
+// 新增：获取当前棋盘上的最大数字
+function getMaxNumber() {
+    let max = 0;
+    for (let i = 0; i < 4; i++) {
+        for (let j = 0; j < 4; j++) {
+            if (board[i][j] > max) {
+                max = board[i][j];
+            }
+        }
+    }
+    return max;
+}
+
 document.addEventListener('DOMContentLoaded', () => {
     document.getElementById('newGameButton').addEventListener('click', newGame);
     document.addEventListener('keydown', handleKeyPress);
@@ -32,7 +45,12 @@ function generateNewNumber() {
     }
     if (emptyCells.length === 0) return;
     const { x, y } = emptyCells[Math.floor(Math.random() * emptyCells.length)];
-    board[x][y] = Math.random() < 0.9 ? 2 : 4;
+    const max = getMaxNumber();
+    let possibleNumbers = [2, 4];
+    if (max >= 4) possibleNumbers.push(8);
+    if (max >= 8) possibleNumbers.push(16);
+    if (max >= 16) possibleNumbers.push(32);
+    board[x][y] = possibleNumbers[Math.floor(Math.random() * possibleNumbers.length)];
 }
 
 function updateBoard() {
@@ -42,6 +60,7 @@ function updateBoard() {
             const targetValue = board[i][j];
             cell.textContent = targetValue === 0 ? '' : targetValue;
             cell.style.backgroundColor = getBackgroundColor(targetValue);
+            cell.setAttribute('data-value', targetValue); // 添加 data-value 属性
             // 这里可以添加更复杂的动画逻辑，例如根据移动方向设置 transform
             // 目前简单实现，可根据实际需求完善
             cell.style.transform = 'scale(1)';
@@ -154,4 +173,4 @@ function isGameOver() {
         }
     }
     return true;
-}   
+}
