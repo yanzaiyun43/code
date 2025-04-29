@@ -1,4 +1,5 @@
 import requests
+import os  # 添加 os 模块导入
 
 url = "https://animedb.sinaapp.com/proxy/p.php"
 
