@@ -1,0 +1,34 @@
+<!DOCTYPE html>
+<html lang="zh">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Document</title>
+</head>
+<style>
+    body{
+        user-select: none;
+    }
+    input[type=text] {
+        width: 300px; /* 输入框宽度 */
+        padding: 10px; /* 输入框内边距 */
+        border: 2px solid #0077aa; /* 输入框边框 */ 
+        border-radius: 5px; /* 输入框圆角 */
+    }
+    input[type=submit] {
+        background-color: #0066ff; /* 绿色背景 */
+        color: white; /* 白色文本 */
+        border-radius: 5px;
+        padding: 10px; /* 按钮内边距 */;
+    }
+    input[type=submit]:hover {
+        background-color: #194a94; /* 鼠标悬停时的背景颜色 */ 
+    }
+</style>
+<body>
+    <form action="https://search.bilibili.com/all" method="get">
+        <input type="text" name="keyword">
+        <input type="submit" value="搜索">
+    </form>
+</body>
+</html>
