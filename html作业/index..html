@@ -1,0 +1,103 @@
+<!DOCTYPE html>
+<html lang="zh">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>HTML表单示例</title>
+    <style>
+        body {
+            font-family: Arial, sans-serif;
+            background-color: #f4f4f4;
+            margin: 0;
+            padding: 0;
+        }
+        .container {
+            width: 80%;
+            margin: 20px auto;
+            background: #fff;
+            padding: 20px;
+            border-radius: 8px;
+            box-shadow: 0 0 10px rgba(0, 0, 0, 0.1);
+        }
+        h1 {
+            text-align: center;
+            color: #333;
+        }
+        form {
+            max-width: 400px;
+            margin: 20px auto;
+        }
+        label {
+            display: block;
+            margin-bottom: 5px;
+            font-weight: bold;
+        }
+        input[type="text"],
+        input[type="password"],
+        input[type="number"],
+        input[type="date"],
+        textarea,
+        select {
+            width: 100%;
+            padding: 8px;
+            margin-bottom: 10px;
+            border: 1px solid #ccc;
+            border-radius: 4px;
+        }
+        input[type="radio"],
+        input[type="checkbox"] {
+            margin-right: 5px;
+        }
+        button {
+            padding: 10px 15px;
+            background-color: #007bff;
+            color: white;
+            border: none;
+            border-radius: 4px;
+            cursor: pointer;
+        }
+        button:hover {
+            background-color: #0056b3;
+        }
+        label .gender{
+            display: inline-block;
+        }  
+    </style>
+</head>
+<body>
+    <div class="container">
+        <h1>form表单</h1>
+        <form action="https://dorm426.xyz/submit.php" method="post">
+            <label for="username">用户名：</label>
+            <input type="text" name="username" placeholder="请输入用户名" required>
+            <label for="password">密码：</label>
+            <input type="password" name="password" required>     
+            <p>
+                <label for="">性别：</label>
+                <input type="radio" name="gender" value="男">男
+                <input type="radio" name="gender" value="女">女
+            </p>
+
+            <p>
+                <label for="hobby[]">爱好:</label>
+                <input type="checkbox" name="hobby[]" value="唱">唱
+                <input type="checkbox" name="hobby[]" value="跳">跳
+                <input type="checkbox" name="hobby[]" value="rap">rap
+                <input type="checkbox" name="hobby[]" value="篮球">篮球
+            </p>
+
+            <label for="city">城市：</label>
+            <select id="city" name="city">
+                <option value="北京">北京</option>
+                <option value="上海">上海</option>
+                <option value="广州">广州</option>
+                <option value="商丘">商丘</option>
+            </select>
+            <label for="message">留言：</label>
+            <textarea name="message" rows="4" cols="30" placeholder="请输入留言内容"></textarea>
+            <button type="submit">提交表单</button>
+            <button type="reset">重置表单</button>
+        </form>
+    </div>
+</body>
+</html>
