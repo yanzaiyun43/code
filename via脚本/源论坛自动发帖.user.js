@@ -1,7 +1,7 @@
 // ==UserScript==
-// @name         源论坛低调自动签到（增强版）
-// @version      1.4
-// @description  支持单发/三连发切换，0点后静默执行
+// @name         源论坛低调自动签到（带反馈）
+// @version      1.5
+// @description  全程 toast 提示，操作可见更安心
 // @author       Qwen
 // @match        https://pc.sysbbs.com/*
 // @run-at       document-end
@@ -11,11 +11,17 @@
 (function () {
     'use strict';
 
-    const FID = 140; // 论坛分区 ID，请根据实际情况修改
+    const FID = 140;
     const POST_URL = `https://pc.sysbbs.com/forum.php?mod=post&action=newthread&fid=${FID}`;
 
     // ⚙️ 【开关】是否启用三连发
-    const ENABLE_TRIPLE_POST = true; // 🔘 true=连发3次 | false=只发1次
+    const ENABLE_TRIPLE_POST = true; // true=连发3次 | false=只发1次
+
+    // 显示提示（统一函数）
+    function showToast(msg, duration = 2000) {
+        alert(`💬 ${msg}`);
+        console.log(`🎯 [签到助手] ${msg}`);
+    }
 
     // 获取北京时间
     function getBeijingTime() {
@@ -43,16 +49,10 @@
     // 当前是否在 6:00 及以后？
     function isAfterSixAM() {
         const now = getBeijingTime();
-        return now.getHours() > 0 || (now.getHours() === 0 && now.getMinutes() >= 0);
+        return now.getHours() > 6 || (now.getHours() === 6 && now.getMinutes() >= 0);
     }
 
-    // 显示提示
-    function showToast(msg) {
-        alert(`📌 ${msg}`);
-        console.log(`🎯 [签到助手] ${msg}`);
-    }
-
-    // 随机选择一个自然标题
+    // 随机标题
     function getRandomTitle() {
         const titles = [
             '今天也来了',
@@ -69,7 +69,7 @@
         return titles[Math.floor(Math.random() * titles.length)];
     }
 
-    // 随机选择一段自然内容
+    // 随机内容
     function getRandomMessage() {
         const messages = [
             '没啥特别的事，就是来看看大家～',
@@ -86,8 +86,9 @@
         return messages[Math.floor(Math.random() * messages.length)];
     }
 
-    // 发送帖子（支持递归调用实现三连发）
+    // 发送帖子
     function sendLowProfilePost(formhashValue, index = 0) {
+        const totalCount = ENABLE_TRIPLE_POST ? 3 : 1;
         const title = getRandomTitle();
         const message = getRandomMessage();
 
@@ -113,37 +114,39 @@
         xhr.onreadystatechange = function () {
             if (xhr.readyState === 4) {
                 if (xhr.status === 200) {
-                    console.log(`✅ 第 ${index + 1} 次发帖成功:`, title);
-                    
-                    // 判断是否继续发下一条
+                    console.log(`✅ 第 ${index + 1} 次发帖成功`);
+                    showToast(`✅ 第${index + 1}/${totalCount}次 ✔`, 1500);
+
                     if (ENABLE_TRIPLE_POST && index < 2) {
-                        const delay = 1500 + Math.random() * 1000; // 1.5s ~ 2.5s 随机延迟
+                        const delay = 1500 + Math.random() * 1000;
                         setTimeout(() => sendLowProfilePost(formhashValue, index + 1), delay);
                     } else {
                         markAsSigned();
-                        const count = ENABLE_TRIPLE_POST ? '三连发完成' : '签到完成';
-                        showToast(`${count} ✅`);
+                        showToast(`🎉 今日签到完成！共${totalCount}贴`, 3000);
                     }
                 } else {
-                    console.error(`❌ 第 ${index + 1} 次发帖失败:`, xhr.status);
-                    showToast(`部分失败，状态码: ${xhr.status}`);
-                    markAsSigned(); // 即使失败也标记为“已尝试”，避免反复触发
+                    console.error(`❌ 第 ${index + 1} 次失败:`, xhr.status);
+                    showToast(`❌ 第${index+1}次失败`, 2000);
+                    markAsSigned(); // 避免重复触发
                 }
             }
         };
 
         xhr.onerror = () => {
-            console.error('📡 请求出错');
-            showToast('网络错误');
+            console.error('📡 网络异常');
+            showToast('⚠️ 网络错误或连接中断');
             markAsSigned();
         };
 
-        console.log(`📤 正在发送第 ${index + 1} 条:`, title);
+        console.log(`📤 发送第 ${index + 1} 条:`, title);
+        showToast(`📤 第${index + 1}次发送中...`, 1000);
         xhr.send(Object.keys(data).map(k => `${k}=${encodeURIComponent(data[k])}`).join('&'));
     }
 
-    // 创建隐藏 iframe 获取 formhash 并开始发帖
+    // 创建 iframe 获取 formhash
     function fetchFormHashAndPost() {
+        showToast('🔍 正在加载发帖页...', 1500);
+
         const iframe = document.createElement('iframe');
         iframe.style.display = 'none';
         iframe.src = POST_URL;
@@ -153,49 +156,50 @@
                 const doc = iframe.contentDocument || iframe.contentWindow.document;
                 const input = doc.querySelector('input[name="formhash"]');
                 if (input && input.value) {
-                    console.log('✅ 成功获取 formhash:', input.value.slice(0, 6) + '...');
-                    sendLowProfilePost(input.value, 0); // 从第1次开始
+                    console.log('✅ 成功获取 formhash');
+                    showToast('🔐 表单已就绪，开始发帖', 1500);
+                    sendLowProfilePost(input.value, 0);
                 } else {
                     showToast('⚠️ 未找到 formhash，请手动进入发帖页一次');
                 }
             } catch (err) {
-                console.error('🚫 无法读取 iframe 内容:', err);
-                showToast('安全策略限制？请检查登录状态');
+                console.error('🚫 读取失败:', err);
+                showToast('⛔ 安全限制？请检查登录状态');
             }
 
-            // 清理 iframe
             setTimeout(() => {
-                if (iframe.parentNode) {
-                    iframe.parentNode.removeChild(iframe);
-                }
+                if (iframe.parentNode) iframe.parentNode.removeChild(iframe);
             }, 3000);
         };
 
         iframe.onerror = () => {
-            console.error('❌ iframe 加载失败');
-            showToast('加载发帖页失败，请检查网络');
+            showToast('❌ 加载发帖页失败，请检查网络');
         };
 
         document.body.appendChild(iframe);
     }
 
-    // 主逻辑启动
+    // 主逻辑
     window.addEventListener('load', function () {
+        showToast('📌 签到助手已启动...', 1000);
+
         const now = getBeijingTime();
         const timeStr = now.toTimeString().split(' ')[0];
         console.log(`⏰ [${timeStr}] 页面加载完成`);
 
         if (hasSignedToday()) {
-            console.log('ℹ️ 今日已签到，跳过');
+            console.log('✅ 今日已完成');
+            showToast('✅ 今日任务已完成', 2000);
             return;
         }
 
         if (!isAfterSixAM()) {
-            console.log('💤 早于6:00，暂不执行');
+            console.log('💤 早于6:00');
+            showToast('⏰ 6点前不执行', 2000);
             return;
         }
 
-        console.log('🚀 开始执行签到流程...');
+        console.log('🚀 开始签到流程');
         setTimeout(fetchFormHashAndPost, 800);
     });
 
