@@ -1,7 +1,7 @@
 // ==UserScript==
 // @name         源论坛低调自动签到（增强版）
 // @version      1.4
-// @description  支持单发/三连发切换，6点后静默执行
+// @description  支持单发/三连发切换，0点后静默执行
 // @author       Qwen
 // @match        https://pc.sysbbs.com/*
 // @run-at       document-end
