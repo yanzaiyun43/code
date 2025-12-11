@@ -1,7 +1,7 @@
 // ==UserScript==
-// @name         源论坛低调自动签到（带反馈）
-// @version      1.5
-// @description  全程 toast 提示，操作可见更安心
+// @name         源论坛低调自动签到（可视化反馈版）
+// @version      1.6
+// @description  带网页内弹窗提示，每一步都看得见
 // @author       Qwen
 // @match        https://pc.sysbbs.com/*
 // @run-at       document-end
@@ -15,12 +15,73 @@
     const POST_URL = `https://pc.sysbbs.com/forum.php?mod=post&action=newthread&fid=${FID}`;
 
     // ⚙️ 【开关】是否启用三连发
-    const ENABLE_TRIPLE_POST = true; // true=连发3次 | false=只发1次
+    const ENABLE_TRIPLE_POST = true;
 
-    // 显示提示（统一函数）
-    function showToast(msg, duration = 2000) {
-        alert(`💬 ${msg}`);
-        console.log(`🎯 [签到助手] ${msg}`);
+    // 创建网页内 toast 提示框
+    let toast;
+    function createToast() {
+        if (document.getElementById('qwen-toast')) return;
+
+        toast = document.createElement('div');
+        toast.id = 'qwen-toast';
+        Object.assign(toast.style, {
+            position: 'fixed',
+            top: '20px',
+            right: '20px',
+            maxWidth: '300px',
+            backgroundColor: 'rgba(0, 0, 0, 0.85)',
+            color: '#fff',
+            padding: '12px 16px',
+            borderRadius: '8px',
+            fontSize: '14px',
+            fontFamily: 'sans-serif',
+            zIndex: '999999',
+            boxShadow: '0 4px 12px rgba(0,0,0,0.2)',
+            transition: 'opacity 0.3s ease',
+            lineHeight: '1.5'
+        });
+        toast.textContent = '📌 正在初始化...';
+        document.body.appendChild(toast);
+
+        // 3秒后淡出（可被后续更新覆盖）
+        setTimeout(() => {
+            if (toast) {
+                toast.style.opacity = '0';
+                toast.style.transition = 'opacity 0.5s ease';
+                setTimeout(() => {
+                    if (toast && toast.parentNode) {
+                        toast.parentNode.removeChild(toast);
+                    }
+                }, 500);
+            }
+        }, 3000);
+    }
+
+    // 更新提示内容（保留元素，更新文字）
+    function updateToast(msg) {
+        if (!toast || !document.body.contains(toast)) {
+            createToast();
+            setTimeout(() => {
+                if (toast) toast.textContent = msg;
+            }, 100);
+        } else {
+            toast.textContent = msg;
+            toast.style.opacity = '1';
+            // 取消之前的隐藏
+            clearTimeout(window.qwen_toast_timeout);
+        }
+
+        window.qwen_toast_timeout = setTimeout(() => {
+            if (toast) {
+                toast.style.opacity = '0';
+                setTimeout(() => {
+                    if (toast && toast.parentNode) {
+                        toast.parentNode.removeChild(toast);
+                        toast = null;
+                    }
+                }, 500);
+            }
+        }, 3000);
     }
 
     // 获取北京时间
@@ -114,38 +175,39 @@
         xhr.onreadystatechange = function () {
             if (xhr.readyState === 4) {
                 if (xhr.status === 200) {
-                    console.log(`✅ 第 ${index + 1} 次发帖成功`);
-                    showToast(`✅ 第${index + 1}/${totalCount}次 ✔`, 1500);
+                    updateToast(`✅ 第${index + 1}/${totalCount}次 ✔`);
+                    console.log(`✅ 第 ${index + 1} 次成功:`, title);
 
                     if (ENABLE_TRIPLE_POST && index < 2) {
                         const delay = 1500 + Math.random() * 1000;
                         setTimeout(() => sendLowProfilePost(formhashValue, index + 1), delay);
                     } else {
                         markAsSigned();
-                        showToast(`🎉 今日签到完成！共${totalCount}贴`, 3000);
+                        updateToast(`🎉 今日签到完成！共${totalCount}帖`);
                     }
                 } else {
+                    updateToast(`❌ 第${index+1}次失败`);
                     console.error(`❌ 第 ${index + 1} 次失败:`, xhr.status);
-                    showToast(`❌ 第${index+1}次失败`, 2000);
-                    markAsSigned(); // 避免重复触发
+                    markAsSigned();
                 }
             }
         };
 
         xhr.onerror = () => {
+            updateToast('⚠️ 网络错误或中断');
             console.error('📡 网络异常');
-            showToast('⚠️ 网络错误或连接中断');
             markAsSigned();
         };
 
         console.log(`📤 发送第 ${index + 1} 条:`, title);
-        showToast(`📤 第${index + 1}次发送中...`, 1000);
+        updateToast(`📤 第${index + 1}次发送中...`);
         xhr.send(Object.keys(data).map(k => `${k}=${encodeURIComponent(data[k])}`).join('&'));
     }
 
     // 创建 iframe 获取 formhash
     function fetchFormHashAndPost() {
-        showToast('🔍 正在加载发帖页...', 1500);
+        updateToast('🔍 正在加载发帖页...');
+        console.log('📥 开始创建 iframe 获取 formhash');
 
         const iframe = document.createElement('iframe');
         iframe.style.display = 'none';
@@ -157,14 +219,14 @@
                 const input = doc.querySelector('input[name="formhash"]');
                 if (input && input.value) {
                     console.log('✅ 成功获取 formhash');
-                    showToast('🔐 表单已就绪，开始发帖', 1500);
+                    updateToast('🔐 表单已就绪，开始发帖');
                     sendLowProfilePost(input.value, 0);
                 } else {
-                    showToast('⚠️ 未找到 formhash，请手动进入发帖页一次');
+                    updateToast('⚠️ 未找到 formhash，请手动进入一次发帖页');
                 }
             } catch (err) {
                 console.error('🚫 读取失败:', err);
-                showToast('⛔ 安全限制？请检查登录状态');
+                updateToast('⛔ 跨域限制？请检查登录状态');
             }
 
             setTimeout(() => {
@@ -173,7 +235,7 @@
         };
 
         iframe.onerror = () => {
-            showToast('❌ 加载发帖页失败，请检查网络');
+            updateToast('❌ 加载失败，请检查网络');
         };
 
         document.body.appendChild(iframe);
@@ -181,7 +243,8 @@
 
     // 主逻辑
     window.addEventListener('load', function () {
-        showToast('📌 签到助手已启动...', 1000);
+        createToast(); // 立即创建
+        updateToast('📌 签到助手已激活');
 
         const now = getBeijingTime();
         const timeStr = now.toTimeString().split(' ')[0];
@@ -189,17 +252,18 @@
 
         if (hasSignedToday()) {
             console.log('✅ 今日已完成');
-            showToast('✅ 今日任务已完成', 2000);
+            updateToast('✅ 今日任务已完成');
             return;
         }
 
         if (!isAfterSixAM()) {
             console.log('💤 早于6:00');
-            showToast('⏰ 6点前不执行', 2000);
+            updateToast('⏰ 6点前不执行');
             return;
         }
 
         console.log('🚀 开始签到流程');
+        updateToast('🚀 开始自动签到流程...');
         setTimeout(fetchFormHashAndPost, 800);
     });
 
