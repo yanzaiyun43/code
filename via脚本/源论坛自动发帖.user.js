@@ -1,7 +1,7 @@
 // ==UserScript==
-// @name         源论坛自动签到（Via兼容版 + Toast提示）
-// @version      1.1
-// @description  打开网页时自动检查：若≥9点且未签到，则执行3次签到；若已签到则弹出Toast提示。
+// @name         源论坛静默自动签到
+// @version      1.0
+// @description  不跳转页面，后台自动完成签到发帖
 // @author       Qwen
 // @match        https://pc.sysbbs.com/*
 // @run-at       document-end
@@ -11,95 +11,50 @@
 (function () {
     'use strict';
 
-    // 配置
-    const SIGN_COUNT = 3;
-    const INTERVAL_MS = 2500;
-    const TARGET_HOUR = 9;
+    const FID = 140; // 论坛分区 ID
+    const POST_URL = `https://pc.sysbbs.com/forum.php?mod=post&action=newthread&fid=${FID}`;
+    const CHECKIN_TITLES = [
+        '【打卡】每日签到',
+        '【打卡】每日签到',
+        '【打卡】每日签到'
+    ];
 
-    // ====== 新增：Toast 提示函数 ======
-    function showToast(message, type) {
-        // 防止重复创建
-        var existing = document.getElementById('sysbbs-toast');
-        if (existing) existing.remove();
-
-        var toast = document.createElement('div');
-        toast.id = 'sysbbs-toast';
-        toast.innerText = message;
-        toast.style.cssText = `
-            position: fixed;
-            bottom: 20px;
-            right: 20px;
-            background: ${type === 'success' ? '#4CAF50' : '#f44336'};
-            color: white;
-            padding: 10px 16px;
-            border-radius: 6px;
-            font-size: 14px;
-            z-index: 2147483647;
-            max-width: 80%;
-            text-align: center;
-            box-shadow: 0 4px 12px rgba(0,0,0,0.2);
-            opacity: 0;
-            transform: translateY(20px);
-            transition: opacity 0.3s, transform 0.3s;
-        `;
-
-        document.body.appendChild(toast);
-
-        // 触发淡入
-        setTimeout(function() {
-            toast.style.opacity = '1';
-            toast.style.transform = 'translateY(0)';
-        }, 10);
-
-        // 2秒后淡出并移除
-        setTimeout(function() {
-            toast.style.opacity = '0';
-            toast.style.transform = 'translateY(20px)';
-            setTimeout(function() {
-                if (toast.parentNode) {
-                    toast.parentNode.removeChild(toast);
-                }
-            }, 300);
-        }, 2000);
+    // 获取北京时间日期字符串 YYYY-MM-DD
+    function getBeijingDate() {
+        const now = new Date(new Date().toLocaleString("en-US", { timeZone: "Asia/Shanghai" }));
+        return now.getFullYear() + '-' +
+            String(now.getMonth() + 1).padStart(2, '0') + '-' +
+            String(now.getDate()).padStart(2, '0');
     }
 
-    // 获取北京时间
-    function getBeijingTime() {
-        return new Date(new Date().toLocaleString("en-US", { timeZone: "Asia/Shanghai" }));
+    // 是否已签到
+    function hasSignedToday() {
+        return localStorage.getItem('sysbbs_last_sign_date') === getBeijingDate();
     }
 
-    // 序列化表单数据
-    function serialize(data) {
-        var pairs = [];
-        for (var key in data) {
-            if (data.hasOwnProperty(key)) {
-                pairs.push(encodeURIComponent(key) + '=' + encodeURIComponent(data[key]));
-            }
-        }
-        return pairs.join('&');
+    // 标记已签到
+    function markAsSigned() {
+        localStorage.setItem('sysbbs_last_sign_date', getBeijingDate());
     }
 
-    // 获取 formhash
-    function getFormHash() {
-        var inputs = document.getElementsByName('formhash');
-        if (inputs.length > 0) {
-            return inputs[0].value;
-        }
-        return 'a217dd31'; // fallback
+    // 显示 Toast（兼容安卓）
+    function showToast(msg) {
+        alert(`✅ 源论坛签到助手：${msg}`);
+        console.log(`🎯 [签到助手] ${msg}`);
     }
 
-    // 单次签到（XMLHttpRequest）
-    function signOnce(index, callback) {
-        var xhr = new XMLHttpRequest();
-        var url = 'https://pc.sysbbs.com/forum.php?mod=post&action=newthread&fid=140&extra=&topicsubmit=yes&mobile=2&handlekey=postform&inajax=1';
+    // 发送签到帖
+    function sendCheckInPost(formhashValue, index) {
+        const title = CHECKIN_TITLES[index];
+        const message = `这是第 ${index + 1} 次自动签到帖，来自 Via 浏览器后台任务 🚀`;
 
-        var data = {
-            'formhash': getFormHash(),
+        const data = {
+            'formhash': formhashValue,
             'posttime': Math.floor(Date.now() / 1000),
             'delete': '0',
             'topicsubmit': 'yes',
-            'subject': '签到',
-            'message': '今日签到第' + index + '次',
+            'subject': title,
+            'message': message,
             'replycredit_extcredits': '0',
             'replycredit_times': '1',
             'replycredit_membertimes': '1',
@@ -112,80 +67,91 @@
             'usesig': '1'
         };
 
+        const xhr = new XMLHttpRequest();
+        const url = POST_URL + '&extra=&mobile=2&handlekey=postform&inajax=1';
+
         xhr.open('POST', url, true);
         xhr.setRequestHeader('Content-Type', 'application/x-www-form-urlencoded; charset=UTF-8');
         xhr.setRequestHeader('X-Requested-With', 'XMLHttpRequest');
         xhr.setRequestHeader('Origin', 'https://pc.sysbbs.com');
-        xhr.setRequestHeader('Referer', 'https://pc.sysbbs.com/forum.php?mod=post&action=newthread&fid=140');
+        xhr.setRequestHeader('Referer', POST_URL);
 
         xhr.onreadystatechange = function () {
             if (xhr.readyState === 4) {
-                if (xhr.status >= 200 && xhr.status < 300) {
-                    console.log('✅ 第 ' + index + ' 次签到成功');
-                    callback(null);
+                if (xhr.status === 200) {
+                    console.log(`第 ${index + 1} 次打卡签到`);
+                    if (index < 2) {
+                        setTimeout(() => sendCheckInPost(formhashValue, index + 1), 1500); // 间隔 1.5s
+                    } else {
+                        markAsSigned();
+                        showToast('签到完成！共发布 3 条签到帖');
+                    }
                 } else {
-                    console.error('❌ 第 ' + index + ' 次失败，状态码:', xhr.status);
-                    callback(new Error('HTTP ' + xhr.status));
+                    console.error(`❌ 第 ${index + 1} 次发帖失败`, xhr.status, xhr.responseText);
+                    showToast(`部分失败，状态码: ${xhr.status}`);
                 }
             }
         };
 
-        xhr.send(serialize(data));
+        xhr.onerror = () => {
+            console.error('📡 发帖请求出错');
+            showToast('网络错误');
+        };
+
+        console.log('📤 正在发送:', title);
+        xhr.send(Object.keys(data).map(k => `${k}=${encodeURIComponent(data[k])}`).join('&'));
     }
 
-    // 执行3次签到
-    function doSignThreeTimes(count) {
-        if (count > SIGN_COUNT) {
-            var today = getBeijingTime().toISOString().split('T')[0];
-            localStorage.setItem('sysbbs_sign_done', today);
-            showToast('✅ 今日签到已完成！', 'success');
-            console.log('📌 源论坛：今日3次签到已完成');
-            return;
-        }
+    // 创建隐藏 iframe 获取 formhash 并发帖
+    function fetchFormHashAndPost() {
+        const iframe = document.createElement('iframe');
+        iframe.style.display = 'none';
+        iframe.src = POST_URL;
 
-        signOnce(count, function (err) {
-            if (err) {
-                console.warn('⚠️ 第 ' + count + ' 次失败，但仍继续下一次');
+        iframe.onload = function () {
+            try {
+                const doc = iframe.contentDocument || iframe.contentWindow.document;
+                const input = doc.querySelector('input[name="formhash"]');
+                if (input && input.value) {
+                    console.log('✅ 成功从 iframe 获取 formhash:', input.value);
+                    sendCheckInPost(input.value, 0); // 开始第一次发帖
+                } else {
+                    console.warn('⚠️ iframe 中未找到 formhash 元素');
+                    showToast('获取 formhash 失败，请进入发帖页一次');
+                }
+            } catch (err) {
+                console.error('🚫 跨域错误？', err);
+                showToast('无法读取 iframe 内容（可能是安全策略）');
             }
-            setTimeout(function () {
-                doSignThreeTimes(count + 1);
-            }, INTERVAL_MS);
-        });
+            // 移除 iframe
+            setTimeout(() => {
+                if (iframe && iframe.parentNode) {
+                    iframe.parentNode.removeChild(iframe);
+                }
+            }, 3000);
+        };
+
+        iframe.onerror = () => {
+            console.error('❌ iframe 加载失败');
+            showToast('加载发帖页失败');
+        };
+
+        document.body.appendChild(iframe);
     }
 
-    // 主逻辑
-    function checkAndRun() {
-        var now = getBeijingTime();
-        var today = now.toISOString().split('T')[0];
-        var lastDone = localStorage.getItem('sysbbs_sign_done');
-        var hour = now.getHours();
-
-        // ✅ 关键新增：如果已签到，弹出 Toast 并退出
-        if (lastDone === today) {
-            console.log('ℹ️ 源论坛：今日已签到，跳过');
-            showToast('已经签到，不再签到', 'info'); // ←←← 就是你想要的！
+    // 主逻辑启动
+    window.addEventListener('load', function () {
+        if (hasSignedToday()) {
+            console.log('ℹ️ 今日已签到，跳过');
+            // showToast('已经签到，不再执行');
             return;
         }
 
-        if (hour < TARGET_HOUR) {
-            console.log('⏳ 源论坛：未到 ' + TARGET_HOUR + ' 点，当前时间 ' + now.toLocaleTimeString());
-            return;
-        }
-
-        if (!document.body) {
-            setTimeout(checkAndRun, 500);
-            return;
-        }
-
-        console.log('🔔 源论坛：满足条件，开始3次签到...');
-        doSignThreeTimes(1);
-    }
-
-    // 启动
-    if (document.readyState === 'loading') {
-        window.addEventListener('DOMContentLoaded', checkAndRun);
-    } else {
-        checkAndRun();
-    }
+        // 延迟一点确保页面稳定
+        setTimeout(() => {
+            console.log('🔍 开始尝试静默签到...');
+            fetchFormHashAndPost();
+        }, 1000);
+    });
 
 })();
