@@ -1,7 +1,7 @@
 // ==UserScript==
-// @name         源论坛全能助手（全站可见版）
-// @version      2.2
-// @description  主页也能看到运行状态！智能判断签到+发帖全流程
+// @name         源论坛助手
+// @version      3.0
+// @description  6点后自动签到+发3帖，内容随机不重复
 // @author       Qwen ❤️
 // @match        https://pc.sysbbs.com/*
 // @run-at       document-end
@@ -11,16 +11,18 @@
 (function () {
     'use strict';
 
-    const FID = 140;
+    const FID = 140; // 论坛分区 ID，请根据实际调整
     const SIGN_PLUGIN_URL = 'https://pc.sysbbs.com/plugin.php?id=k_misign:sign';
+    const POST_URL = `https://pc.sysbbs.com/forum.php?mod=post&action=newthread&fid=${FID}`;
     const TRIPLE_POST_COUNT = 3;
 
-    // ===== 是否6点后？=====
+    // ===== 时间判断：是否 ≥ 北京时间 6:00 =====
     function isAfterSixAM() {
         const now = new Date(new Date().toLocaleString("en-US", { timeZone: "Asia/Shanghai" }));
         return now.getHours() > 6 || (now.getHours() === 6 && now.getMinutes() >= 0);
     }
 
+    // ===== 今日签到标记 key =====
     function getTodayKey() {
         const d = new Date(new Date().toLocaleString("en-US", { timeZone: "Asia/Shanghai" }));
         return `signed_${d.getFullYear()}-${d.getMonth()+1}-${d.getDate()}`;
@@ -30,7 +32,11 @@
         return localStorage.getItem(getTodayKey()) === '1';
     }
 
-    // ===== 创建全局 Toast =====
+    function markAsSigned() {
+        localStorage.setItem(getTodayKey(), '1');
+    }
+
+    // ===== Toast 提示系统 =====
     let toast;
     function showStatus(msg, type = 'info') {
         if (toast && document.body.contains(toast)) {
@@ -65,7 +71,7 @@
         }, 5000);
     }
 
-    // ===== 获取 formhash =====
+    // ===== 获取 formhash（用于签到和发帖）=====
     function getFormHashFromPage(callback) {
         const xhr = new XMLHttpRequest();
         xhr.open('GET', SIGN_PLUGIN_URL, true);
@@ -75,6 +81,7 @@
                 const match = html.match(/name="formhash" value="([a-zA-Z0-9]+)"/);
                 callback(match ? match[1] : null);
             } else {
+                console.warn('⚠️ 请求签到页失败:', xhr.status);
                 callback(null);
             }
         };
@@ -82,64 +89,132 @@
         xhr.send();
     }
 
-    // ===== 真实签到 =====
+    // ===== 执行真实签到 =====
     function doRealSign(callback) {
+        showStatus('🔔 正在尝试真实签到...', 'info');
+
         getFormHashFromPage(formhash => {
-            if (!formhash) return callback(false);
+            if (!formhash) {
+                showStatus('⚠️ 无法获取 formhash，跳过签到', 'warn');
+                callback(false);
+                return;
+            }
 
             const url = `${SIGN_PLUGIN_URL}&operation=qiandao&format=text&formhash=${formhash}`;
+
             const xhr = new XMLHttpRequest();
             xhr.open('GET', url, true);
             xhr.setRequestHeader('X-Requested-With', 'XMLHttpRequest');
             xhr.setRequestHeader('Accept', 'text/plain, */*; q=0.01');
+            xhr.setRequestHeader('Referer', SIGN_PLUGIN_URL);
 
             xhr.onreadystatechange = function () {
                 if (xhr.readyState === 4) {
-                    if (xhr.status === 200 && xhr.responseText.includes('success')) {
-                        const reward = xhr.responseText.split('\t')[2] || '获得奖励';
-                        showStatus(`🎉 签到成功！${reward.replace(/\n/g, ' ')}`, 'success');
-                        localStorage.setItem(getTodayKey(), '1');
-                        callback(true);
-                    } else if (xhr.responseText.includes('already')) {
-                        showStatus('✅ 今日已签到', 'info');
-                        localStorage.setItem(getTodayKey(), '1');
-                        callback(true);
+                    if (xhr.status === 200) {
+                        const res = xhr.responseText;
+
+                        if (res.includes('success')) {
+                            const reward = (res.split('\t')[2] || '获得积分与经验').replace(/\n/g, ' ');
+                            showStatus(`🎉 签到成功！${reward}`, 'success');
+                            markAsSigned();
+                            callback(true);
+                        } else if (res.includes('already')) {
+                            showStatus('✅ 今日已签到', 'info');
+                            markAsSigned();
+                            callback(true);
+                        } else {
+                            showStatus('ℹ️ 可能已签或状态异常', 'info');
+                            callback(false);
+                        }
                     } else {
+                        showStatus('⚠️ 签到请求失败', 'warn');
                         callback(false);
                     }
                 }
             };
 
-            xhr.onerror = () => callback(false);
+            xhr.onerror = () => {
+                showStatus('⚠️ 网络异常，跳过签到', 'warn');
+                callback(false);
+            };
+
             xhr.send();
         });
     }
 
-    // ===== 发三帖（略去细节，和之前一致）=====
+    // ===== 发三篇低调帖子 =====
     function startTriplePost() {
-        showStatus('📝 开始发送3篇低调帖子...', 'info');
+        showStatus(`📝 开始发送 ${TRIPLE_POST_COUNT} 篇低调帖子...`, 'info');
 
         const iframe = document.createElement('iframe');
         iframe.style.display = 'none';
-        iframe.src = `https://pc.sysbbs.com/forum.php?mod=post&action=newthread&fid=${FID}`;
+        iframe.src = POST_URL;
 
         iframe.onload = () => {
             try {
                 const doc = iframe.contentDocument || iframe.contentWindow.document;
                 const input = doc.querySelector('input[name="formhash"]');
-                if (!input?.value) return;
+                if (!input || !input.value) {
+                    showStatus('⚠️ 无法获取发帖 formhash', 'warn');
+                    cleanup();
+                    return;
+                }
 
                 const formhashValue = input.value;
                 sendOnePost(formhashValue, 0);
-            } catch (e) {}
+            } catch (e) {
+                showStatus('⛔ 读取发帖页失败', 'warn');
+                console.error(e);
+                cleanup();
+            }
         };
 
-        function sendOnePost(formhash, index) {
-            const titles = ['今天也来了', '日常报到', '路过留个脚印'];
-            const messages = ['刷一下存在感 😄', '生活需要一点小仪式感', '默默关注中'];
+        iframe.onerror = () => {
+            showStatus('❌ 加载发帖页失败', 'warn');
+            cleanup();
+        };
 
-            const title = titles[Math.floor(Math.random() * titles.length)];
-            const message = messages[Math.floor(Math.random() * messages.length)];
+        // ===== 标题库（10个自然风格）=====
+        const TITLES = [
+            '今天也来了',
+            '日常报到',
+            '路过留个脚印',
+            '随便发个帖',
+            '平凡的一天',
+            '最近在忙啥呢',
+            '看到新帖挺多',
+            '心情不错，冒个泡',
+            '今天刷到了好东西',
+            '有点感慨，说两句'
+        ];
+
+        // ===== 内容库（20条生活化表达）=====
+        const MESSAGES = [
+            '刷一下存在感 😄 生活需要一点小仪式感',
+            '最近工作有点累，但还是来看看大家',
+            '默默关注中，偶尔冒个泡，别见怪',
+            '看到几个有意思的帖子，挺有意思',
+            '今天天气不错，心情也挺好~',
+            '好久没来了，论坛还是这么热闹',
+            '刚吃完饭，顺手打开看看有什么新鲜事',
+            '最近都在听老歌，感觉特别治愈',
+            '有时候一句话就能让人心里一暖',
+            '发现一个好用的小工具，回头分享一下',
+            '每天来一趟，像打卡一样习惯了',
+            '昨晚做了个梦，醒来还记得一点点',
+            '今天遇到件小事，还挺值得思考的',
+            '看到有人讨论读书，我也爱看书',
+            '手机相册翻到一张旧照，有点怀念',
+            '生活平平淡淡，但也挺踏实的',
+            '有时候不想说话，但发个帖就觉得安心',
+            '看到新人加入，欢迎你们呀～',
+            '最近在学做饭，终于不怕糊锅了😂',
+            '这个世界吵吵闹闹，但我喜欢这里的安静'
+        ];
+
+        function sendOnePost(formhash, index) {
+            const title = TITLES[Math.floor(Math.random() * TITLES.length)];
+            const message = MESSAGES[Math.floor(Math.random() * MESSAGES.length)];
 
             const data = {
                 formhash,
@@ -152,37 +227,53 @@
             };
 
             const params = Object.keys(data).map(k => `${k}=${encodeURIComponent(data[k])}`).join('&');
-            const url = `https://pc.sysbbs.com/forum.php?mod=post&action=newthread&fid=${FID}&extra=&mobile=2&handlekey=postform&inajax=1`;
+            const url = POST_URL + '&extra=&mobile=2&handlekey=postform&inajax=1';
 
             const xhr = new XMLHttpRequest();
             xhr.open('POST', url, true);
-            xhr.setRequestHeader('Content-Type', 'application/x-www-form-urlencoded');
+            xhr.setRequestHeader('Content-Type', 'application/x-www-form-urlencoded; charset=UTF-8');
             xhr.setRequestHeader('X-Requested-With', 'XMLHttpRequest');
 
             xhr.onreadystatechange = function () {
                 if (xhr.readyState === 4) {
-                    if (index < TRIPLE_POST_COUNT - 1) {
-                        setTimeout(() => sendOnePost(formhash, index + 1), 1800);
+                    if (xhr.status === 200) {
+                        showStatus(`✅ 第${index+1}/${TRIPLE_POST_COUNT}完成`);
+                        if (index < TRIPLE_POST_COUNT - 1) {
+                            setTimeout(() => sendOnePost(formhash, index + 1), 1500 + Math.random() * 1000);
+                        } else {
+                            showStatus('🎉 三帖全部完成！低调活跃达成 ✨', 'success');
+                        }
                     } else {
-                        showStatus('🎉 三帖全部完成！低调活跃达成 ✨', 'success');
+                        showStatus(`❌ 第${index+1}失败，继续下一帖`, 'warn');
+                        if (index < TRIPLE_POST_COUNT - 1) {
+                            setTimeout(() => sendOnePost(formhash, index + 1), 2000);
+                        } else {
+                            showStatus('⚠️ 部分发帖未成功，不影响整体', 'warn');
+                        }
                     }
                 }
             };
 
+            console.log(`📤 发送第 ${index + 1} 条`, { title, message });
             xhr.send(params);
         }
 
+        function cleanup() {
+            setTimeout(() => {
+                if (iframe.parentNode) iframe.remove();
+            }, 10000);
+        }
+
         document.body.appendChild(iframe);
-        setTimeout(() => { if (iframe.parentNode) iframe.remove(); }, 10000);
     }
 
-    // ===== 主流程：所有页面都能跑！=====
+    // ===== 主流程启动器 =====
     function main() {
         const now = new Date(new Date().toLocaleString("en-US", { timeZone: "Asia/Shanghai" }));
         const timeStr = now.toTimeString().slice(0, 8);
 
-        // 👇 在任何页面都显示初始状态
-        showStatus(`📌 助手启动中...\n⏰ ${timeStr}`, 'info');
+        // 👇 初始状态提示（所有页面都能看到）
+        showStatus(`📌 助手 v3.0 启动\n⏰ ${timeStr}`, 'info');
 
         // 早于6点？
         if (!isAfterSixAM()) {
@@ -198,17 +289,16 @@
         }
 
         // 否则：开始签到 + 发帖
-        showStatus('🔔 准备执行真实签到...', 'info');
         doRealSign(success => {
             setTimeout(startTriplePost, 1000);
         });
     }
 
-    // ===== 不管什么页面，加载完就运行 =====
+    // ===== 启动：确保 DOM 加载完成 =====
     if (document.readyState === 'loading') {
-        document.addEventListener('DOMContentLoaded', main);
+        document.addEventListener('DOMContentLoaded', () => setTimeout(main, 500));
     } else {
-        setTimeout(main, 500); // 确保 DOM 存在
+        setTimeout(main, 500);
     }
 
 })();
