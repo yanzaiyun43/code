@@ -1,7 +1,7 @@
 // ==UserScript==
-// @name         源论坛测试发帖脚本
-// @version      1.0
-// @description  进入页面立即发一个测试帖子，用于验证 formhash 和发帖流程是否正常
+// @name         源论坛测试发帖脚本（修复版）
+// @version      1.1
+// @description  自动等待 formhash 出现后再发帖，提高成功率
 // @author       Qwen
 // @match        https://pc.sysbbs.com/*
 // @run-at       document-end
@@ -11,12 +11,10 @@
 (function () {
     'use strict';
 
-    // 获取北京时间作为时间戳
     function getBeijingTime() {
         return new Date(new Date().toLocaleString("en-US", { timeZone: "Asia/Shanghai" }));
     }
 
-    // 格式化时间为 YYYY-MM-DD HH:MM
     function formatTime(date) {
         return date.getFullYear() + '-' +
             String(date.getMonth() + 1).padStart(2, '0') + '-' +
@@ -25,29 +23,24 @@
             String(date.getMinutes()).padStart(2, '0');
     }
 
-    // 获取 formhash
     function getFormHash() {
         const input = document.querySelector('input[name="formhash"]');
-        if (input) return input.value;
-        console.warn('⚠️ 未找到 formhash 元素！');
-        return 'a217dd31'; // fallback
+        return input ? input.value : null;
     }
 
-    // 序列化表单数据
     function serialize(data) {
         return Object.keys(data)
             .map(key => encodeURIComponent(key) + '=' + encodeURIComponent(data[key]))
             .join('&');
     }
 
-    // 发送测试帖子
     function sendTestPost() {
         const now = getBeijingTime();
         const title = `[测试] 自动发帖成功 - ${formatTime(now)}`;
-        const message = `这是 Via 浏览器自动签到测试帖，formhash 已获取 ✔\n当前时间：${formatTime(now)}\n设备：Via 浏览器`;
+        const message = `这是 Via 浏览器自动签到测试帖 ✔\n当前时间：${formatTime(now)}\n设备：Via`;
 
         const data = {
-            'formhash': getFormHash(),
+            'formhash': 'a217dd31', // 兜底值（不推荐长期使用）
             'posttime': Math.floor(Date.now() / 1000),
             'delete': '0',
             'topicsubmit': 'yes',
@@ -77,23 +70,49 @@
         xhr.onreadystatechange = function () {
             if (xhr.readyState === 4) {
                 if (xhr.status >= 200 && xhr.status < 300) {
-                    console.log('🎉 测试发帖成功！响应：', xhr.responseText.substring(0, 100));
-                    alert('✅ 测试发帖成功！请查看论坛新帖');
+                    console.log('🎉 成功响应片段:', xhr.responseText.substring(0, 150));
+                    alert('✅ 发帖成功！查看新帖');
                 } else {
-                    console.error('❌ 测试发帖失败，状态码：', xhr.status, xhr.statusText);
-                    alert('❌ 发帖失败，检查控制台日志');
+                    console.error('❌ HTTP 错误:', xhr.status, xhr.statusText);
+                    alert(`❌ 发帖失败，状态码: ${xhr.status}`);
                 }
             }
+        };
+
+        xhr.onerror = function () {
+            console.error('📡 网络请求失败（网络错误）');
+            alert('❌ 网络错误，请检查连接');
         };
 
         xhr.send(serialize(data));
     }
 
-    // 页面加载完成后执行
+    // ===== 核心改进：轮询等待 formhash =====
+    function waitForFormHash(attempt = 1, maxAttempts = 10, interval = 300) {
+        if (attempt > maxAttempts) {
+            console.warn('⚠️ 尝试了 10 次仍未找到 formhash，使用默认值继续');
+            alert('⚠️ 未找到 formhash，使用备用值发送（可能失败）');
+            sendTestPost();
+            return;
+        }
+
+        const hashInput = document.querySelector('input[name="formhash"]');
+        if (hashInput && hashInput.value) {
+            console.log(`✅ 第 ${attempt} 次尝试：成功获取 formhash =`, hashInput.value);
+            sendTestPost();
+        } else {
+            console.log(`⏳ 第 ${attempt} 次尝试：未找到 formhash，${interval}ms 后重试...`);
+            setTimeout(() => waitForFormHash(attempt + 1, maxAttempts, interval), interval);
+        }
+    }
+
+    // 页面加载后开始轮询
     if (document.readyState === 'loading') {
-        window.addEventListener('DOMContentLoaded', sendTestPost);
+        window.addEventListener('DOMContentLoaded', () => {
+            setTimeout(waitForFormHash, 500); // 给 DOM 多一点时间
+        });
     } else {
-        setTimeout(sendTestPost, 500); // 稍等确保 DOM 加载
+        setTimeout(waitForFormHash, 500);
     }
 
 })();
