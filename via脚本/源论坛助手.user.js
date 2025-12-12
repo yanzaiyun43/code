@@ -1,8 +1,8 @@
 // ==UserScript==
-// @name         SysBBS 签到+三贴（去叠加+真成功判断）
+// @name         SysBBS 签到+三贴（100%成功判断）
 // @namespace    http://tampermonkey.net/
-// @version      1.4
-// @description  每天自动签到+发3帖；消息不叠加；正确识别发帖成功
+// @version      1.5
+// @description  每天自动签到+发3帖；消息不叠加；tid= 判定发帖成功
 // @author       You
 // @match        *://pc.sysbbs.com/*
 // @grant        GM_setValue
@@ -47,7 +47,7 @@
     if (!GM_getValue(KEY_QD, false)) {
         showMsg('正在签到…');
         const qdOK = qianDao(formhash);
-        GM_setValue(KEY_QD, true);          // 无论成功都标记已试
+        GM_setValue(KEY_QD, true);
         showMsg(qdOK ? '签到成功' : '签到失败（可能已签到）', qdOK ? '#090' : '#f90');
     } else { showMsg('今日已签到，跳过'); }
 
@@ -88,7 +88,7 @@
             xhr.setRequestHeader('X-Requested-With', 'XMLHttpRequest');
             xhr.send();
             const r = xhr.responseText;
-            return r.includes('已签到') || r.includes('succeed') || r.includes('成功');
+            return r.includes('已签到') || r.includes('tid=') || r.includes('succeed');
         } catch (e) { console.error(e); return false; }
     }
 
@@ -99,8 +99,8 @@
             xhr.setRequestHeader('Content-Type', 'application/x-www-form-urlencoded');
             xhr.send(Object.keys(data).map(k => `${k}=${encodeURIComponent(data[k])}`).join('&'));
             const r = xhr.responseText;
-            // 真成功标志
-            return /succeed|thread|viewthread/.test(r) || r.includes('成功');
+            /* *******  关键判断  ******* */
+            return r.includes('tid=');   // 只要返回里出现 tid= 就是成功
         } catch (e) { console.error(e); return false; }
     }
 })();
