@@ -1,9 +1,9 @@
 // ==UserScript==
-// @name         VConsole开关控制
+// @name         VConsole中文面板开关
 // @namespace    http://tampermonkey.net/
-// @version      0.2
-// @description  手动开关控制注入VConsole调试工具
-// @author       You
+// @version      0.4
+// @description  注入带中文界面的VConsole，支持手动开关
+// @author       自定义
 // @match        *://*/*
 // @grant        none
 // ==/UserScript==
@@ -11,8 +11,8 @@
 (function() {
     'use strict';
 
-    // 创建开关按钮样式
-    const btnStyle = `
+    // 开关按钮样式
+    const 按钮样式 = `
         position: fixed;
         top: 20px;
         right: 20px;
@@ -29,32 +29,44 @@
     `;
 
     // 创建开关按钮
-    const toggleBtn = document.createElement('button');
-    toggleBtn.style = btnStyle;
-    toggleBtn.textContent = '开启VConsole';
-    toggleBtn.id = 'vconsole-toggle';
-    document.body.appendChild(toggleBtn);
+    const 开关按钮 = document.createElement('button');
+    开关按钮.style = 按钮样式;
+    开关按钮.textContent = '开启调试面板';
+    document.body.appendChild(开关按钮);
 
-    let vConsoleInstance = null;
+    let 调试面板实例 = null;
+
+    // 加载中文语言包并初始化VConsole
+    function 加载中文VConsole() {
+        // 先加载VConsole主脚本
+        const vConsoleScript = document.createElement('script');
+        vConsoleScript.src = 'https://unpkg.com/vconsole@latest/dist/vconsole.min.js';
+        vConsoleScript.onload = function() {
+            // 再加载中文语言包
+            const langScript = document.createElement('script');
+            langScript.src = 'https://unpkg.com/vconsole@latest/dist/lang/zh-CN.js';
+            langScript.onload = function() {
+                // 初始化并指定中文语言
+                调试面板实例 = new window.VConsole({
+                    lang: 'zh-CN' // 设置为中文
+                });
+                开关按钮.textContent = '关闭调试面板';
+                开关按钮.style.background = '#f56c6c';
+            };
+            document.head.appendChild(langScript);
+        };
+        document.head.appendChild(vConsoleScript);
+    }
 
     // 按钮点击事件
-    toggleBtn.addEventListener('click', function() {
-        if (!vConsoleInstance) {
-            // 加载VConsole脚本并初始化
-            const script = document.createElement('script');
-            script.src = 'https://unpkg.com/vconsole@latest/dist/vconsole.min.js';
-            script.onload = function() {
-                vConsoleInstance = new window.VConsole();
-                toggleBtn.textContent = '关闭VConsole';
-                toggleBtn.style.background = '#f56c6c';
-            };
-            document.head.appendChild(script);
+    开关按钮.addEventListener('click', function() {
+        if (!调试面板实例) {
+            加载中文VConsole();
         } else {
-            // 销毁VConsole实例
-            vConsoleInstance.destroy();
-            vConsoleInstance = null;
-            toggleBtn.textContent = '开启VConsole';
-            toggleBtn.style.background = '#409eff';
+            调试面板实例.destroy();
+            调试面板实例 = null;
+            开关按钮.textContent = '开启调试面板';
+            开关按钮.style.background = '#409eff';
         }
     });
 })();
