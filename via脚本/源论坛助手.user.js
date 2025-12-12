@@ -1,8 +1,8 @@
 // ==UserScript==
-// @name         源论坛助手 v3.9
+// @name         源论坛助手 v3.9.1
 // @namespace    http://tampermonkey.net/
-// @version      3.9
-// @description  签到+三帖连发｜智能解析XML｜进度全程可见
+// @version      3.9.1
+// @description  签到+三帖连发｜智能解析XML｜进度真实反馈
 // @author       Qwen
 // @match        https://pc.sysbbs.com/*
 // @run-at       document-idle
@@ -240,12 +240,22 @@ formhash: ${hashDisplay}
         }
     }
 
-    // ===== 真实签到请求（v3.9 智能解析XML）=====
+    // ===== 截断长文本用于显示 =====
+    function truncateText(str, len) {
+        return str.length > len ? str.slice(0, len) + '...' : str;
+    }
+
+    // ===== 真实签到请求（v3.9.1 智能判断发帖状态）=====
     function doSign(formhash) {
         if (!formhash) {
             showStatus('❌ 签到失败：formhash 为空', 'error');
             return;
         }
+
+        // ✅ 提前检测：今日是否已发过帖？
+        const lastPostTime = localStorage.getItem('qwen_last_post_time');
+        const today = new Date().toDateString();
+        const hasPostedToday = lastPostTime && new Date(parseInt(lastPostTime)).toDateString() === today;
 
         const xhr = new XMLHttpRequest();
         const url = `${SITE_URL}/plugin.php?id=k_misign:sign&operation=qiandao&format=text&formhash=${formhash}`;
@@ -270,12 +280,24 @@ formhash: ${hashDisplay}
                     const reward = extractReward(rawRes) || '星币+1';
                     console.log(`[签到成功] ${reward}`);
                     showStatus(`🎉 签到成功：${reward}`, 'success');
-                    startTriplePost(); // ✅ 启动发帖
+
+                    if (hasPostedToday) {
+                        showStatus('✨ 今日任务全达标！签到+发帖已完成 💯', 'success');
+                    } else {
+                        showStatus('📝 准备启动三篇低调帖子...', 'info');
+                        startTriplePost();
+                    }
                 }
                 else if (/今日已签|已经签到|重复操作|重复签到/i.test(statusText)) {
                     console.log('[签到] 今日已完成');
                     showStatus('📅 今日已签到，无需重复', 'info');
-                    startTriplePost(); // 即使已签也检查发帖
+
+                    if (hasPostedToday) {
+                        showStatus('💬 并且三帖也已完成，今日活跃完美收官 🎉', 'info');
+                    } else {
+                        showStatus('📝 准备补上三篇低调帖子...', 'info');
+                        startTriplePost();
+                    }
                 }
                 else if (xhr.status !== 200) {
                     showStatus('⚠️ 网络异常，签到请求失败', 'error');
@@ -296,15 +318,9 @@ formhash: ${hashDisplay}
         return null;
     }
 
-    // ===== 截断长文本用于显示 =====
-    function truncateText(str, len) {
-        return str.length > len ? str.slice(0, len) + '...' : str;
-    }
-
     // ===== 发帖函数 · 三篇随机内容（带完整提示）=====
     function startTriplePost() {
         const lastPostTime = localStorage.getItem('qwen_last_post_time');
-        const now = Date.now();
         const today = new Date().toDateString();
 
         if (lastPostTime && new Date(parseInt(lastPostTime)).toDateString() === today) {
@@ -313,7 +329,8 @@ formhash: ${hashDisplay}
             return;
         }
 
-        showStatus(`📝 开始发送 ${TRIPLE_POST_COUNT} 篇低调帖子...`, 'info');
+        // ✅ 只有真正开始第一篇时才提示
+        showStatus(`🚀 正在发布第1/${TRIPLE_POST_COUNT}篇...`, 'info');
 
         const iframe = document.createElement('iframe');
         iframe.style.display = 'none';
