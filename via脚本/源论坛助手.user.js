@@ -1,9 +1,9 @@
 // ==UserScript==
-// @name         源论坛助手 v3.7
+// @name         源论坛助手 v3.8
 // @namespace    http://tampermonkey.net/
-// @version      3.7
-// @description  签到+三帖连发｜智能获取formhash｜带状态提示和调试按钮
-// @author       Qwen
+// @version      3.8
+// @description  签到+三帖连发｜智能获取formhash｜精准识别签到状态｜
+// @author       Qwen 守护你 ❤️
 // @match        https://pc.sysbbs.com/*
 // @run-at       document-idle
 // @grant        none
@@ -127,16 +127,16 @@
         document.body.appendChild(QWEN_UI.button);
     }
 
-    // ===== 判断是否已签到过 =====
+    // ===== 判断是否已签到过（页面文本检测）=====
     function isAlreadySigned() {
         const pageText = document.body.innerText;
         const alreadySignIndicators = ['已签到', '今日已到', '签过啦', '明天再来', '连续签到'];
         return alreadySignIndicators.some(text => pageText.includes(text));
     }
 
-    // ===== 智能获取 formhash（v3.7 多源探测）=====
+    // ===== 智能获取 formhash（v3.8 多源探测增强版）=====
     function getFormHash(callback) {
-        // ✅ 方法 1：从页面链接中提取 formhash
+        // ✅ 方法 1：从链接中提取 formhash
         const links = document.querySelectorAll('a[href*="formhash="]');
         for (let link of links) {
             const href = link.href;
@@ -150,7 +150,7 @@
             }
         }
 
-        // ✅ 方法 2：查找隐藏输入框 <input name="formhash">
+        // ✅ 方法 2：查找隐藏输入框
         const input = document.querySelector('input[name="formhash"]');
         if (input?.value) {
             console.log('[Qwen] 从 input 元素获取 formhash:', input.value);
@@ -174,7 +174,7 @@
             }
         }
 
-        // ⚠️ 方法 4：最后使用 iframe 回退加载签到页
+        // ⚠️ 方法 4：iframe 回退加载签到页
         showStatus('🔄 当前页未找到，尝试 iframe 加载...', 'warn');
 
         const iframe = document.createElement('iframe');
@@ -222,7 +222,22 @@
         document.body.appendChild(iframe);
     }
 
-    // ===== 真实签到请求 =====
+    // ===== 解析 XML 响应中的 CDATA 内容 =====
+    function parseXmlResponse(text) {
+        try {
+            const parser = new DOMParser();
+            const doc = parser.parseFromString(text, 'text/xml');
+            const root = doc.querySelector('root');
+            if (root) {
+                return root.textContent.trim();
+            }
+            return text; // fallback
+        } catch (e) {
+            return text;
+        }
+    }
+
+    // ===== 真实签到请求（v3.8 智能解析XML）=====
     function doSign(formhash) {
         if (!formhash) {
             showStatus('❌ 签到失败：formhash 为空', 'error');
@@ -236,28 +251,56 @@
         xhr.withCredentials = true;
         xhr.setRequestHeader('Referer', SIGN_PAGE_URL);
         xhr.setRequestHeader('X-Requested-With', 'XMLHttpRequest');
-        xhr.setRequestHeader('Accept', 'text/plain, */*; q=0.01');
+        xhr.setRequestHeader('Accept', 'application/xml, text/xml, */*; q=0.01');
 
         xhr.onreadystatechange = () => {
             if (xhr.readyState === 4) {
-                const res = xhr.responseText.trim();
+                const rawRes = xhr.responseText.trim();
 
-                if (xhr.status === 200 && /success/.test(res)) {
-                    const rewardMatch = res.split('\t')[2];
-                    const reward = rewardMatch ? rewardMatch.replace(/\n/g, ' ') : '星币+1';
+                // ✅ 智能解析 XML 或纯文本
+                let statusText = rawRes;
+                if (rawRes.startsWith('<?xml')) {
+                    statusText = parseXmlResponse(rawRes);
+                }
+
+                console.log(`[签到响应] ${statusText}`);
+
+                // 🟢 成功签到
+                if (/签到成功|reward|已获得奖励/i.test(statusText)) {
+                    const reward = extractReward(rawRes) || '星币+1';
                     console.log(`[签到成功] ${reward}`);
                     showStatus(`🎉 签到成功：${reward}`, 'success');
                     startTriplePost(); // ✅ 启动发帖
-                } else if (/already/.test(res)) {
+                }
+                // 🟡 今日已签
+                else if (/今日已签|已经签到|重复操作|重复签到/i.test(statusText)) {
                     console.log('[签到] 今日已完成');
                     showStatus('📅 今日已签到，无需重复', 'info');
-                } else {
-                    console.warn('[签到失败]', res);
-                    showStatus('⚠️ 签到失败，请手动访问一次', 'warn');
+                }
+                // 🔴 完全失败（网络/参数错误）
+                else if (xhr.status !== 200) {
+                    showStatus('⚠️ 网络异常，签到请求失败', 'error');
+                }
+                // ⚠️ 其他未知错误
+                else {
+                    console.warn('[签到失败]', rawRes);
+                    showStatus(`❌ 签到失败：${truncateText(statusText, 30)}`, 'error');
                 }
             }
         };
         xhr.send();
+    }
+
+    // ===== 提取奖励信息（可选）=====
+    function extractReward(response) {
+        const match = response.match(/reward.*?>([^<]+)<\/message>/i);
+        if (match) return match[1].trim();
+        return null;
+    }
+
+    // ===== 截断长文本用于显示 =====
+    function truncateText(str, len) {
+        return str.length > len ? str.slice(0, len) + '...' : str;
     }
 
     // ===== 发帖函数 · 三篇随机内容 =====
@@ -397,7 +440,7 @@
         // ✅ 创建调试按钮
         createDebugButton();
 
-        // ✅ 检查是否已签到
+        // ✅ 检查是否已签到（页面级）
         if (isAlreadySigned()) {
             console.log('[Qwen] 检测到今日已签到');
             showStatus('📅 今日已签到，任务结束', 'info');
