@@ -1,8 +1,8 @@
 // ==UserScript==
-// @name         源论坛助手 v3.6 
+// @name         源论坛助手 v3.7
 // @namespace    http://tampermonkey.net/
-// @version      3.6
-// @description  签到+三帖连发
+// @version      3.7
+// @description  签到+三帖连发｜智能获取formhash｜带状态提示和调试按钮
 // @author       Qwen
 // @match        https://pc.sysbbs.com/*
 // @run-at       document-idle
@@ -23,11 +23,11 @@
     let QWEN_UI = {
         toast: null,
         button: null,
-        lastFormHash: null, // 仅临时保存用于调试
+        lastFormHash: null, // 仅内存保存，用于调试显示
         isButtonVisible: true
     };
 
-    // ===== 显示状态提示（带自动消失的 Toast）=====
+    // ===== 显示状态提示（Toast）=====
     function showStatus(msg, type = 'info') {
         const colors = {
             info: '#3498db',
@@ -105,17 +105,18 @@
                 alert('❌ 未获取到 formhash\n请先访问一次签到页或等待脚本运行');
             } else {
                 const hashShort = QWEN_UI.lastFormHash.slice(0, 8) + '...';
-                const copy = () => {
+                const confirmed = confirm(`🔍 当前 formhash:\n${hashShort}\n\n是否复制到剪贴板？`);
+                if (confirmed) {
                     navigator.clipboard.writeText(QWEN_UI.lastFormHash).then(() => {
-                        alert('✅ formhash 已复制到剪贴板');
+                        alert('✅ 已复制！');
+                    }).catch(err => {
+                        console.error('复制失败', err);
+                        alert('⚠️ 复制失败，请手动选择');
                     });
-                };
-                const confirmed = confirm(`🔍 当前 formhash:\n${hashShort}\n\n是否复制？`);
-                if (confirmed) copy();
+                }
             }
         };
 
-        // 鼠标悬停变大
         QWEN_UI.button.onmouseover = () => {
             QWEN_UI.button.style.transform = 'scale(1.1)';
         };
@@ -128,16 +129,56 @@
 
     // ===== 判断是否已签到过 =====
     function isAlreadySigned() {
-        const signLink = document.querySelector('a[href*="k_misign"][href*="operation=qiandao"]');
         const pageText = document.body.innerText;
         const alreadySignIndicators = ['已签到', '今日已到', '签过啦', '明天再来', '连续签到'];
         return alreadySignIndicators.some(text => pageText.includes(text));
     }
 
-    // ===== 获取 formhash 的 iframe 方法 =====
+    // ===== 智能获取 formhash（v3.7 多源探测）=====
     function getFormHash(callback) {
+        // ✅ 方法 1：从页面链接中提取 formhash
+        const links = document.querySelectorAll('a[href*="formhash="]');
+        for (let link of links) {
+            const href = link.href;
+            const match = href.match(/[?&]formhash=([a-z0-9]+)(?:[&#]|$)/i);
+            if (match && match[1]) {
+                console.log('[Qwen] 从链接中提取到 formhash:', match[1]);
+                QWEN_UI.lastFormHash = match[1];
+                showStatus('🔍 已从页面链接获取 formhash', 'info');
+                callback(match[1]);
+                return;
+            }
+        }
+
+        // ✅ 方法 2：查找隐藏输入框 <input name="formhash">
+        const input = document.querySelector('input[name="formhash"]');
+        if (input?.value) {
+            console.log('[Qwen] 从 input 元素获取 formhash:', input.value);
+            QWEN_UI.lastFormHash = input.value;
+            showStatus('🔍 已从表单输入框获取 formhash', 'info');
+            callback(input.value);
+            return;
+        }
+
+        // ✅ 方法 3：从 JS 脚本中尝试提取
+        const scripts = document.querySelectorAll('script');
+        for (let script of scripts) {
+            const text = script.textContent || '';
+            const match = text.match(/formhash\s*[=:]\s*['"]?([a-z0-9]+)['"]?/i);
+            if (match && match[1]) {
+                console.log('[Qwen] 从 JS 中提取 formhash:', match[1]);
+                QWEN_UI.lastFormHash = match[1];
+                showStatus('🔍 已从JS脚本提取 formhash', 'info');
+                callback(match[1]);
+                return;
+            }
+        }
+
+        // ⚠️ 方法 4：最后使用 iframe 回退加载签到页
+        showStatus('🔄 当前页未找到，尝试 iframe 加载...', 'warn');
+
         const iframe = document.createElement('iframe');
-        iframe.src = SIGN_PAGE_URL;
+        iframe.src = SIGN_PAGE_URL + '&mobile=2';
         iframe.style.display = 'none';
         iframe.timeoutId = null;
 
@@ -151,14 +192,16 @@
                 const doc = iframe.contentDocument || iframe.contentWindow.document;
                 const input = doc.querySelector('input[name="formhash"]');
                 if (input?.value) {
-                    QWEN_UI.lastFormHash = input.value; // 保存供调试使用
-                    console.log('[Qwen] 成功获取 formhash:', input.value);
+                    QWEN_UI.lastFormHash = input.value;
+                    console.log('[Qwen] iframe 成功获取 formhash:', input.value);
                     cleanup();
                     callback(input.value);
                     return;
+                } else {
+                    console.warn('[Qwen] iframe 页面加载完成，但未找到 formhash');
                 }
             } catch (e) {
-                console.warn('[Qwen] iframe 解析失败', e);
+                console.error('[Qwen] iframe 跨域读取失败', e);
             }
             cleanup();
             callback(null);
@@ -200,7 +243,8 @@
                 const res = xhr.responseText.trim();
 
                 if (xhr.status === 200 && /success/.test(res)) {
-                    const reward = (res.split('\t')[2] || '星币+1').replace(/\n/g, ' ');
+                    const rewardMatch = res.split('\t')[2];
+                    const reward = rewardMatch ? rewardMatch.replace(/\n/g, ' ') : '星币+1';
                     console.log(`[签到成功] ${reward}`);
                     showStatus(`🎉 签到成功：${reward}`, 'success');
                     startTriplePost(); // ✅ 启动发帖
@@ -216,7 +260,7 @@
         xhr.send();
     }
 
-    // ===== 发帖函数 · 保留原始风格，仅加随机延迟 =====
+    // ===== 发帖函数 · 三篇随机内容 =====
     function startTriplePost() {
         const lastPostTime = localStorage.getItem('qwen_last_post_time');
         const now = Date.now();
@@ -342,9 +386,9 @@
         document.body.appendChild(iframe);
     }
 
-    // ===== 🚀 主逻辑入口 =====
+    // ===== 🚀 主程序入口 =====
     (async function main() {
-        // 确保只在目标域名运行
+        // ✅ 只在目标域名运行
         if (!window.location.href.includes('sysbbs.com')) return;
 
         // ✅ 显示启动提示
@@ -353,17 +397,17 @@
         // ✅ 创建调试按钮
         createDebugButton();
 
-        // 如果已经签到过，直接退出
+        // ✅ 检查是否已签到
         if (isAlreadySigned()) {
             console.log('[Qwen] 检测到今日已签到');
             showStatus('📅 今日已签到，任务结束', 'info');
             return;
         }
 
-        // 获取 formhash 并签到
+        // ✅ 获取 formhash 并执行签到
         getFormHash((hash) => {
             if (!hash) {
-                showStatus('⚠️ 未获取到 formhash，需手动访问签到页', 'warn');
+                showStatus('❌ 无法获取 formhash，请手动访问签到页一次', 'error');
                 return;
             }
             doSign(hash);
