@@ -1,8 +1,8 @@
 // ==UserScript==
-// @name         SysBBS 签到+三贴（最终版 / 防误判）
+// @name         SysBBS 随机治愈池（改写版）
 // @namespace    http://tampermonkey.net/
-// @version      1.7
-// @description  每天 1 签到 3 发帖；帖间 3s 延迟；重试 2 次；tid 正则判定成功
+// @version      2.1
+// @description  改写原池子风格，每天随机抽3组轻松日常句发3帖
 // @author       You
 // @match        *://pc.sysbbs.com/*
 // @grant        GM_setValue
@@ -12,16 +12,44 @@
 (function () {
     'use strict';
 
-    const SUBJECTS = ['签到', '打卡', '冒泡'];
-    const MESSAGES = ['今日签到', '打卡打卡', '冒个泡~'];
-    const FID      = 140;
-    const TODAY    = new Date().toLocaleDateString('zh-CN');
-    const KEY_QD   = 'sysbbs_qd_' + TODAY;
-    const KEY_TIE  = 'sysbbs_tie_' + TODAY;
+    /* ==================  改写后的治愈池  ================== */
+    const TITLES = [
+        '今日份小晴朗送达','摸鱼时间到','喝口水顺便看看大家','风很温柔我也很乖',
+        '把忙碌调成静音','收集一点点开心','生活简单但够用','保持热爱奔赴山海',
+        '小确幸正在加载','今日份温柔已上线','慢下来感受今天','把烦恼设为仅自己可见',
+        '在平凡里找糖吃','阳光刚好心情刚好','记录片刻柔软','把日子过成诗',
+        '清风明月皆可爱','心有繁花不负时光','温柔半两从容一生','日子很滚烫又暖又明亮'
+    ];
 
-    /* ----------  单例消息条  ---------- */
+    const MESSAGES = [
+        '阳光落在窗台上，像给生活加了层滤镜，顺手来报个到～',
+        '把忙碌调成静音，摸鱼五分钟，看看老朋友们在聊啥',
+        '喝口温水，刷个页面，平凡的一天也需要仪式感',
+        '风很温柔，我也很乖，顺路来留个脚印',
+        '收集一点点开心，存进今天的记忆罐，再来冒个泡',
+        '生活简单，但够用，偶尔出现，常常想念',
+        '保持热爱，奔赴山海，哪怕只是先来签个到',
+        '小确幸正在加载，请稍候……加载完成，我来啦',
+        '慢下来，感受今天，顺便告诉大家我仍在',
+        '把烦恼设为仅自己可见，把温柔留给每一次相见',
+        '在平凡里找糖吃，找到就上来分享，找不到也报个平安',
+        '阳光刚好，心情刚好，顺手敲几个字，证明我很好',
+        '记录片刻柔软，留给日后回味，也留给论坛一个身影',
+        '把日子过成诗，偶尔押不上韵，也不妨碍我出现',
+        '清风明月皆可爱，我也一样，偶尔上线，常常挂念',
+        '心有繁花，不负时光，哪怕只是说一句：我还在',
+        '温柔半两，从容一生，闲来无事，过来逛逛',
+        '日子很滚烫，又暖又明亮，我来加点小火花'
+    ];
+
+    const FID     = 140;
+    const TODAY   = new Date().toLocaleDateString('zh-CN');
+    const KEY_QD  = 'sysbbs_qd_' + TODAY;
+    const KEY_TIE = 'sysbbs_tie_' + TODAY;
+
+    /* ----------  单例 toast  ---------- */
     let msgBox = null;
-    function showMsg(text, bg = '#333') {
+    function toast(text, bg = '#333') {
         if (msgBox) msgBox.remove();
         msgBox = document.createElement('div');
         msgBox.style.cssText = `
@@ -38,33 +66,35 @@
 
     /* ----------  主流程（异步）  ---------- */
     (async () => {
-        showMsg('脚本开始运行');
-
         const formhash = document.documentElement.innerHTML.match(/formhash=([a-f0-9]{8})/i)?.[1];
-        if (!formhash) { showMsg('提取 formhash 失败！', '#c00'); return; }
-        showMsg('formhash 已提取');
+        if (!formhash) { toast('提取 formhash 失败！', '#c00'); return; }
 
         // 1. 签到
         if (!GM_getValue(KEY_QD, false)) {
-            showMsg('正在签到…');
-            const qdOK = await qianDao(formhash);
+            toast('正在签到…');
+            const ok = await qianDao(formhash);
             GM_setValue(KEY_QD, true);
-            showMsg(qdOK ? '签到成功' : '签到失败（可能已签到）', qdOK ? '#090' : '#f90');
-        } else { showMsg('今日已签到，跳过'); }
+            toast(ok ? '签到成功' : '签到失败（可能已签）', ok ? '#090' : '#f90');
+        } else { toast('今日已签到'); }
 
-        // 2. 发帖
-        let sent = GM_getValue(KEY_TIE, 0);
-        if (sent >= 3) { showMsg('今日 3 贴已完成'); return; }
+        // 2. 随机抽 3 组（不重复）
+        const sent = GM_getValue(KEY_TIE, 0);
+        if (sent >= 3) { toast('今日 3 贴已完成'); return; }
 
+        const pickedIndexes = randomPick(TITLES.length, 3);
         for (let i = sent; i < 3; i++) {
-            showMsg(`准备发第 ${i + 1} 贴…`);
+            const idx = pickedIndexes[i];
+            const subject = TITLES[idx];
+            const message = MESSAGES[idx];
+            toast(`发第 ${i + 1} 帖：${subject}`);
+
             const data = {
                 formhash: formhash,
                 posttime: Math.floor(Date.now() / 1000),
                 delete: 0,
                 topicsubmit: 'yes',
-                subject: SUBJECTS[i],
-                message: MESSAGES[i],
+                subject: subject,
+                message: message,
                 replycredit_extcredits: 0,
                 replycredit_times: 1,
                 replycredit_membertimes: 1,
@@ -74,24 +104,32 @@
             };
 
             let ok = false;
-            for (let tryNum = 0; tryNum < 3; tryNum++) {   // 最多 3 次
+            for (let tryNum = 0; tryNum < 3; tryNum++) {
                 if (tryNum > 0) await sleep(2000);
                 ok = await sendPost(data);
                 if (ok) break;
             }
-            if (!ok) { showMsg(`第 ${i + 1} 贴最终失败，终止`, '#c00'); return; }
+            if (!ok) { toast(`第 ${i + 1} 贴最终失败，终止`, '#c00'); return; }
 
-            sent++;
-            GM_setValue(KEY_TIE, sent);
-            showMsg(`第 ${sent} 贴发送成功`, '#090');
-
-            if (i < 2) { showMsg('等待 3 秒防 flood…'); await sleep(3000); }
+            const now = i + 1;
+            GM_setValue(KEY_TIE, now);
+            toast(`第 ${now} 贴发送成功`, '#090');
+            if (i < 2) { toast('等待 3 秒防 flood…'); await sleep(3000); }
         }
-        showMsg('签到+三贴全部完成', '#090');
+        toast('签到+随机三贴全部完成', '#090');
     })();
 
     /* ----------  工具函数  ---------- */
     function sleep(ms) { return new Promise(r => setTimeout(r, ms)); }
+
+    function randomPick(max, n) {
+        const arr = Array.from({ length: max }, (_, i) => i);
+        for (let i = arr.length - 1; i > 0; i--) {
+            const j = Math.floor(Math.random() * (i + 1));
+            [arr[i], arr[j]] = [arr[j], arr[i]];
+        }
+        return arr.slice(0, n);
+    }
 
     async function qianDao(fh) {
         try {
@@ -113,7 +151,7 @@
                 body: new URLSearchParams(data).toString()
             });
             const t = await res.text();
-            return /thread-\d+|'tid':'\d+/.test(t);   // 核心判断：出现 tid 就成功
+            return /thread-\d+|'tid':'\d+/.test(t);
         } catch (e) { console.error(e); return false; }
     }
 })();
