@@ -1,8 +1,8 @@
 // ==UserScript==
-// @name         SysBBS 签到+三贴（100%成功判断）
+// @name         SysBBS 签到+三贴（最终版 / 防误判）
 // @namespace    http://tampermonkey.net/
-// @version      1.5
-// @description  每天自动签到+发3帖；消息不叠加；tid= 判定发帖成功
+// @version      1.7
+// @description  每天 1 签到 3 发帖；帖间 3s 延迟；重试 2 次；tid 正则判定成功
 // @author       You
 // @match        *://pc.sysbbs.com/*
 // @grant        GM_setValue
@@ -36,71 +36,84 @@
         setTimeout(() => { if (msgBox) msgBox.remove(); }, 3000);
     }
 
-    /* ----------  主流程  ---------- */
-    showMsg('脚本开始运行');
+    /* ----------  主流程（异步）  ---------- */
+    (async () => {
+        showMsg('脚本开始运行');
 
-    const formhash = document.documentElement.innerHTML.match(/formhash=([a-f0-9]{8})/i)?.[1];
-    if (!formhash) { showMsg('提取 formhash 失败！', '#c00'); return; }
-    showMsg('formhash 已提取');
+        const formhash = document.documentElement.innerHTML.match(/formhash=([a-f0-9]{8})/i)?.[1];
+        if (!formhash) { showMsg('提取 formhash 失败！', '#c00'); return; }
+        showMsg('formhash 已提取');
 
-    // 1. 签到（失败也继续）
-    if (!GM_getValue(KEY_QD, false)) {
-        showMsg('正在签到…');
-        const qdOK = qianDao(formhash);
-        GM_setValue(KEY_QD, true);
-        showMsg(qdOK ? '签到成功' : '签到失败（可能已签到）', qdOK ? '#090' : '#f90');
-    } else { showMsg('今日已签到，跳过'); }
+        // 1. 签到
+        if (!GM_getValue(KEY_QD, false)) {
+            showMsg('正在签到…');
+            const qdOK = await qianDao(formhash);
+            GM_setValue(KEY_QD, true);
+            showMsg(qdOK ? '签到成功' : '签到失败（可能已签到）', qdOK ? '#090' : '#f90');
+        } else { showMsg('今日已签到，跳过'); }
 
-    // 2. 发帖
-    let sent = GM_getValue(KEY_TIE, 0);
-    if (sent >= 3) { showMsg('今日 3 贴已完成'); return; }
+        // 2. 发帖
+        let sent = GM_getValue(KEY_TIE, 0);
+        if (sent >= 3) { showMsg('今日 3 贴已完成'); return; }
 
-    while (sent < 3) {
-        showMsg(`正在发第 ${sent + 1} 贴…`);
-        const data = {
-            formhash: formhash,
-            posttime: Math.floor(Date.now() / 1000),
-            delete: 0,
-            topicsubmit: 'yes',
-            subject: SUBJECTS[sent],
-            message: MESSAGES[sent],
-            replycredit_extcredits: 0,
-            replycredit_times: 1,
-            replycredit_membertimes: 1,
-            replycredit_random: 100,
-            tags: '', price: '', readperm: '', cronpublishdate: '',
-            allownoticeauthor: 1, usesig: 1
-        };
+        for (let i = sent; i < 3; i++) {
+            showMsg(`准备发第 ${i + 1} 贴…`);
+            const data = {
+                formhash: formhash,
+                posttime: Math.floor(Date.now() / 1000),
+                delete: 0,
+                topicsubmit: 'yes',
+                subject: SUBJECTS[i],
+                message: MESSAGES[i],
+                replycredit_extcredits: 0,
+                replycredit_times: 1,
+                replycredit_membertimes: 1,
+                replycredit_random: 100,
+                tags: '', price: '', readperm: '', cronpublishdate: '',
+                allownoticeauthor: 1, usesig: 1
+            };
 
-        const ok = sendPost(data);
-        if (!ok) { showMsg(`第 ${sent + 1} 贴发送失败，终止`, '#c00'); return; }
-        sent++;
-        GM_setValue(KEY_TIE, sent);
-        showMsg(`第 ${sent} 贴发送成功`, '#090');
-    }
-    showMsg('签到+三贴全部完成', '#090');
+            let ok = false;
+            for (let tryNum = 0; tryNum < 3; tryNum++) {   // 最多 3 次
+                if (tryNum > 0) await sleep(2000);
+                ok = await sendPost(data);
+                if (ok) break;
+            }
+            if (!ok) { showMsg(`第 ${i + 1} 贴最终失败，终止`, '#c00'); return; }
+
+            sent++;
+            GM_setValue(KEY_TIE, sent);
+            showMsg(`第 ${sent} 贴发送成功`, '#090');
+
+            if (i < 2) { showMsg('等待 3 秒防 flood…'); await sleep(3000); }
+        }
+        showMsg('签到+三贴全部完成', '#090');
+    })();
 
     /* ----------  工具函数  ---------- */
-    function qianDao(fh) {
+    function sleep(ms) { return new Promise(r => setTimeout(r, ms)); }
+
+    async function qianDao(fh) {
         try {
-            const xhr = new XMLHttpRequest();
-            xhr.open('GET', `https://pc.sysbbs.com/plugin.php?id=k_misign:sign&operation=qiandao&format=text&formhash=${fh}`, false);
-            xhr.setRequestHeader('X-Requested-With', 'XMLHttpRequest');
-            xhr.send();
-            const r = xhr.responseText;
-            return r.includes('已签到') || r.includes('tid=') || r.includes('succeed');
+            const res = await fetch(`https://pc.sysbbs.com/plugin.php?id=k_misign:sign&operation=qiandao&format=text&formhash=${fh}`, {
+                headers: { 'X-Requested-With': 'XMLHttpRequest' },
+                credentials: 'include'
+            });
+            const t = await res.text();
+            return /thread-\d+|'tid':'\d+/.test(t) || t.includes('已签到');
         } catch (e) { console.error(e); return false; }
     }
 
-    function sendPost(data) {
+    async function sendPost(data) {
         try {
-            const xhr = new XMLHttpRequest();
-            xhr.open('POST', `https://pc.sysbbs.com/forum.php?mod=post&action=newthread&fid=${FID}&extra=&topicsubmit=yes&mobile=2&handlekey=postform&inajax=1`, false);
-            xhr.setRequestHeader('Content-Type', 'application/x-www-form-urlencoded');
-            xhr.send(Object.keys(data).map(k => `${k}=${encodeURIComponent(data[k])}`).join('&'));
-            const r = xhr.responseText;
-            /* *******  关键判断  ******* */
-            return r.includes('tid=');   // 只要返回里出现 tid= 就是成功
+            const res = await fetch(`https://pc.sysbbs.com/forum.php?mod=post&action=newthread&fid=${FID}&extra=&topicsubmit=yes&mobile=2&handlekey=postform&inajax=1`, {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/x-www-form-urlencoded' },
+                credentials: 'include',
+                body: new URLSearchParams(data).toString()
+            });
+            const t = await res.text();
+            return /thread-\d+|'tid':'\d+/.test(t);   // 核心判断：出现 tid 就成功
         } catch (e) { console.error(e); return false; }
     }
 })();
