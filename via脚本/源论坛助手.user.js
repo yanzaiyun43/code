@@ -1,9 +1,9 @@
 // ==UserScript==
-// @name         源论坛助手 v3.8
+// @name         源论坛助手 v3.9
 // @namespace    http://tampermonkey.net/
-// @version      3.8
-// @description  签到+三帖连发｜智能获取formhash｜精准识别签到状态｜
-// @author       Qwen 守护你 ❤️
+// @version      3.9
+// @description  签到+三帖连发｜智能解析XML｜进度全程可见
+// @author       Qwen
 // @match        https://pc.sysbbs.com/*
 // @run-at       document-idle
 // @grant        none
@@ -23,7 +23,7 @@
     let QWEN_UI = {
         toast: null,
         button: null,
-        lastFormHash: null, // 仅内存保存，用于调试显示
+        lastFormHash: null,
         isButtonVisible: true
     };
 
@@ -74,7 +74,7 @@
         }, 3000);
     }
 
-    // ===== 创建调试按钮：查看 formhash =====
+    // ===== 创建调试按钮：查看 formhash 与发帖状态 =====
     function createDebugButton() {
         if (QWEN_UI.button) return;
 
@@ -98,23 +98,26 @@
         });
 
         QWEN_UI.button.innerHTML = '?';
-        QWEN_UI.button.title = '点击查看 formhash 状态';
+        QWEN_UI.button.title = '点击查看状态';
 
         QWEN_UI.button.onclick = () => {
-            if (!QWEN_UI.lastFormHash) {
-                alert('❌ 未获取到 formhash\n请先访问一次签到页或等待脚本运行');
-            } else {
-                const hashShort = QWEN_UI.lastFormHash.slice(0, 8) + '...';
-                const confirmed = confirm(`🔍 当前 formhash:\n${hashShort}\n\n是否复制到剪贴板？`);
-                if (confirmed) {
-                    navigator.clipboard.writeText(QWEN_UI.lastFormHash).then(() => {
-                        alert('✅ 已复制！');
-                    }).catch(err => {
-                        console.error('复制失败', err);
-                        alert('⚠️ 复制失败，请手动选择');
-                    });
-                }
+            const lastPostTime = localStorage.getItem('qwen_last_post_time');
+            let postStatus = '从未发过';
+            if (lastPostTime) {
+                const date = new Date(parseInt(lastPostTime));
+                const isToday = date.toDateString() === new Date().toDateString();
+                postStatus = isToday ? '✅ 今日已发' : `📅 上次：${date.toLocaleDateString()}`;
             }
+
+            const hashDisplay = QWEN_UI.lastFormHash 
+                ? QWEN_UI.lastFormHash.slice(0, 8) + '...' 
+                : '❌ 未获取';
+
+            alert(`
+🔍 当前状态：
+formhash: ${hashDisplay}
+发帖记录: ${postStatus}
+`.trim());
         };
 
         QWEN_UI.button.onmouseover = () => {
@@ -134,9 +137,9 @@
         return alreadySignIndicators.some(text => pageText.includes(text));
     }
 
-    // ===== 智能获取 formhash（v3.8 多源探测增强版）=====
+    // ===== 智能获取 formhash（v3.9 多源探测增强版）=====
     function getFormHash(callback) {
-        // ✅ 方法 1：从链接中提取 formhash
+        // 方法 1：从链接中提取 formhash
         const links = document.querySelectorAll('a[href*="formhash="]');
         for (let link of links) {
             const href = link.href;
@@ -150,7 +153,7 @@
             }
         }
 
-        // ✅ 方法 2：查找隐藏输入框
+        // 方法 2：查找隐藏输入框
         const input = document.querySelector('input[name="formhash"]');
         if (input?.value) {
             console.log('[Qwen] 从 input 元素获取 formhash:', input.value);
@@ -160,7 +163,7 @@
             return;
         }
 
-        // ✅ 方法 3：从 JS 脚本中尝试提取
+        // 方法 3：从 JS 脚本中尝试提取
         const scripts = document.querySelectorAll('script');
         for (let script of scripts) {
             const text = script.textContent || '';
@@ -174,7 +177,7 @@
             }
         }
 
-        // ⚠️ 方法 4：iframe 回退加载签到页
+        // 回退：iframe 加载签到页
         showStatus('🔄 当前页未找到，尝试 iframe 加载...', 'warn');
 
         const iframe = document.createElement('iframe');
@@ -231,13 +234,13 @@
             if (root) {
                 return root.textContent.trim();
             }
-            return text; // fallback
+            return text;
         } catch (e) {
             return text;
         }
     }
 
-    // ===== 真实签到请求（v3.8 智能解析XML）=====
+    // ===== 真实签到请求（v3.9 智能解析XML）=====
     function doSign(formhash) {
         if (!formhash) {
             showStatus('❌ 签到失败：formhash 为空', 'error');
@@ -256,8 +259,6 @@
         xhr.onreadystatechange = () => {
             if (xhr.readyState === 4) {
                 const rawRes = xhr.responseText.trim();
-
-                // ✅ 智能解析 XML 或纯文本
                 let statusText = rawRes;
                 if (rawRes.startsWith('<?xml')) {
                     statusText = parseXmlResponse(rawRes);
@@ -265,23 +266,20 @@
 
                 console.log(`[签到响应] ${statusText}`);
 
-                // 🟢 成功签到
                 if (/签到成功|reward|已获得奖励/i.test(statusText)) {
                     const reward = extractReward(rawRes) || '星币+1';
                     console.log(`[签到成功] ${reward}`);
                     showStatus(`🎉 签到成功：${reward}`, 'success');
                     startTriplePost(); // ✅ 启动发帖
                 }
-                // 🟡 今日已签
                 else if (/今日已签|已经签到|重复操作|重复签到/i.test(statusText)) {
                     console.log('[签到] 今日已完成');
                     showStatus('📅 今日已签到，无需重复', 'info');
+                    startTriplePost(); // 即使已签也检查发帖
                 }
-                // 🔴 完全失败（网络/参数错误）
                 else if (xhr.status !== 200) {
                     showStatus('⚠️ 网络异常，签到请求失败', 'error');
                 }
-                // ⚠️ 其他未知错误
                 else {
                     console.warn('[签到失败]', rawRes);
                     showStatus(`❌ 签到失败：${truncateText(statusText, 30)}`, 'error');
@@ -303,12 +301,15 @@
         return str.length > len ? str.slice(0, len) + '...' : str;
     }
 
-    // ===== 发帖函数 · 三篇随机内容 =====
+    // ===== 发帖函数 · 三篇随机内容（带完整提示）=====
     function startTriplePost() {
         const lastPostTime = localStorage.getItem('qwen_last_post_time');
         const now = Date.now();
-        if (lastPostTime && now - lastPostTime < 24 * 60 * 60 * 1000) {
+        const today = new Date().toDateString();
+
+        if (lastPostTime && new Date(parseInt(lastPostTime)).toDateString() === today) {
             console.log('[Qwen] 今日已发过帖，不再重复');
+            showStatus('💬 今日已低调活跃过啦～不必多劳', 'info');
             return;
         }
 
@@ -400,17 +401,21 @@
             xhr.onreadystatechange = function () {
                 if (xhr.readyState === 4) {
                     if (xhr.status === 200) {
-                        showStatus(`✅ 第${index + 1}/${TRIPLE_POST_COUNT}完成`, 'success');
+                        showStatus(`✅ 第${index + 1}/${TRIPLE_POST_COUNT} 已发布：${truncateText(title, 10)}`, 'success');
                         if (index < TRIPLE_POST_COUNT - 1) {
                             setTimeout(
                                 () => sendOnePost(formhash, index + 1),
                                 1800 + Math.random() * 1000
                             );
                         } else {
-                            showStatus('🎉 三帖全部完成！低调活跃达成 ✨', 'success');
+                            showStatus('🎉 三帖全部完成！今日活跃达标 ✨', 'success');
+                            // 🐱 小温柔
+                            setTimeout(() => {
+                                showStatus('🌙 晚安，世界很吵，但你很棒。', 'info');
+                            }, 2500);
                         }
                     } else {
-                        showStatus(`❌ 第${index + 1}失败，继续下一帖`, 'warn');
+                        showStatus(`❌ 第${index + 1} 失败：网络波动`, 'warn');
                         if (index < TRIPLE_POST_COUNT - 1) {
                             setTimeout(
                                 () => sendOnePost(formhash, index + 1),
@@ -431,23 +436,17 @@
 
     // ===== 🚀 主程序入口 =====
     (async function main() {
-        // ✅ 只在目标域名运行
         if (!window.location.href.includes('sysbbs.com')) return;
 
-        // ✅ 显示启动提示
         showStatus('🟢 脚本已启动，正在检测...', 'info');
 
-        // ✅ 创建调试按钮
         createDebugButton();
 
-        // ✅ 检查是否已签到（页面级）
         if (isAlreadySigned()) {
             console.log('[Qwen] 检测到今日已签到');
-            showStatus('📅 今日已签到，任务结束', 'info');
-            return;
+            showStatus('📅 今日已签到，任务继续', 'info');
         }
 
-        // ✅ 获取 formhash 并执行签到
         getFormHash((hash) => {
             if (!hash) {
                 showStatus('❌ 无法获取 formhash，请手动访问签到页一次', 'error');
