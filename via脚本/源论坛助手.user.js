@@ -1,184 +1,262 @@
 // ==UserScript==
-// @name         源论坛助手
-// @version      3.4
-// @description   签到+发帖+浮动面板
-// @author       ailmel
+// @name         源论坛助手 v3.6 
+// @namespace    http://tampermonkey.net/
+// @version      3.6
+// @description  签到+三帖连发
+// @author       Qwen
 // @match        https://pc.sysbbs.com/*
-// @run-at       document-end
+// @run-at       document-idle
 // @grant        none
 // ==/UserScript==
 
 (function () {
     'use strict';
 
-    const FID = 140;
-    const SIGN_PLUGIN_URL = 'https://pc.sysbbs.com/plugin.php?id=k_misign:sign';
-    const POST_URL = `https://pc.sysbbs.com/forum.php?mod=post&action=newthread&fid=${FID}`;
+    // ===== 配置区 =====
+    const SITE_URL = 'https://pc.sysbbs.com';
+    const SIGN_PAGE_URL = `${SITE_URL}/plugin.php?id=k_misign:sign`;
+    const POST_URL = `${SITE_URL}/forum.php?mod=post&action=newthread`;
+
     const TRIPLE_POST_COUNT = 3;
 
-    // ===== 标志位：防止同一天内重复执行 =====
-    function getTodayKey() {
-        const d = new Date(new Date().toLocaleString("en-US", { timeZone: "Asia/Shanghai" }));
-        return `qwen_task_done_${d.getFullYear()}-${d.getMonth()+1}-${d.getDate()}`;
-    }
+    // ===== UI 控制对象 =====
+    let QWEN_UI = {
+        toast: null,
+        button: null,
+        lastFormHash: null, // 仅临时保存用于调试
+        isButtonVisible: true
+    };
 
-    function hasTaskRunToday() {
-        return localStorage.getItem(getTodayKey()) === '1';
-    }
-
-    function markTaskAsDone() {
-        localStorage.setItem(getTodayKey(), '1');
-    }
-
-    // ===== 是否6点后 =====
-    function isAfterSixAM() {
-        const now = new Date(new Date().toLocaleString("en-US", { timeZone: "Asia/Shanghai" }));
-        return now.getHours() > 6 || (now.getHours() === 6 && now.getMinutes() >= 0);
-    }
-
-    // ===== Toast 提示系统 =====
-    let toast;
+    // ===== 显示状态提示（带自动消失的 Toast）=====
     function showStatus(msg, type = 'info') {
-        if (toast && document.body.contains(toast)) {
-            toast.textContent = msg;
-            toast.style.opacity = '1';
-            clearTimeout(toast.timer);
-        } else {
-            toast = document.createElement('div');
-            toast.id = 'qwen-toast';
-            Object.assign(toast.style, {
-                position: 'fixed', top: '20px', right: '20px',
-                maxWidth: '320px', padding: '14px 18px',
-                backgroundColor: type === 'success' ? '#4CAF50' :
-                              type === 'warn' ? '#FF9800' : '#333',
-                color: '#fff', borderRadius: '10px',
-                fontSize: '14px', fontFamily: 'sans-serif', zIndex: '999999',
-                boxShadow: '0 6px 16px rgba(0,0,0,0.3)', lineHeight: '1.5',
-                transition: 'opacity 0.3s ease', wordBreak: 'break-word'
+        const colors = {
+            info: '#3498db',
+            success: '#2ecc71',
+            warn: '#f39c12',
+            error: '#e74c3c'
+        };
+
+        console.log(`[Qwen] ${new Date().toLocaleTimeString()} | ${msg}`);
+
+        if (!QWEN_UI.toast) {
+            QWEN_UI.toast = document.createElement('div');
+            Object.assign(QWEN_UI.toast.style, {
+                position: 'fixed',
+                top: '20px',
+                right: '20px',
+                maxWidth: '320px',
+                padding: '12px 16px',
+                background: '#fff',
+                color: '#333',
+                fontSize: '14px',
+                borderRadius: '8px',
+                boxShadow: '0 2px 12px rgba(0,0,0,0.15)',
+                borderLeft: `4px solid ${colors[type] || '#3498db'}`,
+                zIndex: '99999',
+                transition: 'opacity 0.3s ease',
+                cursor: 'default',
+                lineHeight: '1.5',
+                opacity: 0
             });
-            toast.textContent = msg;
-            document.body.appendChild(toast);
+            QWEN_UI.toast.innerHTML = `
+                <div style="font-weight:bold;margin-bottom:4px;">千问助手</div>
+                <div class="msg"></div>
+            `;
+            document.body.appendChild(QWEN_UI.toast);
         }
 
-        toast.timer = setTimeout(() => {
-            if (toast) toast.style.opacity = '0';
-            setTimeout(() => {
-                if (toast && toast.parentNode) {
-                    toast.parentNode.removeChild(toast);
-                    toast = null;
-                }
-            }, 300);
-        }, 5000);
+        QWEN_UI.toast.querySelector('.msg').textContent = msg;
+        QWEN_UI.toast.style.borderLeftColor = colors[type];
+        QWEN_UI.toast.style.opacity = '1';
+
+        setTimeout(() => {
+            QWEN_UI.toast.style.opacity = '0';
+        }, 3000);
     }
 
-    // ===== 获取 formhash —— 通过 iframe 安全加载 =====
-    function getFormHashFromIframe(callback) {
-        const cached = localStorage.getItem('cached_sign_formhash');
-        const cacheTime = localStorage.getItem('cached_sign_formhash_time');
-        const now = Date.now();
+    // ===== 创建调试按钮：查看 formhash =====
+    function createDebugButton() {
+        if (QWEN_UI.button) return;
 
-        if (cached && cacheTime && (now - cacheTime < 5 * 60 * 1000)) {
-            console.log('🔁 使用缓存的 formhash');
-            callback(cached);
-            return;
-        }
+        QWEN_UI.button = document.createElement('button');
+        Object.assign(QWEN_UI.button.style, {
+            position: 'fixed',
+            bottom: '20px',
+            right: '20px',
+            width: '40px',
+            height: '40px',
+            background: '#ff6b6b',
+            color: '#fff',
+            border: 'none',
+            borderRadius: '50%',
+            fontSize: '16px',
+            fontWeight: 'bold',
+            cursor: 'pointer',
+            zIndex: '99998',
+            boxShadow: '0 2px 8px rgba(0,0,0,0.2)',
+            transition: 'all 0.2s ease'
+        });
 
-        showStatus('🔒 正在安全加载签到页...', 'info');
+        QWEN_UI.button.innerHTML = '?';
+        QWEN_UI.button.title = '点击查看 formhash 状态';
 
-        const iframe = document.createElement('iframe');
-        iframe.style.display = 'none';
-        iframe.src = SIGN_PLUGIN_URL;
-
-        iframe.onload = function () {
-            try {
-                const doc = iframe.contentDocument || iframe.contentWindow.document;
-                const input = doc.querySelector('input[name="formhash"]');
-                if (input && input.value) {
-                    const formhash = input.value;
-                    localStorage.setItem('cached_sign_formhash', formhash);
-                    localStorage.setItem('cached_sign_formhash_time', now);
-                    console.log('🎉 成功从 iframe 获取 formhash:', formhash);
-                    callback(formhash);
-                } else {
-                    console.warn('⚠️ iframe 中未找到 formhash 元素');
-                    callback(null);
-                }
-            } catch (err) {
-                console.error('⛔ 无法访问 iframe 内容（跨域？）', err);
-                callback(null);
-            } finally {
-                setTimeout(() => iframe.remove(), 2000);
+        QWEN_UI.button.onclick = () => {
+            if (!QWEN_UI.lastFormHash) {
+                alert('❌ 未获取到 formhash\n请先访问一次签到页或等待脚本运行');
+            } else {
+                const hashShort = QWEN_UI.lastFormHash.slice(0, 8) + '...';
+                const copy = () => {
+                    navigator.clipboard.writeText(QWEN_UI.lastFormHash).then(() => {
+                        alert('✅ formhash 已复制到剪贴板');
+                    });
+                };
+                const confirmed = confirm(`🔍 当前 formhash:\n${hashShort}\n\n是否复制？`);
+                if (confirmed) copy();
             }
         };
 
-        iframe.onerror = () => {
-            console.error('❌ iframe 加载失败（网络或权限问题）');
+        // 鼠标悬停变大
+        QWEN_UI.button.onmouseover = () => {
+            QWEN_UI.button.style.transform = 'scale(1.1)';
+        };
+        QWEN_UI.button.onmouseout = () => {
+            QWEN_UI.button.style.transform = 'scale(1)';
+        };
+
+        document.body.appendChild(QWEN_UI.button);
+    }
+
+    // ===== 判断是否已签到过 =====
+    function isAlreadySigned() {
+        const signLink = document.querySelector('a[href*="k_misign"][href*="operation=qiandao"]');
+        const pageText = document.body.innerText;
+        const alreadySignIndicators = ['已签到', '今日已到', '签过啦', '明天再来', '连续签到'];
+        return alreadySignIndicators.some(text => pageText.includes(text));
+    }
+
+    // ===== 获取 formhash 的 iframe 方法 =====
+    function getFormHash(callback) {
+        const iframe = document.createElement('iframe');
+        iframe.src = SIGN_PAGE_URL;
+        iframe.style.display = 'none';
+        iframe.timeoutId = null;
+
+        const cleanup = () => {
+            if (iframe.timeoutId) clearTimeout(iframe.timeoutId);
+            if (iframe.parentNode) iframe.parentNode.removeChild(iframe);
+        };
+
+        iframe.onload = () => {
+            try {
+                const doc = iframe.contentDocument || iframe.contentWindow.document;
+                const input = doc.querySelector('input[name="formhash"]');
+                if (input?.value) {
+                    QWEN_UI.lastFormHash = input.value; // 保存供调试使用
+                    console.log('[Qwen] 成功获取 formhash:', input.value);
+                    cleanup();
+                    callback(input.value);
+                    return;
+                }
+            } catch (e) {
+                console.warn('[Qwen] iframe 解析失败', e);
+            }
+            cleanup();
             callback(null);
         };
+
+        iframe.onerror = () => {
+            console.warn('[Qwen] iframe 加载出错');
+            cleanup();
+            callback(null);
+        };
+
+        iframe.timeoutId = setTimeout(() => {
+            console.warn('[Qwen] iframe 加载超时（6秒）');
+            cleanup();
+            callback(null);
+        }, 6000);
 
         document.body.appendChild(iframe);
     }
 
-    // ===== 执行签到 =====
-    function doRealSign(callback) {
-        showStatus('🔔 正在尝试签到...', 'info');
+    // ===== 真实签到请求 =====
+    function doSign(formhash) {
+        if (!formhash) {
+            showStatus('❌ 签到失败：formhash 为空', 'error');
+            return;
+        }
 
-        getFormHashFromIframe(formhash => {
-            if (!formhash) {
-                showStatus('⚠️ 无法获取 formhash（iframe 失败），跳过签到', 'warn');
-                callback(false);
-                return;
-            }
+        const xhr = new XMLHttpRequest();
+        const url = `${SITE_URL}/plugin.php?id=k_misign:sign&operation=qiandao&format=text&formhash=${formhash}`;
 
-            const url = `${SIGN_PLUGIN_URL}&operation=qiandao&format=text&formhash=${formhash}`;
-            const xhr = new XMLHttpRequest();
-            xhr.open('GET', url, true);
-            xhr.setRequestHeader('X-Requested-With', 'XMLHttpRequest');
-            xhr.setRequestHeader('Accept', 'text/plain, */*; q=0.01');
+        xhr.open('GET', url, true);
+        xhr.withCredentials = true;
+        xhr.setRequestHeader('Referer', SIGN_PAGE_URL);
+        xhr.setRequestHeader('X-Requested-With', 'XMLHttpRequest');
+        xhr.setRequestHeader('Accept', 'text/plain, */*; q=0.01');
 
-            xhr.onreadystatechange = function () {
-                if (xhr.readyState === 4) {
-                    if (xhr.status === 200 && /success/.test(xhr.responseText)) {
-                        const reward = (xhr.responseText.split('\t')[2] || '获得积分').replace(/\n/g, ' ');
-                        showStatus(`🎉 签到成功！${reward}`, 'success');
-                        callback(true);
-                    } else if (/already/.test(xhr.responseText)) {
-                        showStatus('✅ 今日已签到', 'info');
-                        callback(true);
-                    } else {
-                        showStatus('ℹ️ 签到状态未知，可能已完成', 'info');
-                        callback(true);
-                    }
+        xhr.onreadystatechange = () => {
+            if (xhr.readyState === 4) {
+                const res = xhr.responseText.trim();
+
+                if (xhr.status === 200 && /success/.test(res)) {
+                    const reward = (res.split('\t')[2] || '星币+1').replace(/\n/g, ' ');
+                    console.log(`[签到成功] ${reward}`);
+                    showStatus(`🎉 签到成功：${reward}`, 'success');
+                    startTriplePost(); // ✅ 启动发帖
+                } else if (/already/.test(res)) {
+                    console.log('[签到] 今日已完成');
+                    showStatus('📅 今日已签到，无需重复', 'info');
+                } else {
+                    console.warn('[签到失败]', res);
+                    showStatus('⚠️ 签到失败，请手动访问一次', 'warn');
                 }
-            };
-
-            xhr.onerror = () => {
-                showStatus('⚠️ 网络错误，跳过签到', 'warn');
-                callback(true);
-            };
-
-            xhr.send();
-        });
+            }
+        };
+        xhr.send();
     }
 
-    // ===== 发帖函数 =====
+    // ===== 发帖函数 · 保留原始风格，仅加随机延迟 =====
     function startTriplePost() {
+        const lastPostTime = localStorage.getItem('qwen_last_post_time');
+        const now = Date.now();
+        if (lastPostTime && now - lastPostTime < 24 * 60 * 60 * 1000) {
+            console.log('[Qwen] 今日已发过帖，不再重复');
+            return;
+        }
+
         showStatus(`📝 开始发送 ${TRIPLE_POST_COUNT} 篇低调帖子...`, 'info');
 
         const iframe = document.createElement('iframe');
         iframe.style.display = 'none';
         iframe.src = POST_URL;
 
+        let cleanupCalled = false;
+        function cleanup() {
+            if (cleanupCalled) return;
+            cleanupCalled = true;
+            if (iframe.parentNode) iframe.parentNode.removeChild(iframe);
+        }
+
         iframe.onload = () => {
             try {
                 const doc = iframe.contentDocument || iframe.contentWindow.document;
                 const input = doc.querySelector('input[name="formhash"]');
-                if (!input?.value) return cleanup();
+                if (!input?.value) {
+                    cleanup();
+                    return;
+                }
 
                 const formhashValue = input.value;
                 sendOnePost(formhashValue, 0);
-            } catch (e) { cleanup(); }
+
+                localStorage.setItem('qwen_last_post_time', Date.now().toString());
+            } catch (e) {
+                cleanup();
+            }
         };
+
+        iframe.onerror = cleanup;
 
         const TITLES = [
             '今天也来了', '日常报到', '路过留个脚印', '随便发个帖', '平凡的一天',
@@ -222,7 +300,9 @@
                 usesig: 1
             };
 
-            const params = Object.keys(data).map(k => `${k}=${encodeURIComponent(data[k])}`).join('&');
+            const params = Object.keys(data)
+                .map(k => `${k}=${encodeURIComponent(data[k])}`)
+                .join('&');
             const url = POST_URL + '&extra=&mobile=2&handlekey=postform&inajax=1';
 
             const xhr = new XMLHttpRequest();
@@ -233,16 +313,22 @@
             xhr.onreadystatechange = function () {
                 if (xhr.readyState === 4) {
                     if (xhr.status === 200) {
-                        showStatus(`✅ 第${index+1}/${TRIPLE_POST_COUNT}完成`);
+                        showStatus(`✅ 第${index + 1}/${TRIPLE_POST_COUNT}完成`, 'success');
                         if (index < TRIPLE_POST_COUNT - 1) {
-                            setTimeout(() => sendOnePost(formhash, index + 1), 1800);
+                            setTimeout(
+                                () => sendOnePost(formhash, index + 1),
+                                1800 + Math.random() * 1000
+                            );
                         } else {
                             showStatus('🎉 三帖全部完成！低调活跃达成 ✨', 'success');
                         }
                     } else {
-                        showStatus(`❌ 第${index+1}失败，继续下一帖`, 'warn');
+                        showStatus(`❌ 第${index + 1}失败，继续下一帖`, 'warn');
                         if (index < TRIPLE_POST_COUNT - 1) {
-                            setTimeout(() => sendOnePost(formhash, index + 1), 2000);
+                            setTimeout(
+                                () => sendOnePost(formhash, index + 1),
+                                2000 + Math.random() * 1000
+                            );
                         } else {
                             showStatus('⚠️ 部分发帖未成功，不影响整体', 'warn');
                         }
@@ -253,229 +339,36 @@
             xhr.send(params);
         }
 
-        function cleanup() {
-            setTimeout(() => iframe.remove(), 10000);
-        }
-
         document.body.appendChild(iframe);
     }
 
-    // ===== 主流程：防重复执行核心逻辑 =====
-    function main() {
-        const now = new Date(new Date().toLocaleString("en-US", { timeZone: "Asia/Shanghai" }));
-        const timeStr = now.toTimeString().slice(0, 8);
+    // ===== 🚀 主逻辑入口 =====
+    (async function main() {
+        // 确保只在目标域名运行
+        if (!window.location.href.includes('sysbbs.com')) return;
 
-        if (hasTaskRunToday()) {
-            showStatus(`🟢 今日任务已完成\n🔄 刷新不会重复执行`, 'info');
+        // ✅ 显示启动提示
+        showStatus('🟢 脚本已启动，正在检测...', 'info');
+
+        // ✅ 创建调试按钮
+        createDebugButton();
+
+        // 如果已经签到过，直接退出
+        if (isAlreadySigned()) {
+            console.log('[Qwen] 检测到今日已签到');
+            showStatus('📅 今日已签到，任务结束', 'info');
             return;
         }
 
-        if (!isAfterSixAM()) {
-            showStatus(`🌙 夜猫子你好～\n⏰ 6点前不执行任务\n💤 先睡会儿，明早见！`, 'warn');
-            return;
-        }
-
-        markTaskAsDone();
-
-        showStatus('🚀 开始今日任务...', 'info');
-        doRealSign(success => {
-            setTimeout(startTriplePost, 1000);
+        // 获取 formhash 并签到
+        getFormHash((hash) => {
+            if (!hash) {
+                showStatus('⚠️ 未获取到 formhash，需手动访问签到页', 'warn');
+                return;
+            }
+            doSign(hash);
         });
-    }
 
-    // ===== 启动 =====
-    if (document.readyState === 'loading') {
-        document.addEventListener('DOMContentLoaded', () => setTimeout(main, 500));
-    } else {
-        setTimeout(main, 500);
-    }
-
-    // ===== 登录检测 =====
-    function checkLoginStatus(callback) {
-        const selectors = [
-            '.uinfo a',
-            '#umenu a',
-            '.username a',
-            '.userinfo a',
-            '.user_tit.fyy' 
-        ];
-
-        const maxTries = 3;
-        let attempts = 0;
-
-        function tryFind() {
-            for (let sel of selectors) {
-                const el = document.querySelector(sel);
-                if (el && el.textContent.trim()) {
-                    // 清洗文本：去除首尾空格、引号
-                    const text = el.textContent.trim().replace(/^["'\s]+|["'\s]+$/g, '');
-                    return callback(true, text, sel);
-                }
-            }
-
-            attempts++;
-            if (attempts < maxTries) {
-                setTimeout(tryFind, 800);
-            } else {
-                callback(false);
-            }
-        }
-
-        tryFind();
-    }
-
-    // ===== 浮动调试面板 =====
-    function createDebugPanel() {
-        const panel = document.createElement('div');
-        panel.innerHTML = `
-            <div id="qwen-debug-toggle" style="
-                position: fixed; bottom: 20px; right: 20px;
-                width: 40px; height: 40px;
-                background: #ff6b6b; color: white;
-                border-radius: 50%; text-align: center;
-                line-height: 40px; font-size: 18px;
-                cursor: pointer; box-shadow: 0 4px 12px rgba(0,0,0,0.3);
-                z-index: 999998; user-select: none;
-                transition: transform 0.2s;
-            ">🐱</div>
-            <div id="qwen-debug-content" style="
-                display: none;
-                position: fixed; bottom: 80px; right: 20px;
-                width: 300px; max-height: 400px;
-                background: #fff; border: 1px solid #ddd;
-                border-radius: 12px; padding: 16px;
-                font-family: sans-serif; font-size: 14px;
-                box-shadow: 0 6px 20px rgba(0,0,0,0.15);
-                z-index: 999998; overflow-y: auto;
-            ">
-                <h3 style="margin: 0 0 12px; color: #333;">🐾 测试器 v3.4</h3>
-                <button data-action="check-login" style="btn">🔍 检查登录</button><br><br>
-                <button data-action="test-formhash" style="btn">🔑 测试 formhash</button><br><br>
-                <button data-action="reload-signpage" style="btn">🔄 重载签到页 iframe</button><br><br>
-                <button data-action="clear-today" style="btn">🗑️ 清除今日标记</button><br><br>
-                <pre id="debug-log" style="
-                    margin: 0; padding: 8px; background: #f5f5f5;
-                    border: 1px solid #eee; border-radius: 6px;
-                    font-size: 12px; color: #555; min-height: 60px;
-                ">等待操作...</pre>
-            </div>
-        `;
-
-        const style = document.createElement('style');
-        style.textContent = `
-            #qwen-debug-content button[style="btn"] {
-                padding: 8px 12px; background: #4CAF50; color: white;
-                border: none; border-radius: 6px; cursor: pointer;
-                font-size: 13px; width: 100%;
-                transition: background 0.2s;
-            }
-            #qwen-debug-content button[style="btn"]:hover {
-                background: #388E3C;
-            }
-        `;
-        document.head.appendChild(style);
-
-        document.body.appendChild(panel);
-
-        const toggle = document.getElementById('qwen-debug-toggle');
-        const content = document.getElementById('qwen-debug-content');
-        const log = document.getElementById('debug-log');
-
-        function appendLog(msg) {
-            console.log('[Qwen Tester]', msg);
-            log.textContent += `\n${new Date().toTimeString().slice(0,8)} > ${msg}`;
-            log.scrollTop = log.scrollHeight;
-        }
-
-        function clearLog() {
-            log.textContent = '';
-        }
-
-        toggle.onclick = () => {
-            content.style.display = content.style.display === 'none' ? 'block' : 'none';
-        };
-
-        content.addEventListener('click', e => {
-            const target = e.target.closest('button');
-            if (!target) return;
-
-            const action = target.dataset.action;
-            clearLog();
-            appendLog(`开始执行: ${action}`);
-
-            switch (action) {
-                case 'check-login':
-                    appendLog('🔍 正在检测登录状态...');
-                    checkLoginStatus((isLoggedIn, name, usedSel) => {
-                        if (isLoggedIn) {
-                            appendLog(`✅ 已登录！你好，${name}！\n📍 来自选择器: ${usedSel}`);
-                        } else {
-                            const hasAuth = /auth=[^;]+/.test(document.cookie);
-                            appendLog(`❌ 未找到用户名元素`);
-                            if (hasAuth) {
-                                appendLog(`🍪 但检测到 auth cookie 存在 → 很可能是页面未完全加载或结构变化`);
-                            } else {
-                                appendLog(`🚫 且无 auth cookie → 可能未真正登录`);
-                            }
-                        }
-                    });
-                    break;
-
-                case 'test-formhash':
-                    getFormHashFromIframe(formhash => {
-                        if (formhash) {
-                            appendLog(`🎉 成功获取 formhash: ${formhash}`);
-                        } else {
-                            appendLog(`❌ 无法获取 formhash，请确认：\n- 是否已登录\n- 广告拦截是否关闭\n- 网络是否正常`);
-                        }
-                    });
-                    break;
-
-                case 'reload-signpage':
-                    clearLog();
-                    appendLog('加载签到页 iframe...');
-                    const iframe = document.createElement('iframe');
-                    iframe.style.cssText = 'position:fixed;top:10px;left:10px;width:300px;height:400px;z-index:9999;border:2px solid #00aaff;';
-                    iframe.src = SIGN_PLUGIN_URL;
-
-                    iframe.onload = () => {
-                        try {
-                            const doc = iframe.contentDocument || iframe.contentWindow.document;
-                            const input = doc.querySelector('input[name="formhash"]');
-                            if (input && input.value) {
-                                appendLog(`🟢 iframe 加载成功！formhash: ${input.value}`);
-                            } else {
-                                appendLog(`🟡 页面加载但未找到 formhash`);
-                            }
-                        } catch (e) {
-                            appendLog(`⛔ 无法访问内容: ${e.message}`);
-                        }
-                    };
-                    iframe.onerror = () => appendLog('🔴 iframe 加载失败');
-                    document.body.appendChild(iframe);
-
-                    const btn = document.createElement('button');
-                    btn.textContent = '× 关闭测试 iframe';
-                    btn.onclick = () => {
-                        iframe.remove();
-                        btn.remove();
-                    };
-                    btn.style.cssText = 'position:fixed;top:10px;right:10px;z-index:10000;background:red;color:white;border:none;padding:8px;font-size:12px;';
-                    document.body.appendChild(btn);
-                    break;
-
-                case 'clear-today':
-                    const key = getTodayKey();
-                    localStorage.removeItem(key);
-                    appendLog(`🗑️ 已清除今日标记: ${key}\n明天可再次运行`);
-                    break;
-            }
-        });
-    }
-
-    // ===== 只在首页加载一次调试面板 =====
-    if (window.location.href.includes('pc.sysbbs.com')) {
-        setTimeout(createDebugPanel, 2000);
-    }
+    })();
 
 })();
