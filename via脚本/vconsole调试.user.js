@@ -1,7 +1,7 @@
 // ==UserScript==
 // @name         VConsole中文面板（刷新不丢日志+纯中文界面）
 // @namespace    http://tampermonkey.net/
-// @version      0.8
+// @version      1.7
 // @description  内置中文语言包，刷新保留日志，强制中文界面
 // @author       自定义
 // @match        *://*/*
