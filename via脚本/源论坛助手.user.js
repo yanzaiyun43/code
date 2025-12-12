@@ -1,7 +1,7 @@
 // ==UserScript==
 // @name         源论坛助手
-// @version      3.3
-// @description  签到+发帖+iframe安全取数+浮动测试面板
+// @version      3.4
+// @description   签到+发帖+浮动面板
 // @author       ailmel
 // @match        https://pc.sysbbs.com/*
 // @run-at       document-end
@@ -73,7 +73,6 @@
 
     // ===== 获取 formhash —— 通过 iframe 安全加载 =====
     function getFormHashFromIframe(callback) {
-        // 缓存机制：5分钟内不重复加载 iframe
         const cached = localStorage.getItem('cached_sign_formhash');
         const cacheTime = localStorage.getItem('cached_sign_formhash_time');
         const now = Date.now();
@@ -96,11 +95,8 @@
                 const input = doc.querySelector('input[name="formhash"]');
                 if (input && input.value) {
                     const formhash = input.value;
-
-                    // 缓存结果
                     localStorage.setItem('cached_sign_formhash', formhash);
                     localStorage.setItem('cached_sign_formhash_time', now);
-
                     console.log('🎉 成功从 iframe 获取 formhash:', formhash);
                     callback(formhash);
                 } else {
@@ -111,7 +107,7 @@
                 console.error('⛔ 无法访问 iframe 内容（跨域？）', err);
                 callback(null);
             } finally {
-                setTimeout(() => iframe.remove(), 2000); // 清理
+                setTimeout(() => iframe.remove(), 2000);
             }
         };
 
@@ -127,7 +123,6 @@
     function doRealSign(callback) {
         showStatus('🔔 正在尝试签到...', 'info');
 
-        // 从 iframe 获取 formhash
         getFormHashFromIframe(formhash => {
             if (!formhash) {
                 showStatus('⚠️ 无法获取 formhash（iframe 失败），跳过签到', 'warn');
@@ -194,6 +189,7 @@
             '刷一下存在感 😄 生活需要一点小仪式感',
             '最近工作有点累，但还是来看看大家',
             '默默关注中，偶尔冒个泡，别见怪',
+            '看到几个有意思的帖子，挺有意思',
             '今天天气不错，心情也挺好~',
             '好久没来了，论坛还是这么热闹',
             '刚吃完饭，顺手打开看看有什么新鲜事',
@@ -241,7 +237,7 @@
                         if (index < TRIPLE_POST_COUNT - 1) {
                             setTimeout(() => sendOnePost(formhash, index + 1), 1800);
                         } else {
-                            showStatus('🎉 三帖全部完成！活跃达成 ✨', 'success');
+                            showStatus('🎉 三帖全部完成！低调活跃达成 ✨', 'success');
                         }
                     } else {
                         showStatus(`❌ 第${index+1}失败，继续下一帖`, 'warn');
@@ -294,7 +290,41 @@
         setTimeout(main, 500);
     }
 
-    // ===== 浮动调试面板：Qwen Tester =====
+    // ===== 登录检测 =====
+    function checkLoginStatus(callback) {
+        const selectors = [
+            '.uinfo a',
+            '#umenu a',
+            '.username a',
+            '.userinfo a',
+            '.user_tit.fyy' 
+        ];
+
+        const maxTries = 3;
+        let attempts = 0;
+
+        function tryFind() {
+            for (let sel of selectors) {
+                const el = document.querySelector(sel);
+                if (el && el.textContent.trim()) {
+                    // 清洗文本：去除首尾空格、引号
+                    const text = el.textContent.trim().replace(/^["'\s]+|["'\s]+$/g, '');
+                    return callback(true, text, sel);
+                }
+            }
+
+            attempts++;
+            if (attempts < maxTries) {
+                setTimeout(tryFind, 800);
+            } else {
+                callback(false);
+            }
+        }
+
+        tryFind();
+    }
+
+    // ===== 浮动调试面板 =====
     function createDebugPanel() {
         const panel = document.createElement('div');
         panel.innerHTML = `
@@ -318,7 +348,7 @@
                 box-shadow: 0 6px 20px rgba(0,0,0,0.15);
                 z-index: 999998; overflow-y: auto;
             ">
-                <h3 style="margin: 0 0 12px; color: #333;">🐾 测试器</h3>
+                <h3 style="margin: 0 0 12px; color: #333;">🐾 测试器 v3.4</h3>
                 <button data-action="check-login" style="btn">🔍 检查登录</button><br><br>
                 <button data-action="test-formhash" style="btn">🔑 测试 formhash</button><br><br>
                 <button data-action="reload-signpage" style="btn">🔄 重载签到页 iframe</button><br><br>
@@ -331,7 +361,6 @@
             </div>
         `;
 
-        // 添加按钮样式
         const style = document.createElement('style');
         style.textContent = `
             #qwen-debug-content button[style="btn"] {
@@ -366,7 +395,6 @@
             content.style.display = content.style.display === 'none' ? 'block' : 'none';
         };
 
-        // 点击事件委托
         content.addEventListener('click', e => {
             const target = e.target.closest('button');
             if (!target) return;
@@ -377,12 +405,20 @@
 
             switch (action) {
                 case 'check-login':
-                    const usernameEl = document.querySelector('.uinfo a') || document.querySelector('#umenu a');
-                    if (usernameEl?.textContent.trim()) {
-                        appendLog(`✅ 已登录，用户名: ${usernameEl.textContent.trim()}`);
-                    } else {
-                        appendLog(`❌ 未检测到用户名，请检查是否登录`);
-                    }
+                    appendLog('🔍 正在检测登录状态...');
+                    checkLoginStatus((isLoggedIn, name, usedSel) => {
+                        if (isLoggedIn) {
+                            appendLog(`✅ 已登录！你好，${name}！\n📍 来自选择器: ${usedSel}`);
+                        } else {
+                            const hasAuth = /auth=[^;]+/.test(document.cookie);
+                            appendLog(`❌ 未找到用户名元素`);
+                            if (hasAuth) {
+                                appendLog(`🍪 但检测到 auth cookie 存在 → 很可能是页面未完全加载或结构变化`);
+                            } else {
+                                appendLog(`🚫 且无 auth cookie → 可能未真正登录`);
+                            }
+                        }
+                    });
                     break;
 
                 case 'test-formhash':
@@ -418,7 +454,6 @@
                     iframe.onerror = () => appendLog('🔴 iframe 加载失败');
                     document.body.appendChild(iframe);
 
-                    // 添加关闭按钮
                     const btn = document.createElement('button');
                     btn.textContent = '× 关闭测试 iframe';
                     btn.onclick = () => {
@@ -438,9 +473,9 @@
         });
     }
 
-    // ===== 首页加载一次调试面板 =====
+    // ===== 只在首页加载一次调试面板 =====
     if (window.location.href.includes('pc.sysbbs.com')) {
-        setTimeout(createDebugPanel, 2000); // 延迟加载，避免干扰主流程
+        setTimeout(createDebugPanel, 2000);
     }
 
 })();
