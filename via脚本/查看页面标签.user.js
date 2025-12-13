@@ -1,7 +1,7 @@
 // ==UserScript==
 // @name         页面标签详细查看器 (点击展开)
 // @description  点击右上角按钮查看标签摘要，再点击摘要查看详细信息。
-// @version      2.1
+// @version      2.2
 // @author       AI Assistant
 // @match        *://*/*
 // @grant        GM_addStyle
@@ -210,7 +210,18 @@
             // 创建标签组标题 (例如: <div> (50))
             const title = document.createElement('h4');
             title.className = 'tag-group-title';
-            title.innerHTML = `<span class="expand-icon">▶</span><span><${tag.toLowerCase()}> (${elements.length})</span>`;
+
+            // --- 修复点：使用更稳健的DOM方法来创建标题 ---
+            const iconSpan = document.createElement('span');
+            iconSpan.className = 'expand-icon';
+            iconSpan.textContent = '▶';
+
+            const textSpan = document.createElement('span');
+            textSpan.textContent = `<${tag.toLowerCase()}> (${elements.length})`;
+
+            title.appendChild(iconSpan);
+            title.appendChild(textSpan);
+            // --- 修复结束 ---
             
             // 创建用于存放示例的子列表
             const exampleList = document.createElement('ul');
