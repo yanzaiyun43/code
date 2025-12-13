@@ -1,7 +1,7 @@
 // ==UserScript==
-// @name         页面标签详细查看器
-// @description  点击右上角按钮，分层查看页面所有HTML标签、数量及详细示例。
-// @version      2.0
+// @name         页面标签详细查看器 (点击展开)
+// @description  点击右上角按钮查看标签摘要，再点击摘要查看详细信息。
+// @version      2.1
 // @author       AI Assistant
 // @match        *://*/*
 // @grant        GM_addStyle
@@ -12,14 +12,14 @@
 
     // 使用 GM_addStyle 添加样式，避免污染页面
     GM_addStyle(`
-        /* 查看标签按钮的样式 - 移动到右上角 */
+        /* 查看标签按钮的样式 - 右上角 */
         .via-tag-viewer-btn {
             position: fixed;
-            top: 20px; /* 从 bottom 改为 top */
+            top: 20px;
             right: 20px;
             z-index: 99999;
             padding: 10px 15px;
-            background-color: #28a745; /* 换个颜色以示区分 */
+            background-color: #17a2b8; /* 换个颜色以示区分 */
             color: white;
             border: none;
             border-radius: 5px;
@@ -29,7 +29,7 @@
             font-family: sans-serif;
         }
         .via-tag-viewer-btn:hover {
-            background-color: #218838;
+            background-color: #138496;
         }
 
         /* 结果显示覆盖层的样式 */
@@ -41,9 +41,9 @@
             height: 100%;
             background-color: rgba(0, 0, 0, 0.7);
             z-index: 100000;
-            display: none; /* 默认隐藏 */
+            display: none;
             justify-content: center;
-            align-items: flex-start; /* 改为顶部对齐，防止长列表居中 */
+            align-items: flex-start;
             padding-top: 20px;
         }
 
@@ -58,7 +58,6 @@
             box-shadow: 0 5px 25px rgba(0,0,0,0.4);
             font-family: system-ui, sans-serif;
         }
-
         .via-tag-viewer-panel h3 {
             margin-top: 0;
             text-align: center;
@@ -74,11 +73,11 @@
             margin: 15px 0;
         }
         .via-tag-viewer-list > li {
-            margin-bottom: 15px;
+            margin-bottom: 10px;
             background-color: #f8f9fa;
             border: 1px solid #e9ecef;
             border-radius: 6px;
-            overflow: hidden; /* 确保内部圆角效果 */
+            overflow: hidden;
         }
 
         /* 标签组标题的样式 */
@@ -90,26 +89,48 @@
             font-family: 'Courier New', Courier, monospace;
             font-size: 1.1em;
             font-weight: bold;
-            cursor: pointer; /* 添加指针，暗示可交互 */
+            cursor: pointer;
+            display: flex;
+            align-items: center;
         }
         .tag-group-title:hover {
             background-color: #dee2e6;
         }
+        /* 展开图标 */
+        .expand-icon {
+            display: inline-block;
+            margin-right: 10px;
+            transition: transform 0.2s ease-in-out;
+            font-size: 0.8em;
+        }
+        .via-tag-viewer-list > li.expanded .expand-icon {
+            transform: rotate(90deg);
+        }
 
-        /* 标签示例子列表的样式 */
+        /* 标签示例子列表的样式 - 默认隐藏 */
         .tag-example-list {
             list-style: none;
             padding: 0;
             margin: 0;
+            max-height: 0;
+            overflow: hidden;
+            transition: max-height 0.4s ease-out, padding 0.4s ease-out;
         }
+        /* 展开时显示 */
+        .via-tag-viewer-list > li.expanded .tag-example-list {
+            max-height: 500px; /* 设置一个足够大的值 */
+            padding: 10px 0;
+            overflow-y: auto;
+        }
+
         .tag-example-list li {
-            padding: 10px 20px;
+            padding: 8px 20px;
             border-top: 1px dashed #ced4da;
             font-family: 'Courier New', Courier, monospace;
             font-size: 0.9em;
             color: #343a40;
-            word-break: break-all; /* 防止长代码撑破布局 */
-            white-space: pre-wrap; /* 保留空格和换行 */
+            word-break: break-all;
+            white-space: pre-wrap;
         }
         .tag-example-list li:first-child {
             border-top: none;
@@ -189,9 +210,8 @@
             // 创建标签组标题 (例如: <div> (50))
             const title = document.createElement('h4');
             title.className = 'tag-group-title';
-            title.textContent = `<${tag.toLowerCase()}> (${elements.length})`;
-            groupLi.appendChild(title);
-
+            title.innerHTML = `<span class="expand-icon">▶</span><span><${tag.toLowerCase()}> (${elements.length})</span>`;
+            
             // 创建用于存放示例的子列表
             const exampleList = document.createElement('ul');
             exampleList.className = 'tag-example-list';
@@ -202,15 +222,12 @@
 
             for (const element of examplesToShow) {
                 const exampleLi = document.createElement('li');
-                // 克隆节点以避免影响原始页面，并获取其outerHTML
                 const clone = element.cloneNode(false);
-                // 移除可能引起问题的脚本属性
                 ['onload', 'onerror', 'onclick', 'onmouseover'].forEach(attr => clone.removeAttribute(attr));
-                exampleLi.textContent = clone.outerHTML.replace(/></g, '>\n<'); // 稍微格式化一下
+                exampleLi.textContent = clone.outerHTML.replace(/></g, '>\n<');
                 exampleList.appendChild(exampleLi);
             }
 
-            // 如果元素超过5个，添加一个提示
             if (elements.length > maxExamples) {
                 const moreLi = document.createElement('li');
                 moreLi.style.fontStyle = 'italic';
@@ -219,8 +236,22 @@
                 exampleList.appendChild(moreLi);
             }
 
+            groupLi.appendChild(title);
             groupLi.appendChild(exampleList);
             listContainer.appendChild(groupLi);
+
+            // 为每个标题添加点击事件来展开/收起
+            title.addEventListener('click', () => {
+                // 手风琴效果：关闭其他所有已展开的项
+                const allItems = listContainer.querySelectorAll('li');
+                allItems.forEach(item => {
+                    if (item !== groupLi && item.classList.contains('expanded')) {
+                        item.classList.remove('expanded');
+                    }
+                });
+                // 切换当前项的展开状态
+                groupLi.classList.toggle('expanded');
+            });
         }
 
         // 显示覆盖层
@@ -233,8 +264,6 @@
     };
 
     closeBtn.addEventListener('click', closeOverlay);
-
-    // 点击覆盖层的背景也可以关闭
     overlay.addEventListener('click', (e) => {
         if (e.target === overlay) {
             closeOverlay();
