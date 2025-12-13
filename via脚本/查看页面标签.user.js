@@ -1,7 +1,7 @@
 // ==UserScript==
 // @name         页面标签详细查看器 (点击展开)
-// @description  点击右上角按钮查看标签摘要，再点击摘要查看详细信息。
-// @version      2.2
+// @description  点击右上角按钮查看标签摘要，再点击摘要查看详细信息。初始只显示10个示例，可点击加载更多。
+// @version      2.4
 // @author       AI Assistant
 // @match        *://*/*
 // @grant        GM_addStyle
@@ -19,7 +19,7 @@
             right: 20px;
             z-index: 99999;
             padding: 10px 15px;
-            background-color: #17a2b8; /* 换个颜色以示区分 */
+            background-color: #17a2b8;
             color: white;
             border: none;
             border-radius: 5px;
@@ -118,7 +118,7 @@
         }
         /* 展开时显示 */
         .via-tag-viewer-list > li.expanded .tag-example-list {
-            max-height: 500px; /* 设置一个足够大的值 */
+            max-height: 1000px; /* 增加最大高度以容纳更多内容 */
             padding: 10px 0;
             overflow-y: auto;
         }
@@ -137,6 +137,24 @@
         }
         .tag-example-list li:hover {
             background-color: #f1f3f5;
+        }
+
+        /* 加载更多按钮的样式 */
+        .via-tag-viewer-load-more-btn {
+            display: block;
+            width: calc(100% - 40px); /* 留出与li相同的padding */
+            margin: 10px 20px;
+            padding: 8px;
+            border: 1px solid #007bff;
+            background-color: #f8f9fa;
+            color: #007bff;
+            border-radius: 4px;
+            cursor: pointer;
+            font-size: 14px;
+            text-align: center;
+        }
+        .via-tag-viewer-load-more-btn:hover {
+            background-color: #e2e6ea;
         }
 
         /* 关闭按钮的样式 */
@@ -182,13 +200,10 @@
 
     // 3. 为“查看标签”按钮添加点击事件
     showTagsBtn.addEventListener('click', () => {
-        // 清空上一次的结果
         listContainer.innerHTML = '';
 
-        // 获取页面上所有元素并按标签名分组
         const allElements = document.getElementsByTagName('*');
         const tagGroups = {};
-
         for (const element of allElements) {
             const tagName = element.tagName;
             if (!tagGroups[tagName]) {
@@ -197,21 +212,18 @@
             tagGroups[tagName].push(element);
         }
 
-        // 对标签名进行排序
-        const sortedTags = Object.keys(tagGroups).sort();
+        const sortedTags = Object.keys(tagGroups).sort((a, b) => a.toLowerCase().localeCompare(b.toLowerCase()));
 
-        // 将统计结果渲染到列表中
+        // --- 修改点：按需加载逻辑 ---
+        const initialLoadCount = 10; // 初始显示数量
+
         for (const tag of sortedTags) {
             const elements = tagGroups[tag];
-
-            // 创建标签组的主容器
             const groupLi = document.createElement('li');
 
-            // 创建标签组标题 (例如: <div> (50))
             const title = document.createElement('h4');
             title.className = 'tag-group-title';
 
-            // --- 修复点：使用更稳健的DOM方法来创建标题 ---
             const iconSpan = document.createElement('span');
             iconSpan.className = 'expand-icon';
             iconSpan.textContent = '▶';
@@ -221,30 +233,40 @@
 
             title.appendChild(iconSpan);
             title.appendChild(textSpan);
-            // --- 修复结束 ---
-            
-            // 创建用于存放示例的子列表
+
             const exampleList = document.createElement('ul');
             exampleList.className = 'tag-example-list';
 
-            // 最多显示5个示例
-            const maxExamples = 5;
-            const examplesToShow = elements.slice(0, maxExamples);
-
-            for (const element of examplesToShow) {
+            // 初始加载
+            const initialExamples = elements.slice(0, initialLoadCount);
+            initialExamples.forEach(element => {
                 const exampleLi = document.createElement('li');
                 const clone = element.cloneNode(false);
                 ['onload', 'onerror', 'onclick', 'onmouseover'].forEach(attr => clone.removeAttribute(attr));
                 exampleLi.textContent = clone.outerHTML.replace(/></g, '>\n<');
                 exampleList.appendChild(exampleLi);
-            }
+            });
 
-            if (elements.length > maxExamples) {
-                const moreLi = document.createElement('li');
-                moreLi.style.fontStyle = 'italic';
-                moreLi.style.color = '#6c757d';
-                moreLi.textContent = `... 还有 ${elements.length - maxExamples} 个`;
-                exampleList.appendChild(moreLi);
+            // 如果数量超过初始加载数，则创建“加载更多”按钮
+            if (elements.length > initialLoadCount) {
+                const loadMoreBtn = document.createElement('button');
+                loadMoreBtn.className = 'via-tag-viewer-load-more-btn';
+                loadMoreBtn.textContent = `加载更多 (剩余 ${elements.length - initialLoadCount} 个)`;
+
+                loadMoreBtn.addEventListener('click', () => {
+                    // 加载剩余的元素
+                    const remainingExamples = elements.slice(initialLoadCount);
+                    remainingExamples.forEach(element => {
+                        const exampleLi = document.createElement('li');
+                        const clone = element.cloneNode(false);
+                        ['onload', 'onerror', 'onclick', 'onmouseover'].forEach(attr => clone.removeAttribute(attr));
+                        exampleLi.textContent = clone.outerHTML.replace(/></g, '>\n<');
+                        exampleList.appendChild(exampleLi);
+                    });
+                    // 移除“加载更多”按钮
+                    loadMoreBtn.remove();
+                });
+                exampleList.appendChild(loadMoreBtn);
             }
 
             groupLi.appendChild(title);
@@ -253,19 +275,17 @@
 
             // 为每个标题添加点击事件来展开/收起
             title.addEventListener('click', () => {
-                // 手风琴效果：关闭其他所有已展开的项
                 const allItems = listContainer.querySelectorAll('li');
                 allItems.forEach(item => {
                     if (item !== groupLi && item.classList.contains('expanded')) {
                         item.classList.remove('expanded');
                     }
                 });
-                // 切换当前项的展开状态
                 groupLi.classList.toggle('expanded');
             });
         }
+        // --- 修改结束 ---
 
-        // 显示覆盖层
         overlay.style.display = 'flex';
     });
 
