@@ -1,8 +1,8 @@
 // ==UserScript==
-// @name         Download JS files helper
+// @name         Download JS – 零配置版（不 fetch）
 // @namespace    https://example.com
-// @version      1.0
-// @description  给页面里所有 .js 链接追加一个“下载”按钮
+// @version      1.1
+// @description  给页面所有 .js 链接加一个“下载”按钮，不 fetch，无 CORS 问题
 // @author       You
 // @match        *://*/*
 // @grant        none
@@ -11,55 +11,47 @@
 (function () {
     'use strict';
 
-    // 创建下载按钮
-    function makeBtn(href, fileName) {
-        const a = document.createElement('a');
-        a.textContent = '⬇ JS';
-        a.href = '#';
-        a.style.marginLeft = '6px';
-        a.style.fontSize = '12px';
-        a.style.color = '#fff';
-        a.style.background = '#007bff';
-        a.style.padding = '2px 6px';
-        a.style.borderRadius = '3px';
-        a.style.textDecoration = 'none';
-        a.title = '下载 ' + fileName;
+    /* 创建下载按钮 */
+    function addDownloadBtn(linkElem) {
+        if (linkElem.dataset.dlBtn) return;          // 已处理过
+        linkElem.dataset.dlBtn = '1';
 
-        a.onclick = e => {
-            e.preventDefault();
-            fetch(href)
-                .then(r => r.blob())
-                .then(blob => {
-                    const url = URL.createObjectURL(blob);
-                    const tmp = document.createElement('a');
-                    tmp.href = url;
-                    tmp.download = fileName;
-                    document.body.appendChild(tmp);
-                    tmp.click();
-                    tmp.remove();
-                    URL.revokeObjectURL(url);
-                })
-                .catch(err => alert('下载失败: ' + err));
+        const fileName = linkElem.href.split('/').pop() || 'file.js';
+
+        const btn = document.createElement('a');
+        btn.textContent = '⬇ JS';
+        btn.href = '#';
+        btn.style.marginLeft = '6px';
+        btn.style.fontSize = '12px';
+        btn.style.color = '#fff';
+        btn.style.background = '#007bff';
+        btn.style.padding = '2px 6px';
+        btn.style.borderRadius = '3px';
+        btn.style.textDecoration = 'none';
+        btn.title = '零配置下载 ' + fileName;
+
+        btn.onclick = ev => {
+            ev.preventDefault();
+
+            // 核心：新建一个带 download 属性的 <a>，指向原链接
+            const dummy = document.createElement('a');
+            dummy.href = linkElem.href;
+            dummy.download = fileName;   // 告诉浏览器“这是附件”
+            dummy.style.display = 'none';
+            document.body.appendChild(dummy);
+            dummy.click();
+            dummy.remove();
         };
-        return a;
+
+        linkElem.parentNode.insertBefore(btn, linkElem.nextSibling);
     }
 
-    // 扫描并追加按钮
+    /* 扫描并补按钮 */
     function scan() {
-        document.querySelectorAll('a[href$=".js"]').forEach(el => {
-            if (el.dataset.downloadBtn) return;   // 已处理过
-            el.dataset.downloadBtn = '1';
-
-            const href = el.href;
-            const fileName = href.split('/').pop();
-            el.parentNode.insertBefore(makeBtn(href, fileName), el.nextSibling);
-        });
+        document.querySelectorAll('a[href$=".js"]').forEach(addDownloadBtn);
     }
 
-    // 首次执行
+    /* 首次 + 动态内容 */
     scan();
-
-    // 对 SPA / Ajax 页面也有效
-    const mo = new MutationObserver(scan);
-    mo.observe(document.body, { childList: true, subtree: true });
+    new MutationObserver(scan).observe(document.body, { childList: true, subtree: true });
 })();
