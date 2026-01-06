@@ -1,8 +1,8 @@
 // ==UserScript==
-// @name         xuexi365 复制原图链接（origin.jpg）
+// @name         xuexi365 一键复制原图（多张图适配）
 // @namespace    https://github.com/yourname
-// @version      2.0
-// @description  复制接口返回的 origin.jpg 原图地址，而非压缩图
+// @version      3.0
+// @description  复制接口返回的 origin.jpg 原图，支持一次发 N 张图
 // @author       you
 // @match        *://*.xuexi365.com/*
 // @grant        GM_setClipboard
@@ -12,29 +12,30 @@
 (() => {
   'use strict';
 
-  const map = new Map();            // key: 压缩图url → value: 原图url
-  const done = new WeakSet();       // 已挂按钮的<img>
+  const map = new Map();   // 压缩图 → 原图
+  const done = new WeakSet();
 
-  /* 从响应文本里提取原图地址 */
-  function extractOrigin(body) {
+  /* 提取成对地址 */
+  function extractPairs(body) {
     if (typeof body !== 'string') return;
-    let m;
-    // 匹配 "imgUrl":"https://...../origin.jpg?..."
-    const reg = /"imgUrl"\s*:\s*"([^"]+\/origin\.jpg[^"]*)"/g;
-    while ((m = reg.exec(body))) {
-      const origin = m[1];
-      // 同时生成对应的压缩图地址（简单替换）
-      const thumb = origin.replace(/\/origin\.jpg/, '/778_778Q50.jpg');
-      map.set(thumb, origin);
-    }
+    try {
+      const obj = JSON.parse(body);
+      const datas = obj?.data?.datas || [];
+      datas.forEach(post => {
+        (post.img_data || []).forEach(item => {
+          if (item.litimg && item.imgUrl) {
+            map.set(item.litimg, item.imgUrl);   // 一一对应
+          }
+        });
+      });
+    } catch (_) {}
   }
 
   /* 给单张图挂按钮 */
   function addBtn(img) {
     if (done.has(img)) return;
-    const thumb = img.src;
-    const origin = map.get(thumb);
-    if (!origin) return;          // 还没拿到对应原图
+    const origin = map.get(img.src);
+    if (!origin) return;
     const box = img.parentElement;
     if (!box) return;
     const btn = document.createElement('span');
@@ -55,7 +56,7 @@
     };
   }
 
-  /* 1. 拦截 XHR */
+  /* 拦截 XHR / fetch 拿响应 */
   const open = XMLHttpRequest.prototype.open;
   const send = XMLHttpRequest.prototype.send;
   XMLHttpRequest.prototype.open = function (m, u) {
@@ -63,33 +64,22 @@
     return open.apply(this, arguments);
   };
   XMLHttpRequest.prototype.send = function () {
-    this.addEventListener('load', () => {
-      try { extractOrigin(this.responseText); } catch (_) {}
-    });
+    this.addEventListener('load', () => extractPairs(this.responseText));
     return send.apply(this, arguments);
   };
-
-  /* 2. 拦截 fetch */
   const _fetch = window.fetch;
   window.fetch = async (...args) => {
     const r = await _fetch(...args);
-    try {
-      const clone = r.clone();
-      const txt = await clone.text();
-      extractOrigin(txt);
-    } catch (_) {}
+    try { extractPairs(await r.clone().text()); } catch (_) {}
     return r;
   };
 
-  /* 3. DOM 监听 */
-  const ob = new MutationObserver(() => {
-    document.querySelectorAll('img').forEach(addBtn);
-  });
-  if (document.body) {
-    ob.observe(document.body, { childList: true, subtree: true });
-  } else {
-    document.addEventListener('DOMContentLoaded', () =>
-      ob.observe(document.body, { childList: true, subtree: true })
-    );
-  }
+  /* DOM 监听 */
+  const ob = new MutationObserver(() =>
+    document.querySelectorAll('img').forEach(addBtn)
+  );
+  if (document.body) ob.observe(document.body, { childList: true, subtree: true });
+  else document.addEventListener('DOMContentLoaded', () =>
+    ob.observe(document.body, { childList: true, subtree: true })
+  );
 })();
