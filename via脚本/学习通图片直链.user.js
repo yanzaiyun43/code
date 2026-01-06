@@ -1,9 +1,9 @@
 // ==UserScript==
 // @name         图片直链
 // @namespace    https://github.com/yanzaiyun43
-// @version      4.0.2
-// @description  自动显示复制按钮，一键获取学习通原图链接
-// @author       ailmel
+// @version      4.0.3
+// @description  智能识别所有原图链接，动态添加复制按钮
+// @author       Qwen (enhanced by ailmel's base)
 // @match        *://*.xuexi365.com/*
 // @grant        GM_setClipboard
 // @run-at       document-idle
@@ -12,130 +12,221 @@
 (() => {
   'use strict';
 
-  const urlMap = new Map();  // 缩略图URL → 原图URL
-  const processedImages = new WeakSet(); // 已处理的图片元素
-
-  // 从网络响应中提取图片映射关系
-  const extractImagePairs = (responseText) => {
-    if (typeof responseText !== 'string') return;
+  // ===== 核心存储 =====
+  const urlMap = new Map(); // 存储所有已发现的缩略图→原图映射
+  const processedImages = new WeakSet(); // 防止重复处理
+  const pendingChecks = new WeakMap(); // 存储待检查的图片
+  
+  // ===== 智能数据提取 =====
+  const extractImagePairs = (text) => {
     try {
-      const data = JSON.parse(responseText);
+      const data = JSON.parse(text);
       const posts = data?.data?.datas || [];
+      let newMappings = 0;
       
       posts.forEach(post => {
         (post.img_data || []).forEach(img => {
-          if (img.litimg && img.imgUrl) {
-            // 存储多种可能的缩略图变体
-            urlMap.set(new URL(img.litimg).pathname, img.imgUrl);
-            urlMap.set(new URL(img.imgUrl).pathname, img.imgUrl); // 兜底原图
-            
-            // 处理可能的CDN参数变体
-            ['rw', 'rh', '_fileSize', '_orientation'].forEach(param => {
-              const url = new URL(img.litimg);
-              url.searchParams.delete(param);
-              urlMap.set(url.pathname, img.imgUrl);
-            });
-          }
+          if (!img.litimg || !img.imgUrl) return;
+          
+          // 存储多种匹配模式
+          const patterns = [
+            img.litimg, // 完整URL
+            new URL(img.litimg).pathname, // 仅路径
+            img.litimg.split('?')[0], // 无参数
+            img.imgUrl.split('/origin.')[0] // CDN基础路径
+          ];
+          
+          patterns.forEach(pattern => {
+            if (!urlMap.has(pattern)) {
+              urlMap.set(pattern, img.imgUrl);
+              newMappings++;
+            }
+          });
         });
       });
+      
+      // 有新数据时触发全量检查
+      if (newMappings > 0) {
+        console.log(`[原图助手] 发现 ${newMappings} 个新映射，触发全量检查`);
+        checkAllImages();
+      }
     } catch (e) {
-      console.debug('[图片直链] 响应解析失败:', e);
+      console.debug('[原图助手] 非图片数据或解析失败', e);
     }
   };
 
-  // 为单张图片添加复制按钮
-  const addCopyButton = (img) => {
+  // ===== 图片匹配引擎 =====
+  const matchOriginalUrl = (img) => {
+    if (!img.src) return null;
+    
+    // 1. 尝试精确匹配
+    if (urlMap.has(img.src)) return urlMap.get(img.src);
+    
+    // 2. 尝试路径匹配
+    const path = new URL(img.src, location.href).pathname;
+    if (urlMap.has(path)) return urlMap.get(path);
+    
+    // 3. 模糊匹配 (处理CDN参数变化)
+    for (const [pattern, originUrl] of urlMap) {
+      if (typeof pattern === 'string' && img.src.includes(pattern)) {
+        return originUrl;
+      }
+    }
+    
+    // 4. 尝试父容器数据 (学习通特有)
+    const parent = img.closest('[data-imgdata]');
+    if (parent) {
+      try {
+        const imgData = JSON.parse(parent.dataset.imgdata);
+        if (imgData.imgUrl) return imgData.imgUrl;
+      } catch (e) {}
+    }
+    
+    return null;
+  };
+
+  // ===== 按钮创建与管理 =====
+  const createCopyButton = (img, originalUrl) => {
+    // 创建/复用容器
+    let container = img.parentElement;
+    if (!container || getComputedStyle(container).position === 'static') {
+      if (!img.dataset.originalParent) {
+        img.dataset.originalParent = 'relative-container';
+        container = document.createElement('div');
+        container.style.cssText = `
+          position: relative; 
+          display: inline-block;
+          max-width: 100%;
+        `;
+        img.parentNode.insertBefore(container, img);
+        container.appendChild(img);
+      } else {
+        container = img.parentElement;
+      }
+    }
+
+    // 防止重复创建
+    if (container.querySelector('.qwen-copy-btn')) return;
+    
+    // 创建按钮
+    const btn = document.createElement('button');
+    btn.className = 'qwen-copy-btn';
+    Object.assign(btn.style, {
+      position: 'absolute',
+      top: '4px',
+      right: '4px',
+      background: 'linear-gradient(135deg, #6a11cb 0%, #2575fc 100%)',
+      color: 'white',
+      border: 'none',
+      borderRadius: '12px',
+      padding: '2px 8px',
+      fontSize: '12px',
+      fontWeight: 'bold',
+      cursor: 'pointer',
+      zIndex: '9999',
+      boxShadow: '0 2px 6px rgba(0,0,0,0.25)',
+      transition: 'all 0.3s ease',
+      backdropFilter: 'blur(2px)',
+    });
+    btn.innerHTML = '🔗 GET URL';
+    btn.title = '复制高清原图链接';
+    
+    // 交互效果
+    btn.onmouseenter = () => {
+      btn.style.transform = 'scale(1.05)';
+      btn.style.boxShadow = '0 3px 8px rgba(0,0,0,0.35)';
+    };
+    btn.onmouseleave = () => {
+      btn.style.transform = 'scale(1)';
+      btn.style.boxShadow = '0 2px 6px rgba(0,0,0,0.25)';
+    };
+    
+    // 复制逻辑 (带反馈)
+    btn.onclick = async (e) => {
+      e.stopPropagation();
+      e.preventDefault();
+      
+      try {
+        await GM_setClipboard(originalUrl, 'text');
+        showFeedback(btn, '✓ COPIED!', '#00c853');
+      } catch (err) {
+        console.error('[原图助手] 复制失败:', err);
+        showFeedback(btn, '✗ FAILED', '#ff1744');
+      }
+    };
+    
+    container.appendChild(btn);
+    processedImages.add(img);
+    return btn;
+  };
+  
+  // 按钮反馈动画
+  const showFeedback = (btn, text, color) => {
+    const originalHTML = btn.innerHTML;
+    const originalBg = btn.style.background;
+    
+    btn.innerHTML = text;
+    btn.style.background = color;
+    btn.style.transform = 'scale(1.1)';
+    
+    setTimeout(() => {
+      btn.innerHTML = originalHTML;
+      btn.style.background = originalBg;
+      btn.style.transform = 'scale(1)';
+    }, 1200);
+  };
+
+  // ===== 图片处理核心 =====
+  const processImage = (img) => {
     if (processedImages.has(img) || !img.isConnected) return;
     
-    // 尝试获取最终图片URL (处理懒加载)
-    const finalSrc = img.complete 
-      ? img.src 
-      : img.dataset.src || img.getAttribute('src') || img.src;
+    // 1. 优先尝试直接匹配
+    const originalUrl = matchOriginalUrl(img);
+    if (originalUrl) {
+      createCopyButton(img, originalUrl);
+      return;
+    }
     
-    if (!finalSrc) return;
-    
-    // 从URL中提取路径匹配
-    const path = new URL(finalSrc, location.href).pathname;
-    const originalUrl = Array.from(urlMap.keys()).find(key => 
-      path.includes(key) || path.replace(/_[^/.]+$/, '') === key.replace(/_[^/.]+$/, '')
-    ) ? urlMap.get(path) : null;
-
-    if (!originalUrl) {
-      // 尝试模糊匹配（处理参数变化）
-      for (const [thumbPath, origin] of urlMap) {
-        if (path.includes(thumbPath.split('?')[0])) {
-          urlMap.set(path, origin);
-          addCopyButton(img);
-          return;
-        }
+    // 2. 图片未加载完成时等待
+    if (!img.complete) {
+      if (!pendingChecks.has(img)) {
+        pendingChecks.set(img, setTimeout(() => {
+          pendingChecks.delete(img);
+          processImage(img);
+        }, 800)); // 800ms后重试
       }
       return;
     }
-
-    // 创建按钮容器 (确保覆盖在图片上)
-    let container = img.parentElement;
-    if (!container || getComputedStyle(container).position === 'static') {
-      container = document.createElement('div');
-      container.style.position = 'relative';
-      container.style.display = 'inline-block';
-      img.parentNode.insertBefore(container, img);
-      container.appendChild(img);
+    
+    // 3. 尝试备用方案（父容器数据）
+    const parent = img.closest('.discuss-item, .work-content');
+    if (parent && !parent.dataset.checked) {
+      parent.dataset.checked = 'true';
+      const scriptData = parent.querySelector('script[type="application/json"]');
+      if (scriptData) {
+        try {
+          const data = JSON.parse(scriptData.textContent);
+          (data.img_data || []).forEach(imgData => {
+            urlMap.set(imgData.litimg, imgData.imgUrl);
+          });
+          processImage(img); // 重试
+        } catch (e) {}
+      }
     }
-
-    // 创建复制按钮
-    const btn = document.createElement('button');
-    Object.assign(btn.style, {
-      position: 'absolute',
-      top: '5px',
-      right: '5px',
-      background: 'rgba(255, 69, 0, 0.9)',
-      color: 'white',
-      border: 'none',
-      borderRadius: '3px',
-      padding: '2px 6px',
-      fontSize: '12px',
-      cursor: 'pointer',
-      zIndex: '9999',
-      transition: 'all 0.2s',
-      boxShadow: '0 1px 3px rgba(0,0,0,0.3)'
+  };
+  
+  // 全量检查（当新数据到达时触发）
+  const checkAllImages = () => {
+    document.querySelectorAll('img[src*="chaoxing.com"], img[src*="cldisk.com"]').forEach(img => {
+      if (!processedImages.has(img)) {
+        processImage(img);
+      }
     });
-    btn.innerHTML = '🔗 原图';
-    btn.title = '点击复制原图链接';
-
-    // 按钮悬停效果
-    btn.onmouseenter = () => {
-      btn.style.background = 'rgba(255, 69, 0, 1)';
-      btn.style.transform = 'scale(1.05)';
-    };
-    btn.onmouseleave = () => {
-      btn.style.background = 'rgba(255, 69, 0, 0.9)';
-      btn.style.transform = 'scale(1)';
-    };
-
-    // 点击复制逻辑
-    btn.onclick = (e) => {
-      e.stopPropagation();
-      GM_setClipboard(originalUrl, 'text').then(() => {
-        btn.innerHTML = '✓ 已复制';
-        btn.style.background = 'rgba(46, 204, 113, 0.9)';
-        setTimeout(() => {
-          btn.innerHTML = '🔗 原图';
-          btn.style.background = 'rgba(255, 69, 0, 0.9)';
-        }, 1200);
-      }).catch(err => {
-        console.error('[图片直链] 复制失败:', err);
-        btn.innerHTML = '✗ 失败';
-        setTimeout(() => btn.innerHTML = '🔗 原图', 1000);
-      });
-    };
-
-    container.appendChild(btn);
-    processedImages.add(img);
   };
 
-  // 监听网络请求获取图片映射
+  // ===== 网络监听增强 =====
   const initNetworkHooks = () => {
-    // 拦截XHR
+    // 拦截所有XHR
     const originalOpen = XMLHttpRequest.prototype.open;
     XMLHttpRequest.prototype.open = function(method, url) {
       this._url = url;
@@ -143,7 +234,7 @@
     };
     
     const originalSend = XMLHttpRequest.prototype.send;
-    XMLHttpRequest.prototype.send = function() {
+    XMLHttpRequest.prototype.send = function(body) {
       this.addEventListener('load', function() {
         if (this.status === 200 && this.responseText) {
           extractImagePairs(this.responseText);
@@ -152,100 +243,79 @@
       return originalSend.apply(this, arguments);
     };
 
-    // 拦截Fetch
+    // 拦截所有Fetch
     const originalFetch = window.fetch;
     window.fetch = async (...args) => {
       const response = await originalFetch(...args);
-      if (response.ok && response.headers.get('content-type')?.includes('json')) {
+      if (response ok && response.headers.get('content-type')?.includes('json')) {
         try {
-          const clone = response.clone();
-          const text = await clone.text();
+          const text = await response.clone().text();
           extractImagePairs(text);
         } catch (e) {
-          console.debug('[图片直链] Fetch响应解析失败:', e);
+          console.debug('[原图助手] Fetch解析失败', e);
         }
       }
       return response;
     };
   };
 
-  // 初始化DOM监听
+  // ===== DOM 监听优化 =====
   const initDOMObserver = () => {
-    // 处理初始存在的图片
-    document.querySelectorAll('img').forEach(img => {
-      if (img.complete) {
-        addCopyButton(img);
-      } else {
-        img.addEventListener('load', () => addCopyButton(img), { once: true });
-      }
-    });
-
-    // 监听动态添加的图片
-    const observer = new MutationObserver(mutations => {
+    // 处理初始图片
+    document.querySelectorAll('img').forEach(processImage);
+    
+    // 监听新元素
+    const domObserver = new MutationObserver(mutations => {
       mutations.forEach(mutation => {
         mutation.addedNodes.forEach(node => {
           if (node.nodeType !== 1) return;
           
+          // 处理单个图片
           if (node.tagName === 'IMG') {
-            handleImage(node);
-          } else {
-            node.querySelectorAll('img').forEach(handleImage);
+            processImage(node);
+          } 
+          // 处理包含图片的容器
+          else {
+            node.querySelectorAll('img').forEach(processImage);
           }
         });
       });
     });
-
-    function handleImage(img) {
-      if (processedImages.has(img)) return;
-      
-      if (img.complete) {
-        addCopyButton(img);
-      } else {
-        img.addEventListener('load', () => addCopyButton(img), { once: true });
-      }
-    }
-
-    observer.observe(document.body, {
+    
+    domObserver.observe(document.body, {
       childList: true,
       subtree: true
     });
 
-    // 额外监听src属性变化 (处理懒加载)
+    // 监听src变化 (懒加载)
     const attrObserver = new MutationObserver(mutations => {
       mutations.forEach(m => {
         if (m.type === 'attributes' && m.attributeName === 'src') {
-          addCopyButton(m.target);
+          processImage(m.target);
         }
       });
     });
-
+    
+    // 初始监听所有图片
     document.querySelectorAll('img').forEach(img => {
       attrObserver.observe(img, { attributes: true, attributeFilter: ['src'] });
     });
-
-    // 监听新添加的图片的属性变化
-    observer.observe(document.body, {
-      childList: true,
-      subtree: true,
-      attributes: true,
-      attributeFilter: ['src']
-    });
   };
 
-  // 初始化脚本
+  // ===== 初始化 =====
   const init = () => {
+    console.log('[原图助手] 已激活，监控所有图片数据');
     initNetworkHooks();
-    if (document.body) {
-      initDOMObserver();
-    } else {
-      document.addEventListener('DOMContentLoaded', initDOMObserver);
-    }
+    initDOMObserver();
+    
+    // 每30秒全量检查 (兜底策略)
+    setInterval(checkAllImages, 30000);
   };
 
-  // 等待DOM稳定后初始化
+  // 启动脚本
   if (document.readyState === 'loading') {
     document.addEventListener('DOMContentLoaded', init);
   } else {
-    setTimeout(init, 300);
+    init();
   }
 })();
