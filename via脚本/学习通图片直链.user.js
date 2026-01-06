@@ -1,134 +1,93 @@
 // ==UserScript==
 // @name         图片直链
-// @namespace    https://github.com/yanzaiyun43
-// @version      4.1.1
-// @description  专为学习通设计：直接解析JSON数据，精准匹配原图链接
-// @author       Qwen
+// @namespace    https://github.com/yourname
+// @version      3.1
+// @description  无需点击图片！首次加载即显示复制按钮，完美适配懒加载
+// @author       Qwen (based on yourname's script)
 // @match        *://*.xuexi365.com/*
-// @match        *://*.chaoxing.com/*
 // @grant        GM_setClipboard
-// @run-at       document-idle
+// @run-at       document-start
 // ==/UserScript==
 
 (() => {
   'use strict';
 
-  // ===== 核心映射表（关键改进）=====
-  const directoryMap = new Map(); // 目录路径 → 原图完整URL
-  const processedImages = new WeakSet(); // 防止重复处理
-  
-  // 清理URL：移除参数，只保留核心路径
-  const cleanUrl = (url) => {
-    try {
-      const u = new URL(url, location.href);
-      return u.origin + u.pathname;
-    } catch {
-      return url.split('?')[0];
-    }
-  };
-  
-  // 提取目录路径（核心！）
-  const extractDirectory = (url) => {
-    const clean = cleanUrl(url);
+  // ===== 核心存储 =====
+  const originMap = new Map();      // 缩略图URL → 原图URL (精确匹配)
+  const dirMap = new Map();         // 目录路径 → 原图URL (兜底匹配)
+  const processed = new WeakSet();  // 已处理的图片
+  const pendingChecks = new WeakMap(); // 待检查的图片 (解决懒加载问题)
+
+  // ===== 智能URL处理 =====
+  const getCleanUrl = (url) => url.split('?')[0].split('#')[0];
+  const getDirectory = (url) => {
+    const clean = getCleanUrl(url);
     const lastSlash = clean.lastIndexOf('/');
     return lastSlash > 0 ? clean.slice(0, lastSlash + 1) : clean;
   };
 
-  // ===== 智能JSON解析（精准提取）=====
-  const processJsonData = (text) => {
+  // ===== 从JSON提取映射关系 =====
+  const extractPairs = (body) => {
+    if (typeof body !== 'string') return;
     try {
-      const data = JSON.parse(text);
-      const posts = data?.data?.datas || [];
-      let found = 0;
+      const obj = JSON.parse(body);
+      const datas = obj?.data?.datas || [];
       
-      posts.forEach(post => {
-        (post.img_data || []).forEach(img => {
-          if (!img.litimg || !img.imgUrl) return;
+      datas.forEach(post => {
+        (post.img_data || []).forEach(item => {
+          if (!item.litimg || !item.imgUrl) return;
           
-          // 1. 提取目录路径（关键！）
-          const dirPath = extractDirectory(img.litimg);
+          // 1. 存储精确映射
+          const cleanThumb = getCleanUrl(item.litimg);
+          originMap.set(cleanThumb, item.imgUrl);
           
-          // 2. 存储原图完整URL（带参数！）
-          if (!directoryMap.has(dirPath)) {
-            directoryMap.set(dirPath, img.imgUrl);
-            found++;
-          }
+          // 2. 存储目录映射 (核心！解决懒加载问题)
+          const dirPath = getDirectory(item.litimg);
+          dirMap.set(dirPath, item.imgUrl);
           
-          // 3. 同时存储缩略图路径映射（备用）
-          const cleanThumb = cleanUrl(img.litimg);
-          if (!directoryMap.has(cleanThumb)) {
-            directoryMap.set(cleanThumb, img.imgUrl);
-          }
+          console.debug(`[原图助手] 新增映射: ${cleanThumb} → ${item.imgUrl.slice(0, 30)}...`);
         });
       });
       
-      if (found > 0) {
-        console.log(`[原图助手] 新增 ${found} 个目录映射`, directoryMap);
-        checkAllImages(); // 立即检查所有图片
-      }
-    } catch (e) {
-      console.debug('[原图助手] JSON解析失败', e);
-    }
+      // 3. 新增映射后立即检查所有待处理图片
+      checkPendingImages();
+    } catch (_) {}
   };
 
-  // ===== 原图匹配引擎 =====
-  const findOriginalUrl = (imgSrc) => {
-    // 1. 尝试目录路径匹配（最可靠！）
-    const dirPath = extractDirectory(imgSrc);
-    if (directoryMap.has(dirPath)) {
-      return directoryMap.get(dirPath);
-    }
-    
-    // 2. 尝试完整路径匹配
-    const cleanSrc = cleanUrl(imgSrc);
-    if (directoryMap.has(cleanSrc)) {
-      return directoryMap.get(cleanSrc);
-    }
-    
-    // 3. 暴力匹配（处理CDN变体）
-    for (const [path, url] of directoryMap) {
-      if (imgSrc.includes(path.split('/').pop() || '')) {
-        return url;
-      }
-    }
-    
-    return null;
-  };
-
-  // ===== 按钮创建（优化位置）=====
+  // ===== 按钮创建 (优化样式) =====
   const createButton = (img, originUrl) => {
-    // 确保容器定位
-    let container = img.closest('.discuss-item-content, .work-content') || img.parentElement;
-    if (getComputedStyle(container).position === 'static') {
-      container.style.position = 'relative';
-    }
+    if (processed.has(img)) return;
     
-    // 防止重复
-    if (container.querySelector('.qwen-origin-btn')) return;
+    // 确保容器可定位
+    let container = img.closest('.discuss-item-content, .work-content, .topic-content') || img.parentElement;
+    if (!container) return;
     
+    // 创建样式更美观的按钮
     const btn = document.createElement('button');
-    btn.className = 'qwen-origin-btn';
-    btn.innerHTML = '🖼️ 原图';
+    btn.className = 'qwen-copy-btn';
+    btn.innerHTML = '<svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="white" stroke-width="2"><path d="M16 4h2a2 2 0 0 1 2 2v14a2 2 0 0 1-2 2H6a2 2 0 0 1-2-2V6a2 2 0 0 1 2-2h2"/><path d="M12 2v6"/></svg> 原图';
+    
     Object.assign(btn.style, {
       position: 'absolute',
-      bottom: '8px',
-      right: '8px',
+      bottom: '6px',
+      right: '6px',
       background: 'linear-gradient(135deg, #6a11cb 0%, #2575fc 100%)',
       color: 'white',
       border: 'none',
       borderRadius: '12px',
-      padding: '3px 10px',
-      fontSize: '13px',
-      fontWeight: 'bold',
+      padding: '3px 8px',
+      fontSize: '12px',
+      fontWeight: '500',
       cursor: 'pointer',
       zIndex: '99999',
-      boxShadow: '0 2px 8px rgba(0,0,0,0.3)',
-      backdropFilter: 'blur(4px)',
-      transition: 'all 0.2s'
+      boxShadow: '0 2px 6px rgba(0,0,0,0.25)',
+      backdropFilter: 'blur(3px)',
+      transition: 'all 0.2s ease',
+      lineHeight: 1,
     });
     
-    // 交互效果
-    btn.onmouseenter = () => btn.style.transform = 'scale(1.05)';
+    // 交互反馈
+    btn.onmouseenter = () => btn.style.transform = 'scale(1.08)';
     btn.onmouseleave = () => btn.style.transform = 'scale(1)';
     
     btn.onclick = async (e) => {
@@ -137,92 +96,129 @@
       
       try {
         await GM_setClipboard(originUrl, 'text');
-        btn.innerHTML = '✓ COPIED!';
+        btn.innerHTML = '<svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="white" stroke-width="2"><polyline points="20 6 9 17 4 12"/></svg> 复制成功';
         btn.style.background = '#00c853';
         setTimeout(() => {
-          btn.innerHTML = '🖼️ 原图';
+          btn.innerHTML = '<svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="white" stroke-width="2"><path d="M16 4h2a2 2 0 0 1 2 2v14a2 2 0 0 1-2 2H6a2 2 0 0 1-2-2V6a2 2 0 0 1 2-2h2"/><path d="M12 2v6"/></svg> 原图';
           btn.style.background = 'linear-gradient(135deg, #6a11cb 0%, #2575fc 100%)';
-        }, 1000);
+        }, 1200);
       } catch (err) {
         console.error('[原图助手] 复制失败:', err);
         btn.innerHTML = '✗ 失败';
         btn.style.background = '#ff5252';
         setTimeout(() => {
-          btn.innerHTML = '🖼️ 原图';
+          btn.innerHTML = '<svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="white" stroke-width="2"><path d="M16 4h2a2 2 0 0 1 2 2v14a2 2 0 0 1-2 2H6a2 2 0 0 1-2-2V6a2 2 0 0 1 2-2h2"/><path d="M12 2v6"/></svg> 原图';
           btn.style.background = 'linear-gradient(135deg, #6a11cb 0%, #2575fc 100%)';
         }, 1500);
       }
     };
     
+    // 确保容器定位
+    if (getComputedStyle(container).position === 'static') {
+      container.style.position = 'relative';
+    }
+    
+    // 防止重复添加
+    const existingBtn = container.querySelector('.qwen-copy-btn');
+    if (existingBtn) container.removeChild(existingBtn);
+    
     container.appendChild(btn);
-    processedImages.add(img);
+    processed.add(img);
   };
 
-  // ===== 图片处理器 =====
-  const handleImage = (img) => {
-    if (processedImages.has(img) || !img.src) return;
+  // ===== 智能图片匹配 (三重保障) =====
+  const matchOriginal = (imgSrc) => {
+    if (!imgSrc || imgSrc.startsWith('data:')) return null;
     
-    const originUrl = findOriginalUrl(img.src);
+    // 1. 精确匹配 (去除参数)
+    const cleanSrc = getCleanUrl(imgSrc);
+    if (originMap.has(cleanSrc)) return originMap.get(cleanSrc);
+    
+    // 2. 目录路径匹配 (核心！解决懒加载)
+    const dirPath = getDirectory(imgSrc);
+    if (dirMap.has(dirPath)) return dirMap.get(dirPath);
+    
+    // 3. 模糊文件名匹配 (极端情况)
+    const fileName = cleanSrc.split('/').pop() || '';
+    for (const [thumb, origin] of originMap) {
+      if (thumb.includes(fileName)) return origin;
+    }
+    
+    return null;
+  };
+
+  // ===== 处理单张图片 =====
+  const handleImage = (img) => {
+    if (processed.has(img)) return;
+    
+    // 1. 立即尝试匹配
+    const originUrl = matchOriginal(img.src);
     if (originUrl) {
       createButton(img, originUrl);
+      return;
+    }
+    
+    // 2. 图片未加载完成？等待加载
+    if (!img.complete) {
+      img.addEventListener('load', () => handleImage(img), { once: true });
+      return;
+    }
+    
+    // 3. 未匹配到？加入待检查队列 (解决懒加载)
+    if (!pendingChecks.has(img)) {
+      pendingChecks.set(img, setTimeout(() => {
+        pendingChecks.delete(img);
+        handleImage(img); // 600ms后重试
+      }, 600));
     }
   };
 
-  // 全量检查
-  const checkAllImages = () => {
-    document.querySelectorAll('img[src*="cldisk.com"], img[src*="chaoxing.com"]').forEach(handleImage);
+  // ===== 检查待处理图片 =====
+  const checkPendingImages = () => {
+    pendingChecks.forEach((timerId, img) => {
+      clearTimeout(timerId);
+      pendingChecks.delete(img);
+      handleImage(img);
+    });
   };
 
-  // ===== 网络监听（全覆盖）=====
+  // ===== 网络监听 (全覆盖) =====
   const initNetworkHooks = () => {
     // 拦截XHR
-    const originalOpen = XMLHttpRequest.prototype.open;
-    XMLHttpRequest.prototype.open = function(method, url) {
-      this._url = url;
-      return originalOpen.apply(this, arguments);
+    const open = XMLHttpRequest.prototype.open;
+    XMLHttpRequest.prototype.open = function(m, u) {
+      this._url = u;
+      return open.apply(this, arguments);
     };
     
-    const originalSend = XMLHttpRequest.prototype.send;
+    const send = XMLHttpRequest.prototype.send;
     XMLHttpRequest.prototype.send = function() {
-      this.addEventListener('load', function() {
+      this.addEventListener('load', () => {
         if (this.status === 200 && this.responseText) {
-          // 仅处理包含图片数据的JSON
-          if (this._url.includes('replys.json') || this.responseText.includes('img_data')) {
-            processJsonData(this.responseText);
-          }
+          extractPairs(this.responseText);
         }
       });
-      return originalSend.apply(this, arguments);
+      return send.apply(this, arguments);
     };
     
     // 拦截Fetch
-    const originalFetch = window.fetch;
+    const _fetch = window.fetch;
     window.fetch = async (...args) => {
-      const response = await originalFetch(...args);
+      const response = await _fetch(...args);
       if (response.ok) {
-        const contentType = response.headers.get('content-type') || '';
-        if (contentType.includes('json') || contentType.includes('text')) {
-          try {
-            const text = await response.clone().text();
-            if (text.includes('img_data') || text.includes('imgUrl')) {
-              processJsonData(text);
-            }
-          } catch (e) {
-            console.debug('[原图助手] Fetch解析异常', e);
-          }
-        }
+        try {
+          const text = await response.clone().text();
+          extractPairs(text);
+        } catch (_) {}
       }
       return response;
     };
   };
 
-  // ===== DOM 监听 =====
+  // ===== DOM 监听 (双保险) =====
   const initDOMObserver = () => {
-    // 首次扫描
-    checkAllImages();
-    
-    // 监听新图片
-    const observer = new MutationObserver(mutations => {
+    // 1. 子节点变化 (新图片)
+    const childObserver = new MutationObserver(mutations => {
       mutations.forEach(m => {
         m.addedNodes.forEach(node => {
           if (node.nodeType !== 1) return;
@@ -236,29 +232,56 @@
       });
     });
     
-    observer.observe(document.body, {
+    // 2. 属性变化 (src更新 - 懒加载关键!)
+    const attrObserver = new MutationObserver(mutations => {
+      mutations.forEach(m => {
+        if (m.type === 'attributes' && m.attributeName === 'src') {
+          const img = m.target;
+          if (img.tagName === 'IMG') {
+            handleImage(img);
+          }
+        }
+      });
+    });
+    
+    // 启动观察
+    childObserver.observe(document.documentElement, {
       childList: true,
       subtree: true
     });
+    
+    attrObserver.observe(document.documentElement, {
+      attributes: true,
+      attributeFilter: ['src'],
+      subtree: true
+    });
+    
+    // 3. 首次扫描
+    document.querySelectorAll('img').forEach(handleImage);
   };
 
   // ===== 初始化 =====
   const init = () => {
-    console.log(`%c[学习通原图助手] %cv6.0 激活！专注目录路径映射`, 
+    console.log(`%c[学习通原图助手] %cv3.1 激活！首次加载即显示按钮`, 
       'color:#6a11cb;font-weight:bold;background:rgba(106,17,203,0.1);padding:2px 6px;border-radius:4px;', 
       'color:#2575fc');
     
     initNetworkHooks();
-    initDOMObserver();
     
-    // 每10秒兜底扫描
-    setInterval(checkAllImages, 10000);
+    if (document.documentElement) {
+      initDOMObserver();
+    } else {
+      document.addEventListener('DOMContentLoaded', initDOMObserver, { once: true });
+    }
+    
+    // 兜底定时检查 (防止任何遗漏)
+    setInterval(checkPendingImages, 2000);
   };
 
-  // 启动
-  if (document.readyState === 'complete') {
+  // 尽早启动
+  if (document.readyState !== 'loading') {
     init();
   } else {
-    window.addEventListener('load', init, { once: true });
+    document.addEventListener('DOMContentLoaded', init, { once: true });
   }
 })();
