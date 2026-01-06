@@ -1,8 +1,8 @@
 // ==UserScript==
-// @name         xuexi365 复制原图（即时显示按钮）
+// @name         xuexi365 复制原图（3.2 修复版）
 // @namespace    https://github.com/yourname
-// @version      3.1
-// @description  图片一出现就挂按钮，无需点击
+// @version      3.2
+// @description  真正的 img 节点一出现就挂按钮
 // @author       you
 // @match        *://*.xuexi365.com/*
 // @grant        GM_setClipboard
@@ -15,7 +15,7 @@
   const map = new Map();   // 压缩图 → 原图
   const done = new WeakSet();
 
-  /* 提取成对地址 */
+  /* 1. 提取映射 */
   function extractPairs(body) {
     if (typeof body !== 'string') return;
     try {
@@ -29,10 +29,10 @@
     } catch (_) {}
   }
 
-  /* 挂按钮核心逻辑 */
+  /* 2. 给 <img> 挂按钮 */
   function attachBtn(img) {
     if (done.has(img)) return;
-    const origin = map.get(img.src);
+    const origin = map.get(img.src);   // 用压缩图反查原图
     if (!origin) return;
     const box = img.parentElement;
     if (!box) return;
@@ -54,7 +54,7 @@
     };
   }
 
-  /* 拦截 XHR / fetch 拿响应 */
+  /* 3. 拦截 XHR / fetch */
   const open = XMLHttpRequest.prototype.open;
   const send = XMLHttpRequest.prototype.send;
   XMLHttpRequest.prototype.open = function () {
@@ -71,28 +71,22 @@
     return r;
   };
 
-  /* 关键：拦截 img.src 赋值 */
-  const desc = Object.getOwnPropertyDescriptor(HTMLImageElement.prototype, 'src');
-  const rawSet = desc.set;
-  desc.set = function (v) {
-    rawSet.call(this, v);
-    // 异步一帧，确保 DOM 已更新
-    requestAnimationFrame(() => attachBtn(this));
-  };
-  Object.defineProperty(HTMLImageElement.prototype, 'src', desc);
-
-  /* 兜底：DOM 增量监听（针对骨架屏等） */
+  /* 4. 监听真正的 <img> 节点 */
   const ob = new MutationObserver(ms =>
     ms.forEach(m =>
       (m.addedNodes || []).forEach(n => {
-        if (n.nodeType !== 1) return;
         if (n.tagName === 'IMG') attachBtn(n);
-        n.querySelectorAll?.('img').forEach(attachBtn);
+        if (n.nodeType === 1) n.querySelectorAll?.('img').forEach(attachBtn);
       })
     )
   );
-  if (document.body) ob.observe(document.body, { childList: true, subtree: true });
-  else document.addEventListener('DOMContentLoaded', () =>
-    ob.observe(document.body, { childList: true, subtree: true })
-  );
+
+  /* 5. 启动 */
+  function start() {
+    ob.observe(document.body, { childList: true, subtree: true });
+    /* 已经存在于 DOM 的也扫一遍 */
+    document.querySelectorAll('img').forEach(attachBtn);
+  }
+  if (document.body) start();
+  else document.addEventListener('DOMContentLoaded', start);
 })();
