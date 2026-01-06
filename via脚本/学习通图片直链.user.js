@@ -1,70 +1,95 @@
 // ==UserScript==
-// @name         xuexi365 图片链接复制器（轻量版）
+// @name         xuexi365 复制原图链接（origin.jpg）
 // @namespace    https://github.com/yourname
-// @version      1.1
-// @description  在回帖图片左上角增加“复制原图链接”按钮，不卡页面
+// @version      2.0
+// @description  复制接口返回的 origin.jpg 原图地址，而非压缩图
 // @author       you
 // @match        *://*.xuexi365.com/*
 // @grant        GM_setClipboard
 // @run-at       document-start
 // ==/UserScript==
 
-(function () {
+(() => {
   'use strict';
 
-  const added = new WeakSet();          // 防止重复按钮
+  const map = new Map();            // key: 压缩图url → value: 原图url
+  const done = new WeakSet();       // 已挂按钮的<img>
 
-  /* 真正插入按钮 */
-  function attachBtn(img) {
-    if (added.has(img)) return;
+  /* 从响应文本里提取原图地址 */
+  function extractOrigin(body) {
+    if (typeof body !== 'string') return;
+    let m;
+    // 匹配 "imgUrl":"https://...../origin.jpg?..."
+    const reg = /"imgUrl"\s*:\s*"([^"]+\/origin\.jpg[^"]*)"/g;
+    while ((m = reg.exec(body))) {
+      const origin = m[1];
+      // 同时生成对应的压缩图地址（简单替换）
+      const thumb = origin.replace(/\/origin\.jpg/, '/778_778Q50.jpg');
+      map.set(thumb, origin);
+    }
+  }
+
+  /* 给单张图挂按钮 */
+  function addBtn(img) {
+    if (done.has(img)) return;
+    const thumb = img.src;
+    const origin = map.get(thumb);
+    if (!origin) return;          // 还没拿到对应原图
     const box = img.parentElement;
     if (!box) return;
-    const url = img.src;
-    if (!url || !/\.(jpg|jpeg|png|gif|webp)/i.test(url)) return;
-
     const btn = document.createElement('span');
     btn.style.cssText = `
       position:absolute; top:2px; left:2px; background:rgba(0,102,255,.9);
       color:#fff; font-size:11px; padding:2px 5px; border-radius:2px;
       cursor:pointer; z-index:9999; line-height:1;
     `;
-    btn.textContent = '复制';
+    btn.textContent = '复制原图';
     box.style.position = 'relative';
     box.appendChild(btn);
-    added.add(img);
-
+    done.add(img);
     btn.onclick = e => {
       e.stopPropagation();
-      GM_setClipboard(url, 'text');
+      GM_setClipboard(origin, 'text');
       btn.textContent = '✓';
-      setTimeout(() => (btn.textContent = '复制'), 1000);
+      setTimeout(() => (btn.textContent = '复制原图'), 1000);
     };
   }
 
-  /* 防抖扫描 */
-  let timer;
-  function debounceScan() {
-    clearTimeout(timer);
-    timer = setTimeout(() => {
-      document.querySelectorAll('img').forEach(attachBtn);
-    }, 300);
-  }
+  /* 1. 拦截 XHR */
+  const open = XMLHttpRequest.prototype.open;
+  const send = XMLHttpRequest.prototype.send;
+  XMLHttpRequest.prototype.open = function (m, u) {
+    this._url = u;
+    return open.apply(this, arguments);
+  };
+  XMLHttpRequest.prototype.send = function () {
+    this.addEventListener('load', () => {
+      try { extractOrigin(this.responseText); } catch (_) {}
+    });
+    return send.apply(this, arguments);
+  };
 
-  /* 等 DOM Ready 后扫一次 */
-  if (document.readyState === 'loading') {
-    document.addEventListener('DOMContentLoaded', debounceScan);
+  /* 2. 拦截 fetch */
+  const _fetch = window.fetch;
+  window.fetch = async (...args) => {
+    const r = await _fetch(...args);
+    try {
+      const clone = r.clone();
+      const txt = await clone.text();
+      extractOrigin(txt);
+    } catch (_) {}
+    return r;
+  };
+
+  /* 3. DOM 监听 */
+  const ob = new MutationObserver(() => {
+    document.querySelectorAll('img').forEach(addBtn);
+  });
+  if (document.body) {
+    ob.observe(document.body, { childList: true, subtree: true });
   } else {
-    debounceScan();
+    document.addEventListener('DOMContentLoaded', () =>
+      ob.observe(document.body, { childList: true, subtree: true })
+    );
   }
-
-  /* 只监听新增节点，不遍历整个 body */
-  new MutationObserver(muts => {
-    for (const m of muts) {
-      for (const n of m.addedNodes) {
-        if (n.nodeType !== 1) continue;        // 只处理 ELEMENT_NODE
-        if (n.tagName === 'IMG') attachBtn(n);
-        else n.querySelectorAll?.('img').forEach(attachBtn);
-      }
-    }
-  }).observe(document.body, { childList: true, subtree: true });
 })();
