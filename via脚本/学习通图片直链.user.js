@@ -1,9 +1,9 @@
 // ==UserScript==
-// @name         xuexi365 复制原图（3.2 修复版）
-// @namespace    https://github.com/yourname
-// @version      3.2
-// @description  真正的 img 节点一出现就挂按钮
-// @author       you
+// @name         图片直链
+// @namespace    https://github.com/yanzaiyun43
+// @version      4.0.1
+// @description  复制图片直链
+// @author       ailmel
 // @match        *://*.xuexi365.com/*
 // @grant        GM_setClipboard
 // @run-at       document-start
@@ -15,7 +15,7 @@
   const map = new Map();   // 压缩图 → 原图
   const done = new WeakSet();
 
-  /* 1. 提取映射 */
+  /* 提取成对地址 */
   function extractPairs(body) {
     if (typeof body !== 'string') return;
     try {
@@ -23,16 +23,18 @@
       const datas = obj?.data?.datas || [];
       datas.forEach(post => {
         (post.img_data || []).forEach(item => {
-          if (item.litimg && item.imgUrl) map.set(item.litimg, item.imgUrl);
+          if (item.litimg && item.imgUrl) {
+            map.set(item.litimg, item.imgUrl);   // 一一对应
+          }
         });
       });
     } catch (_) {}
   }
 
-  /* 2. 给 <img> 挂按钮 */
-  function attachBtn(img) {
+  /* 给单张图挂按钮 */
+  function addBtn(img) {
     if (done.has(img)) return;
-    const origin = map.get(img.src);   // 用压缩图反查原图
+    const origin = map.get(img.src);
     if (!origin) return;
     const box = img.parentElement;
     if (!box) return;
@@ -54,10 +56,11 @@
     };
   }
 
-  /* 3. 拦截 XHR / fetch */
+  /* 拦截 XHR / fetch 拿响应 */
   const open = XMLHttpRequest.prototype.open;
   const send = XMLHttpRequest.prototype.send;
-  XMLHttpRequest.prototype.open = function () {
+  XMLHttpRequest.prototype.open = function (m, u) {
+    this._url = u;
     return open.apply(this, arguments);
   };
   XMLHttpRequest.prototype.send = function () {
@@ -71,22 +74,12 @@
     return r;
   };
 
-  /* 4. 监听真正的 <img> 节点 */
-  const ob = new MutationObserver(ms =>
-    ms.forEach(m =>
-      (m.addedNodes || []).forEach(n => {
-        if (n.tagName === 'IMG') attachBtn(n);
-        if (n.nodeType === 1) n.querySelectorAll?.('img').forEach(attachBtn);
-      })
-    )
+  /* DOM 监听 */
+  const ob = new MutationObserver(() =>
+    document.querySelectorAll('img').forEach(addBtn)
   );
-
-  /* 5. 启动 */
-  function start() {
-    ob.observe(document.body, { childList: true, subtree: true });
-    /* 已经存在于 DOM 的也扫一遍 */
-    document.querySelectorAll('img').forEach(attachBtn);
-  }
-  if (document.body) start();
-  else document.addEventListener('DOMContentLoaded', start);
+  if (document.body) ob.observe(document.body, { childList: true, subtree: true });
+  else document.addEventListener('DOMContentLoaded', () =>
+    ob.observe(document.body, { childList: true, subtree: true })
+  );
 })();
