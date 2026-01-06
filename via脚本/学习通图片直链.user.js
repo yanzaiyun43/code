@@ -1,76 +1,70 @@
 // ==UserScript==
-// @name         xuexi365 图片链接复制器
+// @name         xuexi365 图片链接复制器（轻量版）
 // @namespace    https://github.com/yourname
-// @version      1.0
-// @description  在回帖图片上增加“复制原图链接”按钮
+// @version      1.1
+// @description  在回帖图片左上角增加“复制原图链接”按钮，不卡页面
 // @author       you
 // @match        *://*.xuexi365.com/*
 // @grant        GM_setClipboard
-// @run-at       document-end
+// @run-at       document-start
 // ==/UserScript==
 
 (function () {
   'use strict';
 
-  /* 把按钮插到图片容器里 */
-  function addCopyBtn(imgBox, url) {
-    if (imgBox.dataset.copyBtn) return;          // 防止重复
+  const added = new WeakSet();          // 防止重复按钮
+
+  /* 真正插入按钮 */
+  function attachBtn(img) {
+    if (added.has(img)) return;
+    const box = img.parentElement;
+    if (!box) return;
+    const url = img.src;
+    if (!url || !/\.(jpg|jpeg|png|gif|webp)/i.test(url)) return;
+
     const btn = document.createElement('span');
     btn.style.cssText = `
-      position:absolute; top:4px; left:4px;
-      background:#06f; color:#fff; font-size:12px;
-      padding:2px 6px; border-radius:3px; cursor:pointer;
-      z-index:9999; user-select:none; opacity:.85;
+      position:absolute; top:2px; left:2px; background:rgba(0,102,255,.9);
+      color:#fff; font-size:11px; padding:2px 5px; border-radius:2px;
+      cursor:pointer; z-index:9999; line-height:1;
     `;
     btn.textContent = '复制';
-    btn.title = '复制原图链接';
-    btn.dataset.copyBtn = '1';
+    box.style.position = 'relative';
+    box.appendChild(btn);
+    added.add(img);
+
     btn.onclick = e => {
       e.stopPropagation();
       GM_setClipboard(url, 'text');
-      btn.textContent = '✓ 已复制';
-      setTimeout(() => (btn.textContent = '复制'), 1200);
+      btn.textContent = '✓';
+      setTimeout(() => (btn.textContent = '复制'), 1000);
     };
-    imgBox.style.position = 'relative';
-    imgBox.appendChild(btn);
   }
 
-  /* 轮询 + MutationObserver 双保险 */
-  function scan() {
-    // 1. 已经渲染在页面里的图片
-    document.querySelectorAll('img').forEach(img => {
-      const url = img.src;
-      if (!url || !/\.(jpg|jpeg|png|gif|webp)/i.test(url)) return;
-      const box = img.parentElement;
-      if (box) addCopyBtn(box, url);
-    });
-
-    // 2. 接口返回的 JSON 里 imgUrl 字段（动态插入的）
-    const textNodes = document.querySelectorAll('body *');
-    textNodes.forEach(n => {
-      if (n.tagName === 'IMG') return;
-      const txt = n.textContent || '';
-      let m;
-      try {
-        // 简单提取 imgUrl
-        const reg = /"imgUrl"\s*:\s*"([^"]+)"/g;
-        while ((m = reg.exec(txt))) {
-          const url = m[1];
-          // 找到离这段文字最近的图片元素，把按钮插到它容器上
-          let el = n;
-          while (el && el.tagName !== 'IMG') el = el.nextElementSibling;
-          if (el && el.tagName === 'IMG') {
-            addCopyBtn(el.parentElement, url);
-          }
-        }
-      } catch (_) {}
-    });
+  /* 防抖扫描 */
+  let timer;
+  function debounceScan() {
+    clearTimeout(timer);
+    timer = setTimeout(() => {
+      document.querySelectorAll('img').forEach(attachBtn);
+    }, 300);
   }
 
-  // 初次执行
-  scan();
+  /* 等 DOM Ready 后扫一次 */
+  if (document.readyState === 'loading') {
+    document.addEventListener('DOMContentLoaded', debounceScan);
+  } else {
+    debounceScan();
+  }
 
-  // 后续 DOM 变动再扫一遍
-  const ob = new MutationObserver(() => scan());
-  ob.observe(document.body, { childList: true, subtree: true });
+  /* 只监听新增节点，不遍历整个 body */
+  new MutationObserver(muts => {
+    for (const m of muts) {
+      for (const n of m.addedNodes) {
+        if (n.nodeType !== 1) continue;        // 只处理 ELEMENT_NODE
+        if (n.tagName === 'IMG') attachBtn(n);
+        else n.querySelectorAll?.('img').forEach(attachBtn);
+      }
+    }
+  }).observe(document.body, { childList: true, subtree: true });
 })();
