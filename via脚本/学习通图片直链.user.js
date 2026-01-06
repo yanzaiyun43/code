@@ -1,8 +1,8 @@
 // ==UserScript==
-// @name         xuexi365 一键复制原图（多张图适配）
+// @name         xuexi365 复制原图（即时显示按钮）
 // @namespace    https://github.com/yourname
-// @version      3.0
-// @description  复制接口返回的 origin.jpg 原图，支持一次发 N 张图
+// @version      3.1
+// @description  图片一出现就挂按钮，无需点击
 // @author       you
 // @match        *://*.xuexi365.com/*
 // @grant        GM_setClipboard
@@ -23,16 +23,14 @@
       const datas = obj?.data?.datas || [];
       datas.forEach(post => {
         (post.img_data || []).forEach(item => {
-          if (item.litimg && item.imgUrl) {
-            map.set(item.litimg, item.imgUrl);   // 一一对应
-          }
+          if (item.litimg && item.imgUrl) map.set(item.litimg, item.imgUrl);
         });
       });
     } catch (_) {}
   }
 
-  /* 给单张图挂按钮 */
-  function addBtn(img) {
+  /* 挂按钮核心逻辑 */
+  function attachBtn(img) {
     if (done.has(img)) return;
     const origin = map.get(img.src);
     if (!origin) return;
@@ -59,8 +57,7 @@
   /* 拦截 XHR / fetch 拿响应 */
   const open = XMLHttpRequest.prototype.open;
   const send = XMLHttpRequest.prototype.send;
-  XMLHttpRequest.prototype.open = function (m, u) {
-    this._url = u;
+  XMLHttpRequest.prototype.open = function () {
     return open.apply(this, arguments);
   };
   XMLHttpRequest.prototype.send = function () {
@@ -74,9 +71,25 @@
     return r;
   };
 
-  /* DOM 监听 */
-  const ob = new MutationObserver(() =>
-    document.querySelectorAll('img').forEach(addBtn)
+  /* 关键：拦截 img.src 赋值 */
+  const desc = Object.getOwnPropertyDescriptor(HTMLImageElement.prototype, 'src');
+  const rawSet = desc.set;
+  desc.set = function (v) {
+    rawSet.call(this, v);
+    // 异步一帧，确保 DOM 已更新
+    requestAnimationFrame(() => attachBtn(this));
+  };
+  Object.defineProperty(HTMLImageElement.prototype, 'src', desc);
+
+  /* 兜底：DOM 增量监听（针对骨架屏等） */
+  const ob = new MutationObserver(ms =>
+    ms.forEach(m =>
+      (m.addedNodes || []).forEach(n => {
+        if (n.nodeType !== 1) return;
+        if (n.tagName === 'IMG') attachBtn(n);
+        n.querySelectorAll?.('img').forEach(attachBtn);
+      })
+    )
   );
   if (document.body) ob.observe(document.body, { childList: true, subtree: true });
   else document.addEventListener('DOMContentLoaded', () =>
