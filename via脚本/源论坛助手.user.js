@@ -1,7 +1,7 @@
 // ==UserScript==
 // @name         源论坛助手
 // @namespace    http://tampermonkey.net/
-// @version      2.2
+// @version      2.3
 // @description  每天随机发3帖
 // @author       ailmel
 // @match        *://pc.sysbbs.com/*
