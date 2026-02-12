@@ -14,25 +14,18 @@
 <div id="typer"></div>
 
 <script>
-/* =========================
- *  可配置区域：文案 & 速度
- * ========================= */
 const lines = [
   '第一行文案，打完就删。',
   '第二行文案，删完换下一行。',
   '第三行文案，循环往复。'
 ];
-const typeSpeed = 120;   // 打字间隔
-const delSpeed  = 120;    // 删除间隔
-const holdDelay = 800;   // 打完后的停顿
-
+const typeSpeed = 120;
+const delSpeed  = 120;
+const holdDelay = 800;
 const box = document.getElementById('typer');
 let idx = 0;
 
-/* 简易 sleep 工具函数 */
 async function sleep(ms){ return new Promise(r=>setTimeout(r,ms)); }
-
-/* 逐字打印一行文字，光标跟随 */
 async function type(text){
   const cursor = document.createElement('span');
   cursor.className = 'cursor';
@@ -42,8 +35,6 @@ async function type(text){
     await sleep(typeSpeed);
   }
 }
-
-/* 反向删完整行 */
 async function del(){
   const cursor = box.querySelector('.cursor');
   while(cursor.previousSibling){
@@ -52,8 +43,6 @@ async function del(){
   }
   cursor.remove();
 }
-
-/* 主循环：打 → 停 → 删 → 换行 → 循环 */
 async function loop(){
   while(true){
     await type(lines[idx]);
