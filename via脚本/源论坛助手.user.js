@@ -1,9 +1,9 @@
 // ==UserScript==
-// @name         SysBBS 随机治愈池（改写版）
+// @name         源论坛助手
 // @namespace    http://tampermonkey.net/
-// @version      2.1
-// @description  改写原池子风格，每天随机抽3组轻松日常句发3帖
-// @author       You
+// @version      2.2
+// @description  每天随机发3帖
+// @author       ailmel
 // @match        *://pc.sysbbs.com/*
 // @grant        GM_setValue
 // @grant        GM_getValue
@@ -11,8 +11,6 @@
 
 (function () {
     'use strict';
-
-    /* ==================  改写后的治愈池  ================== */
     const TITLES = [
         '今日份小晴朗送达','摸鱼时间到','喝口水顺便看看大家','风很温柔我也很乖',
         '把忙碌调成静音','收集一点点开心','生活简单但够用','保持热爱奔赴山海',
@@ -46,8 +44,6 @@
     const TODAY   = new Date().toLocaleDateString('zh-CN');
     const KEY_QD  = 'sysbbs_qd_' + TODAY;
     const KEY_TIE = 'sysbbs_tie_' + TODAY;
-
-    /* ----------  单例 toast  ---------- */
     let msgBox = null;
     function toast(text, bg = '#333') {
         if (msgBox) msgBox.remove();
@@ -64,7 +60,7 @@
         setTimeout(() => { if (msgBox) msgBox.remove(); }, 3000);
     }
 
-    /* ----------  主流程（异步）  ---------- */
+    /* ----------  主流程 ---------- */
     (async () => {
         const formhash = document.documentElement.innerHTML.match(/formhash=([a-f0-9]{8})/i)?.[1];
         if (!formhash) { toast('提取 formhash 失败！', '#c00'); return; }
@@ -77,7 +73,7 @@
             toast(ok ? '签到成功' : '签到失败（可能已签）', ok ? '#090' : '#f90');
         } else { toast('今日已签到'); }
 
-        // 2. 随机抽 3 组（不重复）
+        // 2. 随机抽 3 组
         const sent = GM_getValue(KEY_TIE, 0);
         if (sent >= 3) { toast('今日 3 贴已完成'); return; }
 
