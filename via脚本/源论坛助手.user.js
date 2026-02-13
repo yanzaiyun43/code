@@ -61,7 +61,7 @@ const MESSAGES = [
             border-radius:4px;box-shadow:0 2px 6px rgba(0,0,0,.3);
             transition:opacity .5s;
         `;
-        msgBox.textContent = `[SysBBS] ${text}`;
+        msgBox.textContent = `[源论坛助手] ${text}`;
         document.body.appendChild(msgBox);
         setTimeout(() => msgBox.style.opacity = '0', 2500);
         setTimeout(() => { if (msgBox) msgBox.remove(); }, 3000);
