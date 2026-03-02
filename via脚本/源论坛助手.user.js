@@ -1,129 +1,343 @@
 // ==UserScript==
 // @name         源论坛助手
 // @namespace    http://tampermonkey.net/
-// @version      2.4
-// @description  每天随机发3帖
+// @version      2.5
+// @description  获取经验和星币
 // @author       ailmel
 // @match        *://pc.sysbbs.com/*
 // @grant        GM_setValue
 // @grant        GM_getValue
+// @grant        GM_registerMenuCommand
 // ==/UserScript==
 
 (function () {
     'use strict';
+    
     const TITLES = [
-  '来看看',
-  '签到',
-  '路过',
-  '冒泡',
-  '摸鱼',
-  '划水',
-  '打个卡',
-  '报个到',
-  '冒个泡',
-  '刷个存在感',
-  '看看大家',
-  '顺便来一下',
-  '来瞅瞅',
-  '打个招呼',
-  '日常签到'
-];
+        '来看看', '签到', '路过', '冒泡', '摸鱼', '划水',
+        '打个卡', '报个到', '冒个泡', '刷个存在感', '看看大家',
+        '顺便来一下', '来瞅瞅', '打个招呼', '日常签到'
+    ];
 
-const MESSAGES = [
-  '来看看，顺便报个到。',
-  '签到，证明我还在。',
-  '路过，留个脚印。',
-  '冒泡，看看大家。',
-  '摸鱼中，勿扰。',
-  '划水，顺便刷个页面。',
-  '打个卡，证明我没消失。',
-  '报个到，我还活着。',
-  '冒个泡，看看大家在聊啥。',
-  '刷个存在感，顺便摸鱼。',
-  '看看大家，顺便来一下。',
-  '顺便来一下，没什么事。',
-  '来瞅瞅，大家还好吗。',
-  '打个招呼，我还在。',
-  '日常签到，证明我没跑路。'
-];
+    const MESSAGES = [
+        '来看看，顺便报个到。',
+        '签到，证明我还在。',
+        '路过，留个脚印。',
+        '冒泡，看看大家。',
+        '摸鱼中，勿扰。',
+        '划水，顺便刷个页面。',
+        '打个卡，证明我没消失。',
+        '报个到，我还活着。',
+        '冒个泡，看看大家在聊啥。',
+        '刷个存在感，顺便摸鱼。',
+        '看看大家，顺便来一下。',
+        '顺便来一下，没什么事。',
+        '来瞅瞅，大家还好吗。',
+        '打个招呼，我还在。',
+        '日常签到，证明我没跑路。'
+    ];
 
-    const FID     = 140;
-    const TODAY   = new Date().toLocaleDateString('zh-CN');
-    const KEY_QD  = 'sysbbs_qd_' + TODAY;
+    const FID = 140;
+    const TODAY = new Date().toLocaleDateString('zh-CN');
+    const KEY_QD = 'sysbbs_qd_' + TODAY;
     const KEY_TIE = 'sysbbs_tie_' + TODAY;
+    const KEY_EXP = 'sysbbs_exp_' + TODAY;
+    const KEY_FIRST_VISIT = 'sysbbs_first_' + TODAY;
+    const KEY_CLOSED = 'sysbbs_closed_' + TODAY;
+    
     let msgBox = null;
+    let modal = null;
+
+    // 创建可关闭的模态弹窗
+    function createModal(content) {
+        if (modal) modal.remove();
+        
+        modal = document.createElement('div');
+        modal.id = 'sysbbs-modal';
+        modal.style.cssText = `
+            position: fixed;
+            top: 0;
+            left: 0;
+            width: 100%;
+            height: 100%;
+            background: rgba(0,0,0,0.5);
+            z-index: 10000;
+            display: flex;
+            justify-content: center;
+            align-items: center;
+        `;
+        
+        const box = document.createElement('div');
+        box.style.cssText = `
+            background: white;
+            padding: 20px;
+            border-radius: 8px;
+            max-width: 400px;
+            width: 90%;
+            max-height: 80vh;
+            overflow-y: auto;
+            box-shadow: 0 4px 12px rgba(0,0,0,0.3);
+        `;
+        
+        const header = document.createElement('div');
+        header.style.cssText = `
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            margin-bottom: 15px;
+            border-bottom: 1px solid #eee;
+            padding-bottom: 10px;
+        `;
+        
+        const title = document.createElement('h3');
+        title.textContent = '[源论坛助手] 每日任务进度';
+        title.style.cssText = 'margin: 0; color: #333;';
+        
+        const closeBtn = document.createElement('button');
+        closeBtn.textContent = '×';
+        closeBtn.style.cssText = `
+            background: #ff4444;
+            color: white;
+            border: none;
+            width: 30px;
+            height: 30px;
+            border-radius: 50%;
+            cursor: pointer;
+            font-size: 18px;
+            line-height: 1;
+        `;
+        closeBtn.onclick = () => {
+            modal.remove();
+            GM_setValue(KEY_CLOSED, true);
+        };
+        
+        header.appendChild(title);
+        header.appendChild(closeBtn);
+        
+        const body = document.createElement('div');
+        body.innerHTML = content;
+        body.style.cssText = 'line-height: 1.6; color: #666;';
+        
+        const footer = document.createElement('div');
+        footer.style.cssText = `
+            margin-top: 15px;
+            text-align: right;
+            font-size: 12px;
+            color: #999;
+        `;
+        footer.textContent = '今天不再显示此窗口，可在油猴菜单手动打开';
+        
+        box.appendChild(header);
+        box.appendChild(body);
+        box.appendChild(footer);
+        modal.appendChild(box);
+        document.body.appendChild(modal);
+        
+        // 点击背景关闭
+        modal.onclick = (e) => {
+            if (e.target === modal) {
+                modal.remove();
+                GM_setValue(KEY_CLOSED, true);
+            }
+        };
+    }
+
+    // 简单的toast提示（用于后台操作反馈）
     function toast(text, bg = '#333') {
         if (msgBox) msgBox.remove();
         msgBox = document.createElement('div');
         msgBox.style.cssText = `
-            position:fixed;top:10px;right:10px;z-index:9999;
-            padding:8px 14px;background:${bg};color:#fff;font-size:14px;
-            border-radius:4px;box-shadow:0 2px 6px rgba(0,0,0,.3);
-            transition:opacity .5s;
+            position: fixed;
+            top: 10px;
+            right: 10px;
+            z-index: 9999;
+            padding: 8px 14px;
+            background: ${bg};
+            color: #fff;
+            font-size: 14px;
+            border-radius: 4px;
+            box-shadow: 0 2px 6px rgba(0,0,0,.3);
+            transition: opacity .5s;
+            max-width: 300px;
         `;
-        msgBox.textContent = `[源论坛助手] ${text}`;
+        msgBox.textContent = `[助手] ${text}`;
         document.body.appendChild(msgBox);
         setTimeout(() => msgBox.style.opacity = '0', 2500);
         setTimeout(() => { if (msgBox) msgBox.remove(); }, 3000);
     }
 
-    /* ----------  主流程 ---------- */
+    // 生成随机UID (1000-20000)
+    function getRandomUID() {
+        return Math.floor(Math.random() * (20000 - 1000 + 1)) + 1000;
+    }
+
+    // 访问用户空间获取经验
+    async function visitUserSpace() {
+        const visitedCount = GM_getValue(KEY_EXP, 0);
+        if (visitedCount >= 5) {
+            return { success: false, message: '今日经验获取已达上限(5次)' };
+        }
+        
+        const uid = getRandomUID();
+        try {
+            const res = await fetch(`https://pc.sysbbs.com/home.php?mod=space&uid=${uid}&do=profile`, {
+                credentials: 'include'
+            });
+            
+            if (res.ok) {
+                const newCount = visitedCount + 1;
+                GM_setValue(KEY_EXP, newCount);
+                return { 
+                    success: true, 
+                    uid: uid,
+                    count: newCount,
+                    message: `访问UID:${uid}成功 (${newCount}/5)`
+                };
+            }
+            return { success: false, message: '访问失败' };
+        } catch (e) {
+            return { success: false, message: '网络错误' };
+        }
+    }
+
+    // 主流程
     (async () => {
         const formhash = document.documentElement.innerHTML.match(/formhash=([a-f0-9]{8})/i)?.[1];
-        if (!formhash) { toast('提取 formhash 失败！', '#c00'); return; }
+        if (!formhash) { 
+            toast('提取 formhash 失败！', '#c00'); 
+            return; 
+        }
+
+        const isFirstVisit = !GM_getValue(KEY_FIRST_VISIT, false);
+        const isClosed = GM_getValue(KEY_CLOSED, false);
+        
+        // 记录今日首次访问
+        if (isFirstVisit) {
+            GM_setValue(KEY_FIRST_VISIT, true);
+        }
+
+        let logContent = '';
+        const addLog = (msg, status = '') => {
+            const color = status === 'success' ? '#090' : status === 'warning' ? '#f90' : '#333';
+            logContent += `<div style="margin: 5px 0; color: ${color};">${msg}</div>`;
+        };
 
         // 1. 签到
+        let qdResult = '';
         if (!GM_getValue(KEY_QD, false)) {
-            toast('正在签到…');
+            addLog('⏳ 正在签到...');
             const ok = await qianDao(formhash);
             GM_setValue(KEY_QD, true);
-            toast(ok ? '签到成功' : '签到失败（可能已签）', ok ? '#090' : '#f90');
-        } else { toast('今日已签到'); }
-
-        // 2. 随机抽 3 组
-        const sent = GM_getValue(KEY_TIE, 0);
-        if (sent >= 3) { toast('今日 3 贴已完成'); return; }
-
-        const pickedIndexes = randomPick(TITLES.length, 3);
-        for (let i = sent; i < 3; i++) {
-            const idx = pickedIndexes[i];
-            const subject = TITLES[idx];
-            const message = MESSAGES[idx];
-            toast(`发第 ${i + 1} 帖：${subject}`);
-
-            const data = {
-                formhash: formhash,
-                posttime: Math.floor(Date.now() / 1000),
-                delete: 0,
-                topicsubmit: 'yes',
-                subject: subject,
-                message: message,
-                replycredit_extcredits: 0,
-                replycredit_times: 1,
-                replycredit_membertimes: 1,
-                replycredit_random: 100,
-                tags: '', price: '', readperm: '', cronpublishdate: '',
-                allownoticeauthor: 1, usesig: 1
-            };
-
-            let ok = false;
-            for (let tryNum = 0; tryNum < 3; tryNum++) {
-                if (tryNum > 0) await sleep(2000);
-                ok = await sendPost(data);
-                if (ok) break;
-            }
-            if (!ok) { toast(`第 ${i + 1} 贴最终失败，终止`, '#c00'); return; }
-
-            const now = i + 1;
-            GM_setValue(KEY_TIE, now);
-            toast(`第 ${now} 贴发送成功`, '#090');
-            if (i < 2) { toast('等待 3 秒防 flood…'); await sleep(3000); }
+            qdResult = ok ? '✅ 签到成功' : '⚠️ 签到失败（可能已签）';
+            addLog(qdResult, ok ? 'success' : 'warning');
+        } else {
+            addLog('✅ 今日已签到', 'success');
         }
-        toast('签到+随机三贴全部完成', '#090');
+
+        // 2. 访问用户空间获取经验 (前5次)
+        addLog('<br><strong>🎯 获取空间经验:</strong>');
+        const expCount = GM_getValue(KEY_EXP, 0);
+        if (expCount >= 5) {
+            addLog('✅ 今日经验获取已完成 (5/5)', 'success');
+        } else {
+            for (let i = expCount; i < 5; i++) {
+                const result = await visitUserSpace();
+                if (result.success) {
+                    addLog(`✅ ${result.message}`, 'success');
+                    await sleep(1000); // 间隔1秒，避免请求过快
+                } else {
+                    addLog(`❌ ${result.message}`, 'warning');
+                    break;
+                }
+            }
+        }
+
+        // 3. 随机发3帖
+        addLog('<br><strong>📝 自动发帖:</strong>');
+        const sent = GM_getValue(KEY_TIE, 0);
+        if (sent >= 3) {
+            addLog('✅ 今日发帖已完成 (3/3)', 'success');
+        } else {
+            const pickedIndexes = randomPick(TITLES.length, 3);
+            for (let i = sent; i < 3; i++) {
+                const idx = pickedIndexes[i];
+                const subject = TITLES[idx];
+                const message = MESSAGES[idx];
+                
+                addLog(`⏳ 发第 ${i + 1} 帖: ${subject}`);
+                
+                const data = {
+                    formhash: formhash,
+                    posttime: Math.floor(Date.now() / 1000),
+                    delete: 0,
+                    topicsubmit: 'yes',
+                    subject: subject,
+                    message: message,
+                    replycredit_extcredits: 0,
+                    replycredit_times: 1,
+                    replycredit_membertimes: 1,
+                    replycredit_random: 100,
+                    tags: '', price: '', readperm: '', cronpublishdate: '',
+                    allownoticeauthor: 1, usesig: 1
+                };
+
+                let ok = false;
+                for (let tryNum = 0; tryNum < 3; tryNum++) {
+                    if (tryNum > 0) await sleep(2000);
+                    ok = await sendPost(data);
+                    if (ok) break;
+                }
+                
+                if (ok) {
+                    const now = i + 1;
+                    GM_setValue(KEY_TIE, now);
+                    addLog(`✅ 第 ${now} 帖发送成功`, 'success');
+                    if (i < 2) {
+                        addLog('⏳ 等待3秒防flood...');
+                        await sleep(3000);
+                    }
+                } else {
+                    addLog(`❌ 第 ${i + 1} 贴最终失败，终止`, 'warning');
+                    break;
+                }
+            }
+        }
+
+        addLog('<br><strong>🎉 全部任务完成！</strong>', 'success');
+
+        // 显示弹窗逻辑
+        if (isFirstVisit && !isClosed) {
+            createModal(logContent);
+        } else {
+            // 非首次访问，只显示简单toast
+            toast('每日任务已完成', '#090');
+        }
     })();
 
+    // 注册油猴菜单命令，可手动打开日志
+    GM_registerMenuCommand('📋 查看今日任务日志', () => {
+        const qd = GM_getValue(KEY_QD, false) ? '✅' : '❌';
+        const exp = GM_getValue(KEY_EXP, 0);
+        const tie = GM_getValue(KEY_TIE, 0);
+        
+        const content = `
+            <div style="padding: 10px;">
+                <p><strong>今日任务状态:</strong></p>
+                <p>签到: ${qd}</p>
+                <p>空间经验: ${exp}/5 次</p>
+                <p>自动发帖: ${tie}/3 帖</p>
+                <p style="margin-top: 15px; color: #666; font-size: 12px;">
+                    提示: 每天首次访问论坛时会自动显示详细进度窗口。
+                </p>
+            </div>
+        `;
+        createModal(content);
+    });
+
     /* ----------  工具函数  ---------- */
-    function sleep(ms) { return new Promise(r => setTimeout(r, ms)); }
+    function sleep(ms) { 
+        return new Promise(r => setTimeout(r, ms)); 
+    }
 
     function randomPick(max, n) {
         const arr = Array.from({ length: max }, (_, i) => i);
@@ -142,7 +356,10 @@ const MESSAGES = [
             });
             const t = await res.text();
             return /thread-\d+|'tid':'\d+/.test(t) || t.includes('已签到');
-        } catch (e) { console.error(e); return false; }
+        } catch (e) { 
+            console.error(e); 
+            return false; 
+        }
     }
 
     async function sendPost(data) {
@@ -155,6 +372,9 @@ const MESSAGES = [
             });
             const t = await res.text();
             return /thread-\d+|'tid':'\d+/.test(t);
-        } catch (e) { console.error(e); return false; }
+        } catch (e) { 
+            console.error(e); 
+            return false; 
+        }
     }
 })();
