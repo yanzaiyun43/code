@@ -1,8 +1,8 @@
 // ==UserScript==
 // @name         源论坛助手
 // @namespace    http://tampermonkey.net/
-// @version      2.5
-// @description  获取经验和星币
+// @version      2.6
+// @description  源论坛获取经验
 // @author       ailmel
 // @match        *://pc.sysbbs.com/*
 // @grant        GM_setValue
@@ -47,6 +47,115 @@
     
     let msgBox = null;
     let modal = null;
+    let progressBar = null;
+    let progressText = null;
+    let currentStep = 0;
+    const totalSteps = 9; // 1签到+5经验+3发帖
+
+    // 创建进度条
+    function createProgressBar() {
+        const container = document.createElement('div');
+        container.id = 'sysbbs-progress';
+        container.style.cssText = `
+            position: fixed;
+            top: 0;
+            left: 0;
+            width: 100%;
+            height: 60px;
+            background: #fff;
+            z-index: 99999;
+            box-shadow: 0 2px 8px rgba(0,0,0,0.1);
+            display: flex;
+            flex-direction: column;
+            justify-content: center;
+            padding: 0 20px;
+            box-sizing: border-box;
+            font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif;
+        `;
+        
+        const title = document.createElement('div');
+        title.style.cssText = `
+            font-size: 14px;
+            font-weight: bold;
+            color: #333;
+            margin-bottom: 8px;
+            display: flex;
+            justify-content: space-between;
+        `;
+        title.innerHTML = '<span>[源论坛助手] 正在执行每日任务...</span><span id="sysbbs-progress-percent">0%</span>';
+        
+        const barContainer = document.createElement('div');
+        barContainer.style.cssText = `
+            width: 100%;
+            height: 8px;
+            background: #e0e0e0;
+            border-radius: 4px;
+            overflow: hidden;
+        `;
+        
+        const bar = document.createElement('div');
+        bar.id = 'sysbbs-progress-bar';
+        bar.style.cssText = `
+            width: 0%;
+            height: 100%;
+            background: linear-gradient(90deg, #4CAF50, #8BC34A);
+            transition: width 0.3s ease;
+            border-radius: 4px;
+        `;
+        
+        const text = document.createElement('div');
+        text.id = 'sysbbs-progress-text';
+        text.style.cssText = `
+            font-size: 12px;
+            color: #666;
+            margin-top: 6px;
+        `;
+        text.textContent = '初始化中...';
+        
+        barContainer.appendChild(bar);
+        container.appendChild(title);
+        container.appendChild(barContainer);
+        container.appendChild(text);
+        document.body.appendChild(container);
+        
+        progressBar = bar;
+        progressText = text;
+        
+        // 调整页面内容，避免被进度条遮挡
+        document.body.style.paddingTop = '60px';
+    }
+
+    // 更新进度条
+    function updateProgress(stepDescription) {
+        currentStep++;
+        const percent = Math.min(Math.round((currentStep / totalSteps) * 100), 100);
+        
+        if (progressBar) {
+            progressBar.style.width = percent + '%';
+        }
+        if (progressText) {
+            progressText.textContent = `步骤 ${currentStep}/${totalSteps}: ${stepDescription}`;
+        }
+        const percentEl = document.getElementById('sysbbs-progress-percent');
+        if (percentEl) {
+            percentEl.textContent = percent + '%';
+        }
+        
+        console.log(`[源论坛助手] ${stepDescription} (${percent}%)`);
+    }
+
+    // 隐藏进度条
+    function hideProgressBar() {
+        const bar = document.getElementById('sysbbs-progress');
+        if (bar) {
+            bar.style.transition = 'opacity 0.5s';
+            bar.style.opacity = '0';
+            setTimeout(() => {
+                bar.remove();
+                document.body.style.paddingTop = '0';
+            }, 500);
+        }
+    }
 
     // 创建可关闭的模态弹窗
     function createModal(content) {
@@ -61,7 +170,7 @@
             width: 100%;
             height: 100%;
             background: rgba(0,0,0,0.5);
-            z-index: 10000;
+            z-index: 100000;
             display: flex;
             justify-content: center;
             align-items: center;
@@ -72,7 +181,7 @@
             background: white;
             padding: 20px;
             border-radius: 8px;
-            max-width: 400px;
+            max-width: 450px;
             width: 90%;
             max-height: 80vh;
             overflow-y: auto;
@@ -90,8 +199,8 @@
         `;
         
         const title = document.createElement('h3');
-        title.textContent = '[源论坛助手] 每日任务进度';
-        title.style.cssText = 'margin: 0; color: #333;';
+        title.textContent = '[源论坛助手] 每日任务完成报告';
+        title.style.cssText = 'margin: 0; color: #333; font-size: 16px;';
         
         const closeBtn = document.createElement('button');
         closeBtn.textContent = '×';
@@ -116,16 +225,18 @@
         
         const body = document.createElement('div');
         body.innerHTML = content;
-        body.style.cssText = 'line-height: 1.6; color: #666;';
+        body.style.cssText = 'line-height: 1.6; color: #666; font-size: 14px;';
         
         const footer = document.createElement('div');
         footer.style.cssText = `
             margin-top: 15px;
-            text-align: right;
+            text-align: center;
             font-size: 12px;
             color: #999;
+            border-top: 1px solid #eee;
+            padding-top: 10px;
         `;
-        footer.textContent = '今天不再显示此窗口，可在油猴菜单手动打开';
+        footer.textContent = '✓ 今天不再显示此窗口，可在油猴菜单手动查看';
         
         box.appendChild(header);
         box.appendChild(body);
@@ -142,28 +253,28 @@
         };
     }
 
-    // 简单的toast提示（用于后台操作反馈）
+    // 简单的toast提示
     function toast(text, bg = '#333') {
         if (msgBox) msgBox.remove();
         msgBox = document.createElement('div');
         msgBox.style.cssText = `
             position: fixed;
-            top: 10px;
+            top: 70px;
             right: 10px;
-            z-index: 9999;
-            padding: 8px 14px;
+            z-index: 99999;
+            padding: 10px 16px;
             background: ${bg};
             color: #fff;
             font-size: 14px;
             border-radius: 4px;
-            box-shadow: 0 2px 6px rgba(0,0,0,.3);
+            box-shadow: 0 2px 8px rgba(0,0,0,.2);
             transition: opacity .5s;
             max-width: 300px;
         `;
-        msgBox.textContent = `[助手] ${text}`;
+        msgBox.textContent = text;
         document.body.appendChild(msgBox);
-        setTimeout(() => msgBox.style.opacity = '0', 2500);
-        setTimeout(() => { if (msgBox) msgBox.remove(); }, 3000);
+        setTimeout(() => msgBox.style.opacity = '0', 3000);
+        setTimeout(() => { if (msgBox) msgBox.remove(); }, 3500);
     }
 
     // 生成随机UID (1000-20000)
@@ -175,7 +286,7 @@
     async function visitUserSpace() {
         const visitedCount = GM_getValue(KEY_EXP, 0);
         if (visitedCount >= 5) {
-            return { success: false, message: '今日经验获取已达上限(5次)' };
+            return { success: false, message: '今日经验获取已达上限(5次)', count: visitedCount };
         }
         
         const uid = getRandomUID();
@@ -194,9 +305,9 @@
                     message: `访问UID:${uid}成功 (${newCount}/5)`
                 };
             }
-            return { success: false, message: '访问失败' };
+            return { success: false, message: '访问失败', count: visitedCount };
         } catch (e) {
-            return { success: false, message: '网络错误' };
+            return { success: false, message: '网络错误', count: visitedCount };
         }
     }
 
@@ -216,37 +327,47 @@
             GM_setValue(KEY_FIRST_VISIT, true);
         }
 
+        // 创建进度条（仅在首次访问时显示）
+        if (isFirstVisit && !isClosed) {
+            createProgressBar();
+        }
+
         let logContent = '';
         const addLog = (msg, status = '') => {
-            const color = status === 'success' ? '#090' : status === 'warning' ? '#f90' : '#333';
-            logContent += `<div style="margin: 5px 0; color: ${color};">${msg}</div>`;
+            const color = status === 'success' ? '#090' : status === 'warning' ? '#f90' : status === 'error' ? '#c00' : '#333';
+            const icon = status === 'success' ? '✓' : status === 'warning' ? '⚠' : status === 'error' ? '✗' : '•';
+            logContent += `<div style="margin: 6px 0; color: ${color};">${icon} ${msg}</div>`;
         };
 
         // 1. 签到
+        updateProgress('检查签到状态');
         let qdResult = '';
         if (!GM_getValue(KEY_QD, false)) {
-            addLog('⏳ 正在签到...');
+            updateProgress('正在执行签到');
             const ok = await qianDao(formhash);
             GM_setValue(KEY_QD, true);
-            qdResult = ok ? '✅ 签到成功' : '⚠️ 签到失败（可能已签）';
+            qdResult = ok ? '签到成功' : '签到失败（可能已签）';
             addLog(qdResult, ok ? 'success' : 'warning');
         } else {
-            addLog('✅ 今日已签到', 'success');
+            qdResult = '今日已签到';
+            addLog(qdResult, 'success');
         }
 
         // 2. 访问用户空间获取经验 (前5次)
-        addLog('<br><strong>🎯 获取空间经验:</strong>');
+        addLog('<br><strong>🎯 获取空间经验 (每天前5次访问+2经验):</strong>');
         const expCount = GM_getValue(KEY_EXP, 0);
         if (expCount >= 5) {
-            addLog('✅ 今日经验获取已完成 (5/5)', 'success');
+            updateProgress('经验获取已完成');
+            addLog('今日经验获取已完成 (5/5)', 'success');
         } else {
             for (let i = expCount; i < 5; i++) {
+                updateProgress(`正在访问用户空间 (${i+1}/5)`);
                 const result = await visitUserSpace();
                 if (result.success) {
-                    addLog(`✅ ${result.message}`, 'success');
-                    await sleep(1000); // 间隔1秒，避免请求过快
+                    addLog(`${result.message}`, 'success');
+                    await sleep(1000);
                 } else {
-                    addLog(`❌ ${result.message}`, 'warning');
+                    addLog(`${result.message}`, 'warning');
                     break;
                 }
             }
@@ -256,7 +377,8 @@
         addLog('<br><strong>📝 自动发帖:</strong>');
         const sent = GM_getValue(KEY_TIE, 0);
         if (sent >= 3) {
-            addLog('✅ 今日发帖已完成 (3/3)', 'success');
+            updateProgress('发帖任务已完成');
+            addLog('今日发帖已完成 (3/3)', 'success');
         } else {
             const pickedIndexes = randomPick(TITLES.length, 3);
             for (let i = sent; i < 3; i++) {
@@ -264,7 +386,7 @@
                 const subject = TITLES[idx];
                 const message = MESSAGES[idx];
                 
-                addLog(`⏳ 发第 ${i + 1} 帖: ${subject}`);
+                updateProgress(`正在发送第 ${i + 1} 帖`);
                 
                 const data = {
                     formhash: formhash,
@@ -283,7 +405,10 @@
 
                 let ok = false;
                 for (let tryNum = 0; tryNum < 3; tryNum++) {
-                    if (tryNum > 0) await sleep(2000);
+                    if (tryNum > 0) {
+                        updateProgress(`第 ${i+1} 帖重试中 (${tryNum}/3)`);
+                        await sleep(2000);
+                    }
                     ok = await sendPost(data);
                     if (ok) break;
                 }
@@ -291,43 +416,51 @@
                 if (ok) {
                     const now = i + 1;
                     GM_setValue(KEY_TIE, now);
-                    addLog(`✅ 第 ${now} 帖发送成功`, 'success');
+                    addLog(`第 ${now} 帖《${subject}》发送成功`, 'success');
                     if (i < 2) {
-                        addLog('⏳ 等待3秒防flood...');
+                        updateProgress('等待防flood冷却');
                         await sleep(3000);
                     }
                 } else {
-                    addLog(`❌ 第 ${i + 1} 贴最终失败，终止`, 'warning');
+                    addLog(`第 ${i + 1} 贴最终失败，终止`, 'error');
                     break;
                 }
             }
         }
 
-        addLog('<br><strong>🎉 全部任务完成！</strong>', 'success');
+        updateProgress('所有任务完成');
+        addLog('<br><strong>🎉 全部任务执行完毕！</strong>', 'success');
 
-        // 显示弹窗逻辑
-        if (isFirstVisit && !isClosed) {
-            createModal(logContent);
-        } else {
-            // 非首次访问，只显示简单toast
-            toast('每日任务已完成', '#090');
-        }
+        // 延迟隐藏进度条，显示结果
+        setTimeout(() => {
+            hideProgressBar();
+            
+            // 显示结果弹窗
+            if (isFirstVisit && !isClosed) {
+                createModal(logContent);
+            } else {
+                toast('✓ 每日任务已完成', '#090');
+            }
+        }, 800);
     })();
 
-    // 注册油猴菜单命令，可手动打开日志
+    // 注册油猴菜单命令
     GM_registerMenuCommand('📋 查看今日任务日志', () => {
-        const qd = GM_getValue(KEY_QD, false) ? '✅' : '❌';
+        const qd = GM_getValue(KEY_QD, false) ? '✓ 已签到' : '✗ 未签到';
         const exp = GM_getValue(KEY_EXP, 0);
         const tie = GM_getValue(KEY_TIE, 0);
         
         const content = `
             <div style="padding: 10px;">
-                <p><strong>今日任务状态:</strong></p>
-                <p>签到: ${qd}</p>
-                <p>空间经验: ${exp}/5 次</p>
-                <p>自动发帖: ${tie}/3 帖</p>
-                <p style="margin-top: 15px; color: #666; font-size: 12px;">
-                    提示: 每天首次访问论坛时会自动显示详细进度窗口。
+                <p><strong>📊 今日任务状态:</strong></p>
+                <div style="margin: 10px 0; padding: 10px; background: #f5f5f5; border-radius: 4px;">
+                    <p>📝 签到状态: <strong>${qd}</strong></p>
+                    <p>🎯 空间经验: <strong>${exp}/5</strong> 次 (可获 ${Math.min(exp, 5) * 2} 经验)</p>
+                    <p>💬 自动发帖: <strong>${tie}/3</strong> 帖</p>
+                </div>
+                <p style="margin-top: 15px; color: #666; font-size: 12px; line-height: 1.5;">
+                    💡 提示: 每天首次访问论坛时会自动显示详细进度窗口。<br>
+                    进度条会实时显示任务执行状态，请耐心等待所有步骤完成。
                 </p>
             </div>
         `;
