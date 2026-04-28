@@ -1,7 +1,7 @@
 // ==UserScript==
 // @name         灵界 LingVerse 炼造配置面板 v3.0
 // @namespace    lingverse-craft-config
-// @version      2.1.0
+// @version      2.1.1
 // @description  炼造自动化配置：支持炼丹/炼器/制符/化身炼造、许愿锁定、自动售卖、深色/浅色模式跟随游戏主题
 // @author       You
 // @match        https://ling.muge.info/*
@@ -1675,19 +1675,24 @@
                 Logger.info(`${name} 材料不足，将使用灵石补充`);
             }
 
-            const needBuy = recipe.materials?.some(m => m.have < m.need);
+            const requestCount = Math.min(CONFIG.general.batchSize, 50);
+
+            // 计算是否需要补充材料（批量炼制需要 requestCount 次的材料）
+            const needBuy = recipe.materials?.some(m => m.have < m.need * requestCount);
             if (needBuy && CONFIG.general.useQuickBuy && canQuickBuy) {
-                if (recipe.quickBuyCost > CONFIG.general.maxQuickBuyCost) {
-                    Logger.warn(`${name} 补充费用过高(${recipe.quickBuyCost}灵石)`);
-                    return;
+                const totalCost = recipe.quickBuyCost * requestCount;
+                if (totalCost > CONFIG.general.maxQuickBuyCost) {
+                    Logger.warn(`${name} 批量补充费用过高(${totalCost}灵石)，尝试单次炼制`);
+                    // 回退到单次炼制
+                    return this.craftSingle(type, name);
                 }
 
-                Logger.info(`${name} 补充材料中...`);
+                Logger.info(`${name} 补充${requestCount}次材料中...`);
                 try {
-                    const buyRes = await API.quickBuyMats(type, id, 1);
+                    const buyRes = await API.quickBuyMats(type, id, requestCount);
                     if (buyRes.code === 200) {
-                        STATE.stats.spent += recipe.quickBuyCost;
-                        Logger.success(`${name} 材料补充成功`);
+                        STATE.stats.spent += totalCost;
+                        Logger.success(`${name} 材料补充成功，花费${totalCost}灵石`);
                     } else {
                         Logger.error(`${name} 补充失败: ${buyRes.message}`);
                         return;
@@ -1700,26 +1705,65 @@
                 Logger.warn(`${name} 材料不足且无法补充`);
                 return;
             }
-
-            const count = Math.min(CONFIG.general.batchSize, 50);
             try {
                 let res;
                 if (type === 'alchemy') {
-                    res = await API.batchCraftAlchemy(id, count);
+                    res = await API.batchCraftAlchemy(id, requestCount);
                 } else if (type === 'forge') {
-                    res = await API.batchCraftForge(id, count);
+                    res = await API.batchCraftForge(id, requestCount);
                 } else {
-                    res = await API.batchCraftTalisman(id, count);
+                    res = await API.batchCraftTalisman(id, requestCount);
                 }
 
                 if (res.code === 200) {
-                    Logger.success(`${name} x${count} 炼制成功`);
-                    STATE.stats.crafted += count;
+                    // 从API返回获取实际炼制数量
+                    const actualCount = res.data?.count || res.data?.crafted || 1;
+                    Logger.success(`${name} x${actualCount} 炼制成功`);
+                    STATE.stats.crafted += actualCount;
                 } else {
                     Logger.error(`${name} 炼制失败: ${res.message}`);
                 }
             } catch (e) {
                 Logger.error(`${name} 炼制异常: ${e.message}`);
+            }
+        },
+
+        async craftSingle(type, name) {
+            const cache = type === 'alchemy' ? CACHE.alchemy :
+                         type === 'forge' ? CACHE.forge : CACHE.talisman;
+
+            const recipe = cache.find(r => {
+                const itemName = r.pillName || r.name || '';
+                return itemName === name;
+            });
+
+            if (!recipe) {
+                Logger.warn(`未找到配方: ${name}`);
+                return;
+            }
+
+            const idField = type === 'alchemy' ? 'pillId' : 'recipeId';
+            const id = recipe[idField];
+
+            try {
+                let res;
+                if (type === 'alchemy') {
+                    res = await API.craftAlchemy(id);
+                } else if (type === 'forge') {
+                    res = await API.craftForge(id);
+                } else {
+                    res = await API.craftTalisman(id);
+                }
+
+                if (res.code === 200) {
+                    const actualCount = res.data?.count || res.data?.crafted || 1;
+                    Logger.success(`${name} x${actualCount} 单次炼制成功`);
+                    STATE.stats.crafted += actualCount;
+                } else {
+                    Logger.error(`${name} 单次炼制失败: ${res.message}`);
+                }
+            } catch (e) {
+                Logger.error(`${name} 单次炼制异常: ${e.message}`);
             }
         },
 
