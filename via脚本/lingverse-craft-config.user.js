@@ -1,7 +1,7 @@
 // ==UserScript==
 // @name         灵界 LingVerse 炼造配置面板 v3.0
 // @namespace    lingverse-craft-config
-// @version      2.0.0
+// @version      2.1.0
 // @description  炼造自动化配置：支持炼丹/炼器/制符/化身炼造、许愿锁定、自动售卖、深色/浅色模式跟随游戏主题
 // @author       You
 // @match        https://ling.muge.info/*
@@ -305,6 +305,9 @@
         getVars() {
             const isDark = this.isDark();
             return {
+                // 主题标识
+                isDark,
+
                 // 背景色
                 bgPrimary: isDark ? '#0a0f1c' : '#f3f2f0',
                 bgSecondary: isDark ? '#111827' : '#eae9e7',
@@ -433,43 +436,39 @@
             }
         },
 
-        createFloatButton() {
-            if ($('#lv-craft-float-btn')) return;
+        createSidebarButton() {
+            if ($('#lv-craft-sidebar-btn')) return;
 
             const v = Theme.getVars();
             const btn = document.createElement('button');
-            btn.id = 'lv-craft-float-btn';
-            btn.innerHTML = '🔥';
+            btn.id = 'lv-craft-sidebar-btn';
+            btn.innerHTML = '<span style="font-size:16px;margin-right:6px;">🔥</span>炼造';
             btn.style.cssText = `
-                position: fixed;
-                bottom: 100px;
-                right: 15px;
-                width: 52px;
-                height: 52px;
-                z-index: 99999;
-                background: ${v.gradientGold};
-                border: 2px solid ${v.accentGold};
-                border-radius: 50%;
-                color: #fff;
-                font-size: 24px;
+                width: 100%;
+                padding: 10px 12px;
+                margin-top: 12px;
+                background: ${v.isDark ? 'rgba(201, 153, 58, 0.15)' : 'rgba(184, 70, 62, 0.1)'};
+                border: 1px solid ${v.isDark ? 'rgba(201, 153, 58, 0.3)' : 'rgba(184, 70, 62, 0.25)'};
+                border-radius: 8px;
+                color: ${v.textGold};
+                font-size: 13px;
+                font-weight: bold;
                 cursor: pointer;
-                box-shadow: ${v.shadowMd}, ${v.shadowGlow};
-                transition: all 0.3s ease;
+                transition: all 0.2s ease;
                 display: flex;
                 align-items: center;
                 justify-content: center;
                 -webkit-tap-highlight-color: transparent;
-                touch-action: manipulation;
-                text-shadow: 0 1px 2px rgba(0,0,0,0.3);
+                font-family: KaiTi, 楷体, STKaiti, "Noto Serif SC", serif;
             `;
 
             btn.addEventListener('mouseenter', () => {
-                btn.style.transform = 'scale(1.1)';
-                btn.style.boxShadow = `${v.shadowMd}, 0 0 30px ${v.accentGold}60`;
+                btn.style.background = v.isDark ? 'rgba(201, 153, 58, 0.25)' : 'rgba(184, 70, 62, 0.2)';
+                btn.style.borderColor = v.isDark ? 'rgba(201, 153, 58, 0.5)' : 'rgba(184, 70, 62, 0.4)';
             });
             btn.addEventListener('mouseleave', () => {
-                btn.style.transform = 'scale(1)';
-                btn.style.boxShadow = `${v.shadowMd}, ${v.shadowGlow}`;
+                btn.style.background = v.isDark ? 'rgba(201, 153, 58, 0.15)' : 'rgba(184, 70, 62, 0.1)';
+                btn.style.borderColor = v.isDark ? 'rgba(201, 153, 58, 0.3)' : 'rgba(184, 70, 62, 0.25)';
             });
 
             btn.addEventListener('click', (e) => {
@@ -478,14 +477,65 @@
                 this.togglePanel();
             });
 
-            btn.addEventListener('touchstart', () => {
-                btn.style.transform = 'scale(0.95)';
-            }, { passive: true });
-            btn.addEventListener('touchend', () => {
-                btn.style.transform = 'scale(1)';
-            }, { passive: true });
+            // 插入到侧边栏底部
+            this.insertToSidebar(btn);
+        },
 
-            document.body.appendChild(btn);
+        insertToSidebar(btn) {
+            // 尝试多种方式找到侧边栏
+            const sidebar = $('.player-panel') || $('#playerPanel') || $('.sidebar') || $('#sidebar');
+            if (sidebar) {
+                // 检查是否已有该按钮
+                if (!sidebar.querySelector('#lv-craft-sidebar-btn')) {
+                    sidebar.appendChild(btn);
+                }
+                return;
+            }
+
+            // 如果找不到侧边栏，创建一个固定的侧边栏按钮
+            const v = Theme.getVars();
+            const container = document.createElement('div');
+            container.id = 'lv-craft-sidebar-container';
+            container.style.cssText = `
+                position: fixed;
+                left: 0;
+                top: 50%;
+                transform: translateY(-50%);
+                z-index: 9999;
+                writing-mode: vertical-rl;
+                text-orientation: mixed;
+            `;
+
+            btn.innerHTML = '🔥炼造';
+            btn.style.cssText = `
+                padding: 16px 8px;
+                background: ${v.isDark ? 'rgba(201, 153, 58, 0.2)' : 'rgba(184, 70, 62, 0.15)'};
+                border: 1px solid ${v.isDark ? 'rgba(201, 153, 58, 0.4)' : 'rgba(184, 70, 62, 0.3)'};
+                border-left: none;
+                border-radius: 0 8px 8px 0;
+                color: ${v.textGold};
+                font-size: 14px;
+                font-weight: bold;
+                cursor: pointer;
+                writing-mode: vertical-rl;
+                text-orientation: mixed;
+                letter-spacing: 4px;
+                box-shadow: ${v.shadowMd};
+                transition: all 0.2s ease;
+                font-family: KaiTi, 楷体, STKaiti, "Noto Serif SC", serif;
+            `;
+
+            btn.addEventListener('mouseenter', () => {
+                btn.style.background = v.isDark ? 'rgba(201, 153, 58, 0.35)' : 'rgba(184, 70, 62, 0.25)';
+                btn.style.paddingLeft = '12px';
+            });
+            btn.addEventListener('mouseleave', () => {
+                btn.style.background = v.isDark ? 'rgba(201, 153, 58, 0.2)' : 'rgba(184, 70, 62, 0.15)';
+                btn.style.paddingLeft = '8px';
+            });
+
+            container.appendChild(btn);
+            document.body.appendChild(container);
         },
 
         async createPanel() {
@@ -1767,14 +1817,17 @@
         if (!location.href.includes('ling.muge.info')) return;
 
         Theme.initObserver();
-        UI.createFloatButton();
+        // 延迟创建侧边栏按钮，确保侧边栏已加载
+        setTimeout(() => {
+            UI.createSidebarButton();
+        }, 2000);
 
         setTimeout(() => {
             CraftManager.loadRecipes();
         }, 3000);
 
         Logger.info('炼造助手 v3.0.0 已加载');
-        Logger.info('点击右下角 🔥 按钮打开配置面板');
+        Logger.info('点击侧边栏 🔥炼造 按钮打开配置面板');
 
         // 自动开始
         setTimeout(() => {
