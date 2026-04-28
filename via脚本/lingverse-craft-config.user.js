@@ -1,7 +1,7 @@
 // ==UserScript==
 // @name         灵界 LingVerse 炼造配置面板
 // @namespace    lingverse-craft-config
-// @version      2.1.19
+// @version      2.1.20
 // @description  炼造自动化配置：支持炼丹/炼器/制符/化身炼造、许愿锁定、自动售卖、深色/浅色模式跟随游戏主题
 // @author       LingVerse
 // @match        https://ling.muge.info/*
@@ -2837,20 +2837,33 @@
                 Logger.info(`${name} 材料不足，将使用灵石补充`);
             }
 
+            // 使用配置的batchSize作为目标炼制次数
             const requestCount = Math.min(CONFIG.general.batchSize, 50);
 
+            // 计算基于材料的最大可炼制次数
+            let maxCraftableCount = requestCount;
+            if (recipe.materials && recipe.materials.length > 0) {
+                const materialLimits = recipe.materials.map(m => {
+                    if (!m.need || m.need <= 0) return requestCount;
+                    return Math.floor((m.have || 0) / m.need);
+                });
+                maxCraftableCount = Math.min(...materialLimits, requestCount);
+            }
+
+            // 检查材料是否足够
             const needBuy = recipe.materials?.some(m => m.have < m.need * requestCount);
             if (needBuy && CONFIG.general.useQuickBuy && canQuickBuy) {
-                const totalCost = recipe.quickBuyCost * requestCount;
+                // 计算需要补充的份数 = 目标次数 - 现有材料可炼次数
+                const buyAmount = requestCount - maxCraftableCount;
+                const totalCost = recipe.quickBuyCost * buyAmount;
                 if (totalCost > CONFIG.general.maxQuickBuyCost) {
                     Logger.warn(`${name} 批量补充费用过高(${totalCost}灵石)，尝试单次炼制`);
-
                     return this.craftSingle(type, name);
                 }
 
-                Logger.info(`${name} 补充${requestCount}次材料中...`);
+                Logger.info(`${name} 补充${buyAmount}份材料中(目标${requestCount}次，现有可炼${maxCraftableCount}次)...`);
                 try {
-                    const buyRes = await API.quickBuyMats(type, id, requestCount);
+                    const buyRes = await API.quickBuyMats(type, id, buyAmount);
                     if (buyRes.code === 200) {
                         STATE.stats.spent += totalCost;
                         Logger.success(`${name} 材料补充成功，花费${totalCost}灵石`);
