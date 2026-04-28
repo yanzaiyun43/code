@@ -1,7 +1,7 @@
 // ==UserScript==
 // @name         灵界 LingVerse 炼造配置面板
 // @namespace    lingverse-craft-config
-// @version      2.1.13
+// @version      2.1.14
 // @description  炼造自动化配置：支持炼丹/炼器/制符/化身炼造、许愿锁定、自动售卖、深色/浅色模式跟随游戏主题
 // @author       LingVerse
 // @match        https://ling.muge.info/*
@@ -2066,12 +2066,27 @@
             localStorage.setItem('lv_craft_config_v3', JSON.stringify(CONFIG));
         },
 
+        // 深度合并配置对象
+        mergeConfig(target, source) {
+            for (const key in source) {
+                if (source[key] && typeof source[key] === 'object' && !Array.isArray(source[key])) {
+                    // 递归合并对象
+                    target[key] = target[key] || {};
+                    this.mergeConfig(target[key], source[key]);
+                } else {
+                    // 直接赋值基本类型
+                    target[key] = source[key];
+                }
+            }
+        },
+
         loadConfigToPanel() {
             const saved = localStorage.getItem('lv_craft_config_v3');
             if (saved) {
                 try {
                     const parsed = JSON.parse(saved);
-                    Object.assign(CONFIG, parsed);
+                    // 深度合并配置，确保新字段有默认值
+                    this.mergeConfig(CONFIG, parsed);
                 } catch (e) {
                     Logger.error('加载配置失败');
                 }
@@ -2087,45 +2102,51 @@
                 if (el) el.checked = checked;
             };
 
-            setValue('#lv-target-alchemy', CONFIG.targets.alchemy);
-            setValue('#lv-target-forge', CONFIG.targets.forge);
-            setValue('#lv-target-talisman', CONFIG.targets.talisman);
+            // 安全获取配置值，提供默认值
+            const getVal = (obj, key, def) => obj && obj[key] !== undefined ? obj[key] : def;
 
-            setChecked('#lv-incarnation-enabled', CONFIG.targets.incarnation.enabled);
-            setValue('#lv-incarnation-type', CONFIG.targets.incarnation.type);
-            setValue('#lv-incarnation-target', CONFIG.targets.incarnation.target);
+            setValue('#lv-target-alchemy', getVal(CONFIG.targets, 'alchemy', ''));
+            setValue('#lv-target-forge', getVal(CONFIG.targets, 'forge', ''));
+            setValue('#lv-target-talisman', getVal(CONFIG.targets, 'talisman', ''));
 
-            setChecked('#lv-autosell-batch-mode', CONFIG.autoSell.useBatchAPI);
-            setValue('#lv-autosell-batch-rarity', CONFIG.autoSell.batchMaxRarity);
+            setChecked('#lv-incarnation-enabled', getVal(CONFIG.targets.incarnation, 'enabled', false));
+            setValue('#lv-incarnation-type', getVal(CONFIG.targets.incarnation, 'type', 'alchemy'));
+            setValue('#lv-incarnation-target', getVal(CONFIG.targets.incarnation, 'target', ''));
 
-            setChecked('#lv-autosell-pills', CONFIG.autoSell.pills.enabled);
-            setValue('#lv-autosell-pills-rarity', CONFIG.autoSell.pills.maxRarity);
+            setChecked('#lv-autosell-batch-mode', getVal(CONFIG.autoSell, 'useBatchAPI', false));
+            setValue('#lv-autosell-batch-rarity', getVal(CONFIG.autoSell, 'batchMaxRarity', 2));
 
-            setChecked('#lv-autosell-equip', CONFIG.autoSell.equipment.enabled);
-            setValue('#lv-autosell-equip-rarity', CONFIG.autoSell.equipment.maxRarity);
+            setChecked('#lv-autosell-pills', getVal(CONFIG.autoSell.pills, 'enabled', false));
+            setValue('#lv-autosell-pills-rarity', getVal(CONFIG.autoSell.pills, 'maxRarity', 2));
+
+            setChecked('#lv-autosell-equip', getVal(CONFIG.autoSell.equipment, 'enabled', false));
+            setValue('#lv-autosell-equip-rarity', getVal(CONFIG.autoSell.equipment, 'maxRarity', 2));
 
             UI.updateBatchSellMode();
 
-            setChecked('#lv-use-quickbuy', CONFIG.general.useQuickBuy);
-            setChecked('#lv-auto-start', CONFIG.general.autoStart);
-            setValue('#lv-batch-size', CONFIG.general.batchSize);
-            setValue('#lv-max-cost', CONFIG.general.maxQuickBuyCost);
-            setValue('#lv-interval', CONFIG.general.autoCraftInterval);
+            setChecked('#lv-use-quickbuy', getVal(CONFIG.general, 'useQuickBuy', true));
+            setChecked('#lv-auto-start', getVal(CONFIG.general, 'autoStart', false));
+            setValue('#lv-batch-size', getVal(CONFIG.general, 'batchSize', 10));
+            setValue('#lv-max-cost', getVal(CONFIG.general, 'maxQuickBuyCost', 5000));
+            setValue('#lv-interval', getVal(CONFIG.general, 'autoCraftInterval', 30));
 
-            setChecked('#lv-adaptive-interval', CONFIG.general.adaptiveInterval);
-            setValue('#lv-min-interval', CONFIG.general.minInterval);
-            setValue('#lv-max-interval', CONFIG.general.maxInterval);
-            setValue('#lv-success-decrease', CONFIG.general.successDecrease);
-            setValue('#lv-error-increase', CONFIG.general.errorIncrease);
+            setChecked('#lv-adaptive-interval', getVal(CONFIG.general, 'adaptiveInterval', true));
+            setValue('#lv-min-interval', getVal(CONFIG.general, 'minInterval', 10));
+            setValue('#lv-max-interval', getVal(CONFIG.general, 'maxInterval', 60));
+            setValue('#lv-success-decrease', getVal(CONFIG.general, 'successDecrease', 2));
+            setValue('#lv-error-increase', getVal(CONFIG.general, 'errorIncrease', 5));
 
-            setChecked('#lv-autostop-enabled', CONFIG.general.autoStop.enabled);
-            setChecked('#lv-autostop-spirit', CONFIG.general.autoStop.onInsufficientSpirit);
-            setChecked('#lv-autostop-mp', CONFIG.general.autoStop.onInsufficientMp);
-            setChecked('#lv-autostop-inventory', CONFIG.general.autoStop.onInventoryFull);
-            setChecked('#lv-autostop-meditating', CONFIG.general.autoStop.onMeditating);
-            setChecked('#lv-autostop-cost', CONFIG.general.autoStop.onMaxCostReached);
-            setChecked('#lv-autostop-error', CONFIG.general.autoStop.stopOnError);
-            setValue('#lv-max-craft-cost', CONFIG.general.autoStop.maxCraftCost);
+            // 自动停止设置 - 确保autoStop对象存在
+            const autoStop = CONFIG.general.autoStop || {};
+            setChecked('#lv-autostop-enabled', getVal(autoStop, 'enabled', true));
+            setChecked('#lv-autostop-spirit', getVal(autoStop, 'onInsufficientSpirit', true));
+            setChecked('#lv-autostop-mp', getVal(autoStop, 'onInsufficientMp', true));
+            setChecked('#lv-autostop-inventory', getVal(autoStop, 'onInventoryFull', true));
+            setChecked('#lv-autostop-meditating', getVal(autoStop, 'onMeditating', true));
+            setChecked('#lv-autostop-cost', getVal(autoStop, 'onMaxCostReached', true));
+            setChecked('#lv-autostop-error', getVal(autoStop, 'stopOnError', true));
+            setValue('#lv-max-craft-cost', getVal(autoStop, 'maxCraftCost', 100000));
+            setValue('#lv-max-errors', getVal(autoStop, 'maxConsecutiveErrors', 5));
             setValue('#lv-max-errors', CONFIG.general.autoStop.maxConsecutiveErrors);
         },
 
