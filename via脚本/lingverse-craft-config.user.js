@@ -1,7 +1,7 @@
 // ==UserScript==
 // @name         灵界 LingVerse 炼造配置面板 v3.0
 // @namespace    lingverse-craft-config
-// @version      2.1.7
+// @version      2.1.8
 // @description  炼造自动化配置：支持炼丹/炼器/制符/化身炼造、许愿锁定、自动售卖、深色/浅色模式跟随游戏主题
 // @author       LingVerse
 // @match        https://ling.muge.info/*
@@ -442,25 +442,24 @@
             const v = Theme.getVars();
             const btn = document.createElement('button');
             btn.id = 'lv-craft-sidebar-btn';
-            btn.innerHTML = '<span style="font-size:14px;margin-right:4px;">🔥</span>炼造';
+            btn.innerHTML = '🔥炼造';
             btn.style.cssText = `
-                width: calc(100% - 32px);
-                margin: 12px 16px 0 16px;
-                padding: 8px 10px;
+                width: 100%;
+                margin-top: 10px;
+                padding: 6px 8px;
                 background: ${v.isDark ? 'rgba(201, 153, 58, 0.15)' : 'rgba(184, 70, 62, 0.1)'};
                 border: 1px solid ${v.isDark ? 'rgba(201, 153, 58, 0.3)' : 'rgba(184, 70, 62, 0.25)'};
-                border-radius: 6px;
+                border-radius: 4px;
                 color: ${v.textGold};
-                font-size: 12px;
+                font-size: 11px;
                 font-weight: bold;
                 cursor: pointer;
                 transition: all 0.2s ease;
-                display: flex;
-                align-items: center;
-                justify-content: center;
+                display: block;
+                text-align: center;
                 -webkit-tap-highlight-color: transparent;
                 font-family: KaiTi, 楷体, STKaiti, "Noto Serif SC", serif;
-                box-sizing: border-box;
+                line-height: 1.4;
             `;
 
             btn.addEventListener('mouseenter', () => {
