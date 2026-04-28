@@ -1,7 +1,7 @@
 // ==UserScript==
 // @name         灵界 LingVerse 炼造配置面板 v3.0
 // @namespace    lingverse-craft-config
-// @version      2.1.2
+// @version      2.1.3
 // @description  炼造自动化配置：支持炼丹/炼器/制符/化身炼造、许愿锁定、自动售卖、深色/浅色模式跟随游戏主题
 // @author       You
 // @match        https://ling.muge.info/*
@@ -482,60 +482,30 @@
         },
 
         insertToSidebar(btn) {
-            // 尝试多种方式找到侧边栏
+            // 尝试找到角色信息栏（第一个 panel-section）
+            const playerPanel = $('.player-panel') || $('#playerPanel');
+            if (playerPanel) {
+                const firstSection = playerPanel.querySelector('.panel-section');
+                if (firstSection) {
+                    // 在角色信息栏后面插入按钮
+                    if (!playerPanel.querySelector('#lv-craft-sidebar-btn')) {
+                        firstSection.insertAdjacentElement('afterend', btn);
+                    }
+                    return;
+                }
+            }
+
+            // 备用方案：插入到侧边栏底部
             const sidebar = $('.player-panel') || $('#playerPanel') || $('.sidebar') || $('#sidebar');
             if (sidebar) {
-                // 检查是否已有该按钮
                 if (!sidebar.querySelector('#lv-craft-sidebar-btn')) {
                     sidebar.appendChild(btn);
                 }
                 return;
             }
 
-            // 如果找不到侧边栏，创建一个固定的侧边栏按钮
-            const v = Theme.getVars();
-            const container = document.createElement('div');
-            container.id = 'lv-craft-sidebar-container';
-            container.style.cssText = `
-                position: fixed;
-                left: 0;
-                top: 50%;
-                transform: translateY(-50%);
-                z-index: 9999;
-                writing-mode: vertical-rl;
-                text-orientation: mixed;
-            `;
-
-            btn.innerHTML = '🔥炼造';
-            btn.style.cssText = `
-                padding: 16px 8px;
-                background: ${v.isDark ? 'rgba(201, 153, 58, 0.2)' : 'rgba(184, 70, 62, 0.15)'};
-                border: 1px solid ${v.isDark ? 'rgba(201, 153, 58, 0.4)' : 'rgba(184, 70, 62, 0.3)'};
-                border-left: none;
-                border-radius: 0 8px 8px 0;
-                color: ${v.textGold};
-                font-size: 14px;
-                font-weight: bold;
-                cursor: pointer;
-                writing-mode: vertical-rl;
-                text-orientation: mixed;
-                letter-spacing: 4px;
-                box-shadow: ${v.shadowMd};
-                transition: all 0.2s ease;
-                font-family: KaiTi, 楷体, STKaiti, "Noto Serif SC", serif;
-            `;
-
-            btn.addEventListener('mouseenter', () => {
-                btn.style.background = v.isDark ? 'rgba(201, 153, 58, 0.35)' : 'rgba(184, 70, 62, 0.25)';
-                btn.style.paddingLeft = '12px';
-            });
-            btn.addEventListener('mouseleave', () => {
-                btn.style.background = v.isDark ? 'rgba(201, 153, 58, 0.2)' : 'rgba(184, 70, 62, 0.15)';
-                btn.style.paddingLeft = '8px';
-            });
-
-            container.appendChild(btn);
-            document.body.appendChild(container);
+            // 如果找不到侧边栏，延迟重试
+            setTimeout(() => this.insertToSidebar(btn), 1000);
         },
 
         async createPanel() {
@@ -1603,7 +1573,7 @@
             }, CONFIG.general.autoCraftInterval * 1000);
         },
 
-        stop() {
+        stop(reason = null) {
             if (!STATE.running) return;
 
             STATE.running = false;
@@ -1613,7 +1583,11 @@
             }
 
             UI.updateRunStatus();
-            Logger.info('自动炼造已停止');
+            if (reason) {
+                Logger.warn(`自动炼造已停止: ${reason}`);
+            } else {
+                Logger.info('自动炼造已停止');
+            }
         },
 
         async executeOnce() {
@@ -1622,17 +1596,29 @@
                 return;
             }
 
+            // 检查玩家状态
+            const statusCheck = await this.checkPlayerStatus();
+            if (!statusCheck.canCraft) {
+                this.stop(statusCheck.reason);
+                return;
+            }
+
             try {
+                let craftedCount = 0;
+
                 if (CONFIG.targets.alchemy) {
-                    await this.craftByName('alchemy', CONFIG.targets.alchemy);
+                    const result = await this.craftByName('alchemy', CONFIG.targets.alchemy);
+                    if (result && result.count) craftedCount += result.count;
                 }
 
                 if (CONFIG.targets.forge) {
-                    await this.craftByName('forge', CONFIG.targets.forge);
+                    const result = await this.craftByName('forge', CONFIG.targets.forge);
+                    if (result && result.count) craftedCount += result.count;
                 }
 
                 if (CONFIG.targets.talisman) {
-                    await this.craftByName('talisman', CONFIG.targets.talisman);
+                    const result = await this.craftByName('talisman', CONFIG.targets.talisman);
+                    if (result && result.count) craftedCount += result.count;
                 }
 
                 if (CONFIG.targets.incarnation.enabled && CONFIG.targets.incarnation.target) {
@@ -1643,8 +1629,56 @@
 
                 UI.updateStats();
 
+                // 如果本次没有成功炼制任何物品，可能是资源耗尽
+                if (craftedCount === 0 && (CONFIG.targets.alchemy || CONFIG.targets.forge || CONFIG.targets.talisman)) {
+                    STATE.consecutiveEmptyCrafts = (STATE.consecutiveEmptyCrafts || 0) + 1;
+                    if (STATE.consecutiveEmptyCrafts >= 3) {
+                        this.stop('连续多次未成功炼制，可能是神识/灵力/材料不足');
+                        STATE.consecutiveEmptyCrafts = 0;
+                    }
+                } else {
+                    STATE.consecutiveEmptyCrafts = 0;
+                }
+
             } catch (e) {
                 Logger.error('执行失败: ' + e.message);
+            }
+        },
+
+        async checkPlayerStatus() {
+            try {
+                const res = await API.getPlayerInfo();
+                if (res.code !== 200 || !res.data) {
+                    return { canCraft: false, reason: '无法获取玩家信息' };
+                }
+
+                const player = res.data;
+
+                // 检查神识
+                if (player.spirit !== undefined && player.maxSpirit !== undefined) {
+                    if (player.spirit < 10) {
+                        return { canCraft: false, reason: '神识不足（需要至少10点）' };
+                    }
+                }
+
+                // 检查灵力
+                if (player.mp !== undefined && player.maxMp !== undefined) {
+                    if (player.mp < 10) {
+                        return { canCraft: false, reason: '灵力不足（需要至少10点）' };
+                    }
+                }
+
+                // 检查灵石（如果开启自动补充）
+                if (CONFIG.general.useQuickBuy) {
+                    const stones = player.lowerSpiritStone || 0;
+                    if (stones < 100) {
+                        return { canCraft: false, reason: '灵石不足（需要至少100点用于补充材料）' };
+                    }
+                }
+
+                return { canCraft: true, reason: null };
+            } catch (e) {
+                return { canCraft: true, reason: null }; // 获取失败时不阻止炼制
             }
         },
 
@@ -1659,7 +1693,7 @@
 
             if (!recipe) {
                 Logger.warn(`未找到配方: ${name}`);
-                return;
+                return { count: 0 };
             }
 
             const idField = type === 'alchemy' ? 'pillId' : 'recipeId';
@@ -1670,7 +1704,7 @@
             if (!canCraft) {
                 if (!canQuickBuy || !CONFIG.general.useQuickBuy) {
                     Logger.warn(`${name} 不可炼制`);
-                    return;
+                    return { count: 0 };
                 }
                 Logger.info(`${name} 材料不足，将使用灵石补充`);
             }
@@ -1695,15 +1729,15 @@
                         Logger.success(`${name} 材料补充成功，花费${totalCost}灵石`);
                     } else {
                         Logger.error(`${name} 补充失败: ${buyRes.message}`);
-                        return;
+                        return { count: 0 };
                     }
                 } catch (e) {
                     Logger.error(`${name} 补充异常: ${e.message}`);
-                    return;
+                    return { count: 0 };
                 }
             } else if (needBuy && !canQuickBuy) {
                 Logger.warn(`${name} 材料不足且无法补充`);
-                return;
+                return { count: 0 };
             }
             try {
                 let res;
@@ -1732,11 +1766,14 @@
                     const msg = res.data?.message || `${name} x${actualCount} 炼制成功`;
                     Logger.success(msg);
                     STATE.stats.crafted += actualCount;
+                    return { count: actualCount };
                 } else {
                     Logger.error(`${name} 炼制失败: ${res.message}`);
+                    return { count: 0 };
                 }
             } catch (e) {
                 Logger.error(`${name} 炼制异常: ${e.message}`);
+                return { count: 0 };
             }
         },
 
@@ -1751,7 +1788,7 @@
 
             if (!recipe) {
                 Logger.warn(`未找到配方: ${name}`);
-                return;
+                return { count: 0 };
             }
 
             const idField = type === 'alchemy' ? 'pillId' : 'recipeId';
@@ -1781,11 +1818,14 @@
                     const msg = res.data?.message || `${name} x${actualCount} 单次炼制成功`;
                     Logger.success(msg);
                     STATE.stats.crafted += actualCount;
+                    return { count: actualCount };
                 } else {
                     Logger.error(`${name} 单次炼制失败: ${res.message}`);
+                    return { count: 0 };
                 }
             } catch (e) {
                 Logger.error(`${name} 单次炼制异常: ${e.message}`);
+                return { count: 0 };
             }
         },
 
@@ -1883,17 +1923,22 @@
         if (!location.href.includes('ling.muge.info')) return;
 
         Theme.initObserver();
-        // 延迟创建侧边栏按钮，确保侧边栏已加载
-        setTimeout(() => {
-            UI.createSidebarButton();
-        }, 2000);
+        Logger.info('炼造助手 v3.0.0 已加载');
 
+        // 等待游戏DOM完全加载后再创建按钮
+        waitForElement('.player-panel', 10000)
+            .then(() => {
+                UI.createSidebarButton();
+                Logger.info('点击侧边栏 🔥炼造 按钮打开配置面板');
+            })
+            .catch(() => {
+                Logger.warn('未找到侧边栏，按钮可能无法显示');
+            });
+
+        // 延迟加载配方
         setTimeout(() => {
             CraftManager.loadRecipes();
         }, 3000);
-
-        Logger.info('炼造助手 v3.0.0 已加载');
-        Logger.info('点击侧边栏 🔥炼造 按钮打开配置面板');
 
         // 自动开始
         setTimeout(() => {
@@ -1901,6 +1946,35 @@
                 CraftManager.start();
             }
         }, 5000);
+    }
+
+    // 等待元素出现的辅助函数
+    function waitForElement(selector, timeout = 10000) {
+        return new Promise((resolve, reject) => {
+            const element = document.querySelector(selector);
+            if (element) {
+                resolve(element);
+                return;
+            }
+
+            const observer = new MutationObserver(() => {
+                const element = document.querySelector(selector);
+                if (element) {
+                    observer.disconnect();
+                    resolve(element);
+                }
+            });
+
+            observer.observe(document.body, {
+                childList: true,
+                subtree: true
+            });
+
+            setTimeout(() => {
+                observer.disconnect();
+                reject(new Error(`等待元素 ${selector} 超时`));
+            }, timeout);
+        });
     }
 
     if (document.readyState === 'loading') {
