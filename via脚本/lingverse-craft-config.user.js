@@ -1,8 +1,8 @@
 // ==UserScript==
 // @name         灵界 LingVerse 炼造配置面板
 // @namespace    lingverse-craft-config
-// @version      1.1.0
-// @description  炼造自动化配置：插入炼造页面中，填写名字炼制、自动售卖、许愿锁定
+// @version      1.2.0
+// @description  炼造自动化配置：插入炼造页面中，填写名字炼制、自动售卖丹药/装备/符箓、许愿锁定
 // @author       You
 // @match        https://ling.muge.info/*
 // @match        http://ling.muge.info/*
@@ -20,12 +20,16 @@
     // ============================================================
     const CONFIG = {
         targets: { alchemy: '', forge: '', talisman: '' },
-        autoSell: { enabled: false, maxRarity: 2, excludeSlots: [], minEnhanceLevel: 0, keepWithAffix: true },
+        autoSell: {
+            pills: { enabled: false, maxRarity: 2 },      // 自动卖丹药
+            equipment: { enabled: false, maxRarity: 2, excludeSlots: [], minEnhanceLevel: 0, keepWithAffix: true }, // 自动卖装备
+            talismans: { enabled: false, maxRarity: 2 },  // 自动卖符箓
+        },
         wishLock: { enabled: false, targetName: '', targetRarity: 4 },
         general: { batchSize: 10, useQuickBuy: true, maxQuickBuyCost: 5000, autoStart: false }
     };
 
-    const STATE = { running: false, currentMode: null, stats: { crafted: 0, sold: 0, spent: 0 } };
+    const STATE = { running: false, currentMode: null, stats: { crafted: 0, soldPills: 0, soldEquip: 0, soldTalismans: 0, spent: 0 } };
 
     const $ = (sel) => document.querySelector(sel);
     const wait = (ms) => new Promise(r => setTimeout(r, ms));
@@ -40,20 +44,19 @@
     // 插入炼造页面的配置面板
     // ============================================================
     function insertCraftPanel() {
-        // 检查是否在炼造页面 (通过判断炉子信息卡是否存在)
         const furnaceBar = $('#alchemyFurnaceBar') || $('#forgeFurnaceBar') || $('#talismanFurnaceBar');
         if (!furnaceBar) return;
-
-        // 避免重复插入
         if ($('#lv-craft-auto-panel')) return;
 
         const panel = document.createElement('div');
         panel.id = 'lv-craft-auto-panel';
+        // 修复移动端滑动：使用 pointer-events: auto 确保触摸事件正常
         panel.style.cssText = `
             margin:12px 16px;padding:12px 16px;
             background:linear-gradient(135deg,rgba(201,153,58,0.08) 0%,rgba(201,153,58,0.02) 100%);
             border:1px solid rgba(201,153,58,0.25);border-radius:8px;
             font-size:12px;color:#e8e0d0;
+            pointer-events:auto;touch-action:auto;-webkit-overflow-scrolling:touch;
         `;
 
         panel.innerHTML = `
@@ -67,23 +70,48 @@
             <div style="margin-bottom:12px;">
                 <div style="font-size:11px;color:#6a6560;margin-bottom:6px;">炼制目标（填写名称，留空则跳过）</div>
                 <div style="display:flex;gap:8px;flex-wrap:wrap;">
-                    <input type="text" id="lv-target-alchemy" placeholder="炼丹: 如聚气丹" style="flex:1;min-width:100px;background:rgba(0,0,0,0.3);border:1px solid rgba(61,171,151,0.3);color:#3dab97;padding:6px 10px;border-radius:6px;font-size:12px;outline:none;">
-                    <input type="text" id="lv-target-forge" placeholder="炼器: 如玄铁剑" style="flex:1;min-width:100px;background:rgba(0,0,0,0.3);border:1px solid rgba(201,153,58,0.3);color:#c9993a;padding:6px 10px;border-radius:6px;font-size:12px;outline:none;">
-                    <input type="text" id="lv-target-talisman" placeholder="制符: 如火球符" style="flex:1;min-width:100px;background:rgba(0,0,0,0.3);border:1px solid rgba(154,106,224,0.3);color:#9a6ae0;padding:6px 10px;border-radius:6px;font-size:12px;outline:none;">
+                    <input type="text" id="lv-target-alchemy" placeholder="炼丹: 如聚气丹" style="flex:1;min-width:100px;background:rgba(0,0,0,0.3);border:1px solid rgba(61,171,151,0.3);color:#3dab97;padding:6px 10px;border-radius:6px;font-size:12px;outline:none;-webkit-user-select:text;user-select:text;">
+                    <input type="text" id="lv-target-forge" placeholder="炼器: 如玄铁剑" style="flex:1;min-width:100px;background:rgba(0,0,0,0.3);border:1px solid rgba(201,153,58,0.3);color:#c9993a;padding:6px 10px;border-radius:6px;font-size:12px;outline:none;-webkit-user-select:text;user-select:text;">
+                    <input type="text" id="lv-target-talisman" placeholder="制符: 如火球符" style="flex:1;min-width:100px;background:rgba(0,0,0,0.3);border:1px solid rgba(154,106,224,0.3);color:#9a6ae0;padding:6px 10px;border-radius:6px;font-size:12px;outline:none;-webkit-user-select:text;user-select:text;">
                 </div>
             </div>
 
-            <!-- 快捷设置 -->
+            <!-- 自动售卖设置 -->
+            <div style="margin-bottom:12px;padding:10px;background:rgba(0,0,0,0.15);border-radius:6px;">
+                <div style="font-size:11px;color:#6a6560;margin-bottom:8px;">自动售卖（勾选启用，超过指定品阶保留）</div>
+                <div style="display:flex;gap:12px;flex-wrap:wrap;">
+                    <label style="display:flex;align-items:center;gap:4px;cursor:pointer;font-size:11px;color:#a8a090;">
+                        <input type="checkbox" id="lv-autosell-pills" style="accent-color:#3dab97;">
+                        <span style="color:#3dab97;">💊卖丹≤</span>
+                        <select id="lv-autosell-pills-rarity" style="background:rgba(0,0,0,0.3);border:1px solid rgba(255,255,255,0.1);color:#e8e0d0;padding:2px 4px;border-radius:4px;font-size:10px;">
+                            <option value="1">普通</option>
+                            <option value="2" selected>优良</option>
+                            <option value="3">稀有</option>
+                        </select>
+                    </label>
+                    <label style="display:flex;align-items:center;gap:4px;cursor:pointer;font-size:11px;color:#a8a090;">
+                        <input type="checkbox" id="lv-autosell-equip" style="accent-color:#c9993a;">
+                        <span style="color:#c9993a;">⚔️卖装≤</span>
+                        <select id="lv-autosell-equip-rarity" style="background:rgba(0,0,0,0.3);border:1px solid rgba(255,255,255,0.1);color:#e8e0d0;padding:2px 4px;border-radius:4px;font-size:10px;">
+                            <option value="1">普通</option>
+                            <option value="2" selected>优良</option>
+                            <option value="3">稀有</option>
+                        </select>
+                    </label>
+                    <label style="display:flex;align-items:center;gap:4px;cursor:pointer;font-size:11px;color:#a8a090;">
+                        <input type="checkbox" id="lv-autosell-talismans" style="accent-color:#9a6ae0;">
+                        <span style="color:#9a6ae0;">📜卖符≤</span>
+                        <select id="lv-autosell-talismans-rarity" style="background:rgba(0,0,0,0.3);border:1px solid rgba(255,255,255,0.1);color:#e8e0d0;padding:2px 4px;border-radius:4px;font-size:10px;">
+                            <option value="1">普通</option>
+                            <option value="2" selected>优良</option>
+                            <option value="3">稀有</option>
+                        </select>
+                    </label>
+                </div>
+            </div>
+
+            <!-- 其他设置 -->
             <div style="display:flex;gap:12px;align-items:center;flex-wrap:wrap;margin-bottom:12px;">
-                <label style="display:flex;align-items:center;gap:6px;cursor:pointer;font-size:12px;color:#a8a090;">
-                    <input type="checkbox" id="lv-autosell" style="accent-color:#c9993a;">
-                    <span>自动卖装备≤</span>
-                    <select id="lv-autosell-rarity" style="background:rgba(0,0,0,0.3);border:1px solid rgba(255,255,255,0.1);color:#e8e0d0;padding:2px 6px;border-radius:4px;font-size:11px;">
-                        <option value="1">普通</option>
-                        <option value="2" selected>优良</option>
-                        <option value="3">稀有</option>
-                    </select>
-                </label>
                 <label style="display:flex;align-items:center;gap:6px;cursor:pointer;font-size:12px;color:#a8a090;">
                     <input type="checkbox" id="lv-wishlock" style="accent-color:#c9993a;">
                     <span>许愿锁定</span>
@@ -96,19 +124,16 @@
 
             <!-- 操作按钮 -->
             <div style="display:flex;gap:10px;align-items:center;">
-                <button id="lv-btn-start" style="flex:1;background:linear-gradient(135deg,#8a6a20 0%,#c9993a 50%,#8a6a20 100%);border:none;color:#fff;padding:8px 16px;border-radius:6px;cursor:pointer;font-size:13px;font-weight:bold;transition:all 0.2s;">开始炼造</button>
-                <button id="lv-btn-save" style="background:rgba(255,255,255,0.05);border:1px solid rgba(255,255,255,0.1);color:#a8a090;padding:8px 14px;border-radius:6px;cursor:pointer;font-size:12px;">保存</button>
-                <button id="lv-btn-once" style="background:rgba(61,171,151,0.15);border:1px solid rgba(61,171,151,0.3);color:#3dab97;padding:8px 14px;border-radius:6px;cursor:pointer;font-size:12px;" title="执行一次炼造">执行一次</button>
+                <button id="lv-btn-start" style="flex:1;background:linear-gradient(135deg,#8a6a20 0%,#c9993a 50%,#8a6a20 100%);border:none;color:#fff;padding:8px 16px;border-radius:6px;cursor:pointer;font-size:13px;font-weight:bold;transition:all 0.2s;touch-action:manipulation;-webkit-tap-highlight-color:transparent;">开始炼造</button>
+                <button id="lv-btn-save" style="background:rgba(255,255,255,0.05);border:1px solid rgba(255,255,255,0.1);color:#a8a090;padding:8px 14px;border-radius:6px;cursor:pointer;font-size:12px;touch-action:manipulation;-webkit-tap-highlight-color:transparent;">保存</button>
+                <button id="lv-btn-once" style="background:rgba(61,171,151,0.15);border:1px solid rgba(61,171,151,0.3);color:#3dab97;padding:8px 14px;border-radius:6px;cursor:pointer;font-size:12px;touch-action:manipulation;-webkit-tap-highlight-color:transparent;" title="执行一次炼造">执行一次</button>
             </div>
 
             <!-- 日志 -->
-            <div id="lv-craft-log" style="margin-top:10px;max-height:80px;overflow-y:auto;font-size:11px;color:#888;background:rgba(0,0,0,0.2);padding:8px;border-radius:6px;display:none;"></div>
+            <div id="lv-craft-log" style="margin-top:10px;max-height:100px;overflow-y:auto;font-size:11px;color:#888;background:rgba(0,0,0,0.2);padding:8px;border-radius:6px;display:none;pointer-events:auto;touch-action:pan-y;-webkit-overflow-scrolling:touch;"></div>
         `;
 
-        // 插入到炉子信息卡下方
         furnaceBar.parentNode.insertBefore(panel, furnaceBar.nextSibling);
-
-        // 绑定事件
         bindPanelEvents();
         loadConfigToPanel();
     }
@@ -133,23 +158,40 @@
         CONFIG.targets.alchemy = $('#lv-target-alchemy').value.trim();
         CONFIG.targets.forge = $('#lv-target-forge').value.trim();
         CONFIG.targets.talisman = $('#lv-target-talisman').value.trim();
-        CONFIG.autoSell.enabled = $('#lv-autosell').checked;
-        CONFIG.autoSell.maxRarity = parseInt($('#lv-autosell-rarity').value);
+
+        CONFIG.autoSell.pills.enabled = $('#lv-autosell-pills').checked;
+        CONFIG.autoSell.pills.maxRarity = parseInt($('#lv-autosell-pills-rarity').value);
+
+        CONFIG.autoSell.equipment.enabled = $('#lv-autosell-equip').checked;
+        CONFIG.autoSell.equipment.maxRarity = parseInt($('#lv-autosell-equip-rarity').value);
+
+        CONFIG.autoSell.talismans.enabled = $('#lv-autosell-talismans').checked;
+        CONFIG.autoSell.talismans.maxRarity = parseInt($('#lv-autosell-talismans-rarity').value);
+
         CONFIG.wishLock.enabled = $('#lv-wishlock').checked;
         CONFIG.general.batchSize = parseInt($('#lv-batch').value) || 10;
-        localStorage.setItem('lv_craft_config_v3', JSON.stringify(CONFIG));
+        localStorage.setItem('lv_craft_config_v4', JSON.stringify(CONFIG));
     }
 
     function loadConfigToPanel() {
         try {
-            const saved = localStorage.getItem('lv_craft_config_v3');
+            const saved = localStorage.getItem('lv_craft_config_v4');
             if (saved) Object.assign(CONFIG, JSON.parse(saved));
         } catch (e) {}
+
         $('#lv-target-alchemy').value = CONFIG.targets.alchemy;
         $('#lv-target-forge').value = CONFIG.targets.forge;
         $('#lv-target-talisman').value = CONFIG.targets.talisman;
-        $('#lv-autosell').checked = CONFIG.autoSell.enabled;
-        $('#lv-autosell-rarity').value = CONFIG.autoSell.maxRarity;
+
+        $('#lv-autosell-pills').checked = CONFIG.autoSell.pills.enabled;
+        $('#lv-autosell-pills-rarity').value = CONFIG.autoSell.pills.maxRarity;
+
+        $('#lv-autosell-equip').checked = CONFIG.autoSell.equipment.enabled;
+        $('#lv-autosell-equip-rarity').value = CONFIG.autoSell.equipment.maxRarity;
+
+        $('#lv-autosell-talismans').checked = CONFIG.autoSell.talismans.enabled;
+        $('#lv-autosell-talismans-rarity').value = CONFIG.autoSell.talismans.maxRarity;
+
         $('#lv-wishlock').checked = CONFIG.wishLock.enabled;
         $('#lv-batch').value = CONFIG.general.batchSize;
     }
@@ -206,21 +248,25 @@
     async function doCraftOnce() {
         const api = getApi();
 
-        // 炼丹
         if (CONFIG.targets.alchemy) {
             await craftByName(api, 'alchemy', CONFIG.targets.alchemy, '/api/game/alchemy/recipes', '/api/game/alchemy/batch-craft', 'pillId');
         }
-        // 炼器
         if (CONFIG.targets.forge) {
             await craftByName(api, 'forge', CONFIG.targets.forge, '/api/game/forge/recipes', '/api/game/forge/batch-craft', 'recipeId');
         }
-        // 制符
         if (CONFIG.targets.talisman) {
             await craftByName(api, 'talisman', CONFIG.targets.talisman, '/api/game/talisman/recipes', '/api/game/talisman/batch-craft', 'recipeId');
         }
+
         // 自动售卖
-        if (CONFIG.autoSell.enabled) {
-            await doAutoSell(api);
+        if (CONFIG.autoSell.pills.enabled) {
+            await doAutoSellPills(api);
+        }
+        if (CONFIG.autoSell.equipment.enabled) {
+            await doAutoSellEquipment(api);
+        }
+        if (CONFIG.autoSell.talismans.enabled) {
+            await doAutoSellTalismans(api);
         }
     }
 
@@ -246,7 +292,6 @@
                 return;
             }
 
-            // 补充材料
             const needBuy = target.materials && target.materials.some(m => m.have < m.need);
             if (needBuy && CONFIG.general.useQuickBuy && target.canQuickBuy) {
                 if (target.quickBuyCost <= CONFIG.general.maxQuickBuyCost) {
@@ -262,7 +307,6 @@
                 }
             }
 
-            // 批量制作
             const batchSize = Math.min(CONFIG.general.batchSize, 50);
             const craftRes = await api.post(craftEndpoint, {
                 [idField]: target.pillId || target.recipeId,
@@ -280,17 +324,47 @@
         }
     }
 
-    async function doAutoSell(api) {
+    // 自动售卖丹药
+    async function doAutoSellPills(api) {
+        try {
+            const res = await api.get('/api/game/inventory');
+            if (res.code !== 200 || !res.data) return;
+
+            const items = res.data.filter(item => {
+                if (item.type !== 'pill') return false;
+                if (item.rarity > CONFIG.autoSell.pills.maxRarity) return false;
+                return true;
+            });
+
+            if (items.length === 0) return;
+
+            let sold = 0;
+            for (const item of items.slice(0, 20)) {
+                try {
+                    await api.post('/api/game/inventory/sell', { itemId: item.id, quantity: item.quantity || 1 });
+                    sold += item.quantity || 1;
+                } catch (e) {}
+            }
+
+            if (sold > 0) {
+                appendLog(`自动售卖 ${sold} 个丹药`, 'success');
+                STATE.stats.soldPills += sold;
+            }
+        } catch (e) {}
+    }
+
+    // 自动售卖装备
+    async function doAutoSellEquipment(api) {
         try {
             const res = await api.get('/api/game/inventory');
             if (res.code !== 200 || !res.data) return;
 
             const items = res.data.filter(item => {
                 if (!['weapon','armor','accessory','ring'].includes(item.type)) return false;
-                if (item.rarity > CONFIG.autoSell.maxRarity) return false;
-                if ((item.enhanceLevel || 0) > CONFIG.autoSell.minEnhanceLevel) return false;
-                if (CONFIG.autoSell.excludeSlots.includes(item.type)) return false;
-                if (CONFIG.autoSell.keepWithAffix && item.affixes && item.affixes.length > 0) return false;
+                if (item.rarity > CONFIG.autoSell.equipment.maxRarity) return false;
+                if ((item.enhanceLevel || 0) > CONFIG.autoSell.equipment.minEnhanceLevel) return false;
+                if (CONFIG.autoSell.equipment.excludeSlots.includes(item.type)) return false;
+                if (CONFIG.autoSell.equipment.keepWithAffix && item.affixes && item.affixes.length > 0) return false;
                 return true;
             });
 
@@ -306,18 +380,46 @@
 
             if (sold > 0) {
                 appendLog(`自动售卖 ${sold} 件装备`, 'success');
-                STATE.stats.sold += sold;
+                STATE.stats.soldEquip += sold;
+            }
+        } catch (e) {}
+    }
+
+    // 自动售卖符箓
+    async function doAutoSellTalismans(api) {
+        try {
+            const res = await api.get('/api/game/inventory');
+            if (res.code !== 200 || !res.data) return;
+
+            const items = res.data.filter(item => {
+                if (item.type !== 'talisman') return false;
+                if (item.rarity > CONFIG.autoSell.talismans.maxRarity) return false;
+                return true;
+            });
+
+            if (items.length === 0) return;
+
+            let sold = 0;
+            for (const item of items.slice(0, 20)) {
+                try {
+                    await api.post('/api/game/inventory/sell', { itemId: item.id, quantity: item.quantity || 1 });
+                    sold += item.quantity || 1;
+                } catch (e) {}
+            }
+
+            if (sold > 0) {
+                appendLog(`自动售卖 ${sold} 张符箓`, 'success');
+                STATE.stats.soldTalismans += sold;
             }
         } catch (e) {}
     }
 
     // ============================================================
-    // 初始化 - 监听炼造页面打开
+    // 初始化
     // ============================================================
     function init() {
         if (!location.href.includes('ling.muge.info')) return;
 
-        // 监听页面变化，当炼造页面打开时插入面板
         const observer = new MutationObserver(() => {
             const furnaceBar = $('#alchemyFurnaceBar') || $('#forgeFurnaceBar') || $('#talismanFurnaceBar');
             if (furnaceBar && !$('#lv-craft-auto-panel')) {
@@ -327,7 +429,6 @@
 
         observer.observe(document.body, { childList: true, subtree: true });
 
-        // 初始检查
         setTimeout(() => {
             const furnaceBar = $('#alchemyFurnaceBar') || $('#forgeFurnaceBar') || $('#talismanFurnaceBar');
             if (furnaceBar) insertCraftPanel();
