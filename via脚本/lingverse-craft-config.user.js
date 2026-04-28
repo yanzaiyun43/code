@@ -1,7 +1,7 @@
 // ==UserScript==
 // @name         灵界 LingVerse 炼造配置面板
 // @namespace    lingverse-craft-config
-// @version      2.1.21
+// @version      2.1.22
 // @description  炼造自动化配置：支持炼丹/炼器/制符/化身炼造、许愿锁定、自动售卖、深色/浅色模式跟随游戏主题
 // @author       LingVerse
 // @match        https://ling.muge.info/*
@@ -2830,9 +2830,12 @@
             // 优先使用API返回的canQuickBuy，如果没有则根据quickBuyCost判断
             const canQuickBuy = recipe.canQuickBuy !== undefined ? recipe.canQuickBuy : (recipe.quickBuyCost > 0);
 
+            // 调试日志
+            Logger.info(`${name} 配方信息: canCraft=${canCraft}, canQuickBuy=${canQuickBuy}, quickBuyCost=${recipe.quickBuyCost}, id=${id}`);
+
             if (!canCraft) {
                 if (!canQuickBuy || !CONFIG.general.useQuickBuy) {
-                    Logger.warn(`${name} 不可炼制`);
+                    Logger.warn(`${name} 不可炼制(canQuickBuy=${canQuickBuy}, useQuickBuy=${CONFIG.general.useQuickBuy})`);
                     return { count: 0 };
                 }
                 Logger.info(`${name} 材料不足，将使用灵石补充`);
@@ -2849,20 +2852,24 @@
                     return Math.floor((m.have || 0) / m.need);
                 });
                 maxCraftableCount = Math.min(...materialLimits, requestCount);
+                Logger.info(`${name} 材料情况: 目标${requestCount}次, 可炼${maxCraftableCount}次, 材料详情:`, recipe.materials.map(m => `${m.name}:${m.have}/${m.need}`).join(', '));
             }
 
             // 检查材料是否足够
             const needBuy = recipe.materials?.some(m => m.have < m.need * requestCount);
-            if (needBuy && CONFIG.general.useQuickBuy && canQuickBuy) {
+            if (needBuy && CONFIG.general.useQuickBuy) {
                 // 计算需要补充的份数 = 目标次数 - 现有材料可炼次数
                 const buyAmount = requestCount - maxCraftableCount;
                 const totalCost = recipe.quickBuyCost * buyAmount;
+                
+                Logger.info(`${name} 需要补充: ${buyAmount}份, 预计费用: ${totalCost}灵石, canQuickBuy=${canQuickBuy}`);
+                
                 if (totalCost > CONFIG.general.maxQuickBuyCost) {
                     Logger.warn(`${name} 批量补充费用过高(${totalCost}灵石)，尝试单次炼制`);
                     return this.craftSingle(type, name);
                 }
 
-                Logger.info(`${name} 补充${buyAmount}份材料中(目标${requestCount}次，现有可炼${maxCraftableCount}次)...`);
+                Logger.info(`${name} 补充${buyAmount}份材料中...`);
                 try {
                     const buyRes = await API.quickBuyMats(type, id, buyAmount);
                     if (buyRes.code === 200) {
@@ -2876,8 +2883,8 @@
                     Logger.error(`${name} 补充异常: ${e.message}`);
                     return { count: 0 };
                 }
-            } else if (needBuy && !canQuickBuy) {
-                Logger.warn(`${name} 材料不足且无法补充`);
+            } else if (needBuy && !CONFIG.general.useQuickBuy) {
+                Logger.warn(`${name} 材料不足且自动补充已禁用`);
                 return { count: 0 };
             }
             try {
