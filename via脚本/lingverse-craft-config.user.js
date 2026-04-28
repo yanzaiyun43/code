@@ -1,8 +1,8 @@
 // ==UserScript==
 // @name         灵界 LingVerse 炼造配置面板
 // @namespace    lingverse-craft-config
-// @version      1.3.0
-// @description  炼造自动化配置：浮动面板，支持拖拽，自动售卖丹药/装备/符箓
+// @version      1.4.0
+// @description  炼造自动化配置：下拉选择物品，自动售卖丹药/装备/符箓
 // @author       You
 // @match        https://ling.muge.info/*
 // @match        http://ling.muge.info/*
@@ -24,6 +24,12 @@
         },
         wishLock: { enabled: false, targetName: '', targetRarity: 4 },
         general: { batchSize: 10, useQuickBuy: true, maxQuickBuyCost: 5000, autoStart: false }
+    };
+
+    const CACHE = {
+        alchemy: [],
+        forge: [],
+        talisman: []
     };
 
     const STATE = { running: false, panelOpen: false, stats: { crafted: 0, soldPills: 0, soldEquip: 0, soldTalismans: 0, spent: 0 } };
@@ -62,28 +68,52 @@
             togglePanel();
         });
 
-        btn.addEventListener('touchstart', (e) => {
-            btn.style.transform = 'scale(0.95)';
-        }, {passive: true});
-
-        btn.addEventListener('touchend', (e) => {
-            btn.style.transform = 'scale(1)';
-        }, {passive: true});
+        btn.addEventListener('touchstart', (e) => { btn.style.transform = 'scale(0.95)'; }, {passive: true});
+        btn.addEventListener('touchend', (e) => { btn.style.transform = 'scale(1)'; }, {passive: true});
 
         document.body.appendChild(btn);
     }
 
     // ============================================================
-    // 创建配置面板（独立浮动，可拖拽）
+    // 获取配方列表
     // ============================================================
-    function createPanel() {
+    async function loadRecipes() {
+        const api = getApi();
+        try {
+            const [alchemyRes, forgeRes, talismanRes] = await Promise.all([
+                api.get('/api/game/alchemy/recipes'),
+                api.get('/api/game/forge/recipes'),
+                api.get('/api/game/talisman/recipes')
+            ]);
+
+            if (alchemyRes.code === 200 && alchemyRes.data) {
+                CACHE.alchemy = alchemyRes.data.recipes || [];
+            }
+            if (forgeRes.code === 200 && forgeRes.data) {
+                CACHE.forge = forgeRes.data.recipes || [];
+            }
+            if (talismanRes.code === 200 && talismanRes.data) {
+                CACHE.talisman = talismanRes.data.recipes || [];
+            }
+        } catch (e) {
+            log('加载配方列表失败', 'error');
+        }
+    }
+
+    // ============================================================
+    // 创建配置面板
+    // ============================================================
+    async function createPanel() {
         if ($('#lv-craft-panel')) return;
+
+        // 先加载配方
+        await loadRecipes();
 
         const panel = document.createElement('div');
         panel.id = 'lv-craft-panel';
         panel.style.cssText = `
             position:fixed;top:50%;left:50%;transform:translate(-50%,-50%);
-            width:92%;max-width:380px;max-height:85vh;z-index:100000;
+            width:92%;max-width:400px;max-height:85vh;z-index:100000;
             background:linear-gradient(180deg,#0d1320 0%,#151d2e 100%);
             border:1px solid rgba(201,153,58,0.4);border-radius:12px;
             font-size:12px;color:#e8e0d0;box-shadow:0 8px 32px rgba(0,0,0,0.8);
@@ -91,8 +121,13 @@
             font-family:KaiTi,楷体,STKaiti,"Noto Serif SC",serif;
         `;
 
+        // 生成下拉选项
+        const alchemyOptions = generateOptions(CACHE.alchemy, 'pillName');
+        const forgeOptions = generateOptions(CACHE.forge, 'name');
+        const talismanOptions = generateOptions(CACHE.talisman, 'talismanName');
+
         panel.innerHTML = `
-            <!-- 标题栏（可拖拽） -->
+            <!-- 标题栏 -->
             <div id="lv-panel-header" style="background:linear-gradient(90deg,rgba(201,153,58,0.25) 0%,rgba(201,153,58,0.1) 100%);padding:12px 16px;border-bottom:1px solid rgba(201,153,58,0.2);display:flex;justify-content:space-between;align-items:center;cursor:move;-webkit-user-select:none;user-select:none;">
                 <div style="display:flex;align-items:center;gap:8px;">
                     <span style="font-size:18px;">🔥</span>
@@ -102,17 +137,45 @@
                 <button id="lv-panel-close" style="background:rgba(255,255,255,0.05);border:1px solid rgba(255,255,255,0.1);color:#888;width:28px;height:28px;border-radius:50%;cursor:pointer;font-size:16px;display:flex;align-items:center;justify-content:center;-webkit-tap-highlight-color:transparent;">×</button>
             </div>
 
-            <!-- 内容区（可滚动） -->
+            <!-- 内容区 -->
             <div style="padding:14px;overflow-y:auto;flex:1;-webkit-overflow-scrolling:touch;">
                 
-                <!-- 炼制目标 -->
-                <div style="margin-bottom:14px;">
-                    <div style="font-size:11px;color:#6a6560;margin-bottom:6px;">炼制目标（填写名称，留空则跳过）</div>
-                    <div style="display:flex;flex-direction:column;gap:8px;">
-                        <input type="text" id="lv-target-alchemy" placeholder="💊 炼丹: 如聚气丹" style="width:100%;background:rgba(0,0,0,0.3);border:1px solid rgba(61,171,151,0.4);color:#3dab97;padding:8px 10px;border-radius:6px;font-size:12px;outline:none;-webkit-user-select:text;user-select:text;">
-                        <input type="text" id="lv-target-forge" placeholder="⚔️ 炼器: 如玄铁剑" style="width:100%;background:rgba(0,0,0,0.3);border:1px solid rgba(201,153,58,0.4);color:#c9993a;padding:8px 10px;border-radius:6px;font-size:12px;outline:none;-webkit-user-select:text;user-select:text;">
-                        <input type="text" id="lv-target-talisman" placeholder="📜 制符: 如火球符" style="width:100%;background:rgba(0,0,0,0.3);border:1px solid rgba(154,106,224,0.4);color:#9a6ae0;padding:8px 10px;border-radius:6px;font-size:12px;outline:none;-webkit-user-select:text;user-select:text;">
+                <!-- 炼丹 -->
+                <div style="margin-bottom:12px;">
+                    <div style="font-size:11px;color:#3dab97;margin-bottom:4px;display:flex;align-items:center;gap:4px;">
+                        <span>💊</span>炼丹目标
                     </div>
+                    <select id="lv-target-alchemy" style="width:100%;background:rgba(0,0,0,0.3);border:1px solid rgba(61,171,151,0.4);color:#e8e0d0;padding:8px 10px;border-radius:6px;font-size:12px;outline:none;">
+                        <option value="">-- 不自动炼丹 --</option>
+                        ${alchemyOptions}
+                    </select>
+                </div>
+
+                <!-- 炼器 -->
+                <div style="margin-bottom:12px;">
+                    <div style="font-size:11px;color:#c9993a;margin-bottom:4px;display:flex;align-items:center;gap:4px;">
+                        <span>⚔️</span>炼器目标
+                    </div>
+                    <select id="lv-target-forge" style="width:100%;background:rgba(0,0,0,0.3);border:1px solid rgba(201,153,58,0.4);color:#e8e0d0;padding:8px 10px;border-radius:6px;font-size:12px;outline:none;">
+                        <option value="">-- 不自动炼器 --</option>
+                        ${forgeOptions}
+                    </select>
+                </div>
+
+                <!-- 制符 -->
+                <div style="margin-bottom:14px;">
+                    <div style="font-size:11px;color:#9a6ae0;margin-bottom:4px;display:flex;align-items:center;gap:4px;">
+                        <span>📜</span>制符目标
+                    </div>
+                    <select id="lv-target-talisman" style="width:100%;background:rgba(0,0,0,0.3);border:1px solid rgba(154,106,224,0.4);color:#e8e0d0;padding:8px 10px;border-radius:6px;font-size:12px;outline:none;">
+                        <option value="">-- 不自动制符 --</option>
+                        ${talismanOptions}
+                    </select>
+                </div>
+
+                <!-- 刷新按钮 -->
+                <div style="margin-bottom:14px;text-align:center;">
+                    <button id="lv-btn-refresh" style="background:rgba(255,255,255,0.05);border:1px solid rgba(255,255,255,0.1);color:#888;padding:6px 16px;border-radius:6px;cursor:pointer;font-size:11px;-webkit-tap-highlight-color:transparent;">🔄 刷新配方列表</button>
                 </div>
 
                 <!-- 自动售卖 -->
@@ -179,8 +242,78 @@
         makePanelDraggable();
     }
 
+    function generateOptions(recipes, nameField) {
+        if (!recipes || recipes.length === 0) {
+            return '<option value="">暂无可用配方</option>';
+        }
+
+        // 按分类分组
+        const groups = {};
+        recipes.forEach(r => {
+            const category = r.category || r.type || '其他';
+            if (!groups[category]) groups[category] = [];
+            groups[category].push(r);
+        });
+
+        let html = '';
+        for (const [category, items] of Object.entries(groups)) {
+            html += `<optgroup label="${getCategoryName(category)}">`;
+            items.forEach(r => {
+                const name = r[nameField] || r.name || '未知';
+                const canCraft = r.canCraft || r.canForge ? '' : ' [未解锁]';
+                html += `<option value="${name}">${name}${canCraft}</option>`;
+            });
+            html += '</optgroup>';
+        }
+        return html;
+    }
+
+    function getCategoryName(cat) {
+        const map = {
+            'cultivation': '修为丹', 'heal_hp': '回血丹', 'heal_mp': '回灵丹',
+            'breakthrough': '突破丹', 'special': '特殊丹',
+            'weapon': '武器', 'armor': '防具', 'accessory': '饰品', 'ring': '储物戒',
+            'combat': '战斗符', 'support': '辅助符', 'special': '特殊符'
+        };
+        return map[cat] || cat;
+    }
+
     // ============================================================
-    // 面板拖拽功能
+    // 刷新配方列表
+    // ============================================================
+    async function refreshRecipes() {
+        const btn = $('#lv-btn-refresh');
+        if (btn) btn.textContent = '🔄 加载中...';
+
+        await loadRecipes();
+
+        // 更新下拉框
+        const alchemySelect = $('#lv-target-alchemy');
+        const forgeSelect = $('#lv-target-forge');
+        const talismanSelect = $('#lv-target-talisman');
+
+        if (alchemySelect) {
+            const current = alchemySelect.value;
+            alchemySelect.innerHTML = '<option value="">-- 不自动炼丹 --</option>' + generateOptions(CACHE.alchemy, 'pillName');
+            alchemySelect.value = current;
+        }
+        if (forgeSelect) {
+            const current = forgeSelect.value;
+            forgeSelect.innerHTML = '<option value="">-- 不自动炼器 --</option>' + generateOptions(CACHE.forge, 'name');
+            forgeSelect.value = current;
+        }
+        if (talismanSelect) {
+            const current = talismanSelect.value;
+            talismanSelect.innerHTML = '<option value="">-- 不自动制符 --</option>' + generateOptions(CACHE.talisman, 'talismanName');
+            talismanSelect.value = current;
+        }
+
+        if (btn) btn.textContent = '🔄 刷新配方列表';
+        log('配方列表已刷新');
+    }
+
+    // ============================================================
+    // 面板拖拽
     // ============================================================
     function makePanelDraggable() {
         const panel = $('#lv-craft-panel');
@@ -213,16 +346,12 @@
             panel.style.top = (startTop + dy) + 'px';
         };
 
-        const onEnd = () => {
-            isDragging = false;
-        };
+        const onEnd = () => { isDragging = false; };
 
         header.addEventListener('mousedown', onStart);
         header.addEventListener('touchstart', onStart, {passive: true});
-
         document.addEventListener('mousemove', onMove);
         document.addEventListener('touchmove', onMove, {passive: false});
-
         document.addEventListener('mouseup', onEnd);
         document.addEventListener('touchend', onEnd);
     }
@@ -230,10 +359,10 @@
     // ============================================================
     // 面板开关
     // ============================================================
-    function togglePanel() {
+    async function togglePanel() {
         const panel = $('#lv-craft-panel');
         if (!panel) {
-            createPanel();
+            await createPanel();
             togglePanel();
             return;
         }
@@ -256,6 +385,8 @@
             $('#lv-craft-panel').style.display = 'none';
             STATE.panelOpen = false;
         };
+
+        $('#lv-btn-refresh').onclick = refreshRecipes;
 
         $('#lv-btn-start').onclick = () => {
             if (STATE.running) {
@@ -281,9 +412,13 @@
     // 配置读写
     // ============================================================
     function saveConfigFromPanel() {
-        CONFIG.targets.alchemy = $('#lv-target-alchemy').value.trim();
-        CONFIG.targets.forge = $('#lv-target-forge').value.trim();
-        CONFIG.targets.talisman = $('#lv-target-talisman').value.trim();
+        const alchemySelect = $('#lv-target-alchemy');
+        const forgeSelect = $('#lv-target-forge');
+        const talismanSelect = $('#lv-target-talisman');
+
+        CONFIG.targets.alchemy = alchemySelect ? alchemySelect.value : '';
+        CONFIG.targets.forge = forgeSelect ? forgeSelect.value : '';
+        CONFIG.targets.talisman = talismanSelect ? talismanSelect.value : '';
 
         CONFIG.autoSell.pills.enabled = $('#lv-autosell-pills').checked;
         CONFIG.autoSell.pills.maxRarity = parseInt($('#lv-autosell-pills-rarity').value);
@@ -296,18 +431,22 @@
 
         CONFIG.wishLock.enabled = $('#lv-wishlock').checked;
         CONFIG.general.batchSize = parseInt($('#lv-batch').value) || 10;
-        localStorage.setItem('lv_craft_config_v5', JSON.stringify(CONFIG));
+        localStorage.setItem('lv_craft_config_v6', JSON.stringify(CONFIG));
     }
 
     function loadConfigToPanel() {
         try {
-            const saved = localStorage.getItem('lv_craft_config_v5');
+            const saved = localStorage.getItem('lv_craft_config_v6');
             if (saved) Object.assign(CONFIG, JSON.parse(saved));
         } catch (e) {}
 
-        if ($('#lv-target-alchemy')) $('#lv-target-alchemy').value = CONFIG.targets.alchemy;
-        if ($('#lv-target-forge')) $('#lv-target-forge').value = CONFIG.targets.forge;
-        if ($('#lv-target-talisman')) $('#lv-target-talisman').value = CONFIG.targets.talisman;
+        const alchemySelect = $('#lv-target-alchemy');
+        const forgeSelect = $('#lv-target-forge');
+        const talismanSelect = $('#lv-target-talisman');
+
+        if (alchemySelect) alchemySelect.value = CONFIG.targets.alchemy;
+        if (forgeSelect) forgeSelect.value = CONFIG.targets.forge;
+        if (talismanSelect) talismanSelect.value = CONFIG.targets.talisman;
 
         if ($('#lv-autosell-pills')) $('#lv-autosell-pills').checked = CONFIG.autoSell.pills.enabled;
         if ($('#lv-autosell-pills-rarity')) $('#lv-autosell-pills-rarity').value = CONFIG.autoSell.pills.maxRarity;
@@ -397,7 +536,7 @@
             const recipes = res.data.recipes || [];
             const target = recipes.find(r => {
                 const itemName = r.pillName || r.name || r.talismanName || '';
-                return itemName.includes(name);
+                return itemName === name;
             });
 
             if (!target) { appendLog(`未找到: ${name}`, 'warn'); return; }
