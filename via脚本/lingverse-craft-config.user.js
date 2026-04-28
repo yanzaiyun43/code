@@ -1,7 +1,7 @@
 // ==UserScript==
 // @name         灵界 LingVerse 炼造配置面板
 // @namespace    lingverse-craft-config
-// @version      2.1.23
+// @version      2.1.24
 // @description  炼造自动化配置：支持炼丹/炼器/制符/化身炼造、许愿锁定、自动售卖、深色/浅色模式跟随游戏主题
 // @author       LingVerse
 // @match        https://ling.muge.info/*
@@ -2907,6 +2907,33 @@
                         return { count: 0 };
                     }
                 } catch (e) {
+                    if (e.message && e.message.includes('无需补充')) {
+                        // 材料已经足够，直接尝试炼制
+                        Logger.info(`${name} 材料已足够，直接炼制${maxCraftableCount}次`);
+                        const adjustedRequestCount = maxCraftableCount;
+                        let res;
+                        if (type === 'alchemy') {
+                            res = await API.batchCraftAlchemy(id, adjustedRequestCount);
+                        } else if (type === 'forge') {
+                            res = await API.batchCraftForge(id, adjustedRequestCount);
+                        } else {
+                            res = await API.batchCraftTalisman(id, adjustedRequestCount);
+                        }
+                        if (res.code === 200) {
+                            let actualCount = res.data?.count || res.data?.crafted;
+                            if (!actualCount && res.data?.message) {
+                                const match = res.data.message.match(/(\d+)次/);
+                                if (match) actualCount = parseInt(match[1]);
+                            }
+                            actualCount = actualCount || adjustedRequestCount;
+                            Logger.success(res.data?.message || `${name} x${actualCount} 炼制成功`);
+                            STATE.stats.crafted += actualCount;
+                            return { count: actualCount };
+                        } else {
+                            Logger.error(`${name} 炼制失败: ${res.message}`);
+                            return { count: 0 };
+                        }
+                    }
                     Logger.error(`${name} 补充异常: ${e.message}`);
                     return { count: 0 };
                 }
