@@ -1,9 +1,9 @@
 // ==UserScript==
 // @name         灵界 LingVerse 炼造配置面板 v3.0
 // @namespace    lingverse-craft-config
-// @version      2.1.4
+// @version      2.1.5
 // @description  炼造自动化配置：支持炼丹/炼器/制符/化身炼造、许愿锁定、自动售卖、深色/浅色模式跟随游戏主题
-// @author       You
+// @author       LingVerse
 // @match        https://ling.muge.info/*
 // @match        http://ling.muge.info/*
 // @grant        none
@@ -1958,14 +1958,33 @@
         },
 
         isMeditating() {
-            if (_win.meditationStartTime && _win.meditationStartTime > 0) return true;
-            if (window.meditationStartTime && window.meditationStartTime > 0) return true;
-
+            // 优先通过DOM元素判断，这是最准确的实时状态
             const meditateBtn = document.getElementById('meditateBtn');
-            if (meditateBtn?.classList.contains('meditating')) return true;
-
             const meditationBar = document.getElementById('meditationBar');
-            if (meditationBar && !meditationBar.classList.contains('hidden')) return true;
+
+            // 检查冥想按钮状态
+            if (meditateBtn) {
+                // 按钮显示"冥想中..."或有meditating类
+                if (meditateBtn.classList.contains('meditating')) return true;
+                if (meditateBtn.textContent?.includes('冥想中')) return true;
+            }
+
+            // 检查冥想进度条是否显示
+            if (meditationBar) {
+                const isVisible = !meditationBar.classList.contains('hidden') &&
+                                 meditationBar.style.display !== 'none';
+                if (isVisible) return true;
+            }
+
+            // 备用：检查全局变量（但可能不准确）
+            const win = unsafeWindow || window;
+            if (win.meditationStartTime && win.meditationStartTime > 0) {
+                // 额外检查：如果开始时间超过8小时，可能已经结束了
+                const elapsed = Date.now() - win.meditationStartTime;
+                if (elapsed < 28800000) { // 8小时内
+                    return true;
+                }
+            }
 
             return false;
         }
