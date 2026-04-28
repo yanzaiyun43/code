@@ -1,8 +1,8 @@
 // ==UserScript==
 // @name         灵界 LingVerse 炼造配置面板
 // @namespace    lingverse-craft-config
-// @version      1.4.1
-// @description  炼造自动化配置：下拉选择物品，自动售卖丹药/装备/符箓，修复配方加载和面板样式
+// @version      1.4.2
+// @description  炼造自动化配置：下拉选择物品，自动售卖丹药/装备/符，修复配方加载和面板样式
 // @author       You
 // @match        https://ling.muge.info/*
 // @match        http://ling.muge.info/*
@@ -312,9 +312,25 @@
             html += `<optgroup label="${getCategoryName(category)}">`;
             items.forEach(r => {
                 const name = r[nameField] || r.name || '未知';
-                // 炼丹用 canCraft，炼器用 canForge，制符用 canCraft
-                const canDo = r.canCraft || r.canForge ? '' : ' [未解锁]';
-                html += `<option value="${name}">${name}${canDo}</option>`;
+                // 判断状态：可炼制 / 可补充 / 未解锁
+                const canCraft = r.canCraft || r.canForge;
+                let status = '';
+                if (canCraft) {
+                    status = '';
+                } else if (r.canQuickBuy) {
+                    status = ` [可补充${r.quickBuyCost}灵石]`;
+                } else if (r.disableReason === 'stage_low') {
+                    status = ' [境界不足]';
+                } else if (r.disableReason === 'furnace_low') {
+                    status = ' [炉子等级不足]';
+                } else if (r.disableReason === 'need_furnace') {
+                    status = ' [需炼丹炉]';
+                } else if (r.disableReason === 'no_mp') {
+                    status = ' [灵力不足]';
+                } else {
+                    status = ' [未解锁]';
+                }
+                html += `<option value="${name}">${name}${status}</option>`;
             });
             html += '</optgroup>';
         }
