@@ -125,14 +125,17 @@
 
         updateMonitor(playerInfo) {
             if (!playerInfo) return;
-            this.monitor.spiritStones = playerInfo.spiritStones || 0;
-            this.monitor.maxSpiritStones = playerInfo.maxSpiritStones || 0;
-            this.monitor.mp = playerInfo.mp || 0;
-            this.monitor.maxMp = playerInfo.maxMp || 0;
+            // API返回的是lowerStone（下品灵石），不是spiritStones
+            this.monitor.spiritStones = playerInfo.lowerStone || playerInfo.spiritStones || 0;
+            this.monitor.maxSpiritStones = playerInfo.maxLowerStone || playerInfo.maxSpiritStones || 0;
+            // API返回的是spirit（神识），不是mp
+            this.monitor.mp = playerInfo.spirit || playerInfo.mp || 0;
+            this.monitor.maxMp = playerInfo.maxSpirit || playerInfo.maxMp || 0;
             this.monitor.stamina = playerInfo.stamina || 0;
             this.monitor.maxStamina = playerInfo.maxStamina || 0;
-            this.monitor.inventoryCount = playerInfo.inventoryCount || 0;
-            this.monitor.inventoryLimit = playerInfo.inventoryLimit || 0;
+            // API返回的是inventoryUsed（已使用格子数）和inventoryCapacity（容量上限）
+            this.monitor.inventoryCount = playerInfo.inventoryUsed || playerInfo.inventoryCount || 0;
+            this.monitor.inventoryLimit = playerInfo.inventoryCapacity || playerInfo.inventoryLimit || 100;
             this.monitor.lastUpdate = Date.now();
         },
         
@@ -2760,7 +2763,7 @@
 
                 // 快速购买模式下的额外灵石检查
                 if (CONFIG.general.useQuickBuy) {
-                    const stones = player.lowerSpiritStone || player.spiritStones || 0;
+                    const stones = player.lowerStone || player.spiritStones || 0;
                     const threshold = CONFIG.general.autoStop.spiritThreshold || 100;
                     if (stones < threshold) {
                         return { canCraft: false, reason: `灵石不足(${stones}<${threshold})，无法快速购买材料` };
