@@ -1,8 +1,8 @@
 // ==UserScript==
 // @name         灵界 LingVerse 炼造配置面板
 // @namespace    lingverse-craft-config
-// @version      1.4.0
-// @description  炼造自动化配置：下拉选择物品，自动售卖丹药/装备/符箓
+// @version      1.4.1
+// @description  炼造自动化配置：下拉选择物品，自动售卖丹药/装备/符箓，修复配方加载和面板样式
 // @author       You
 // @match        https://ling.muge.info/*
 // @match        http://ling.muge.info/*
@@ -79,24 +79,68 @@
     // ============================================================
     async function loadRecipes() {
         const api = getApi();
-        try {
-            const [alchemyRes, forgeRes, talismanRes] = await Promise.all([
-                api.get('/api/game/alchemy/recipes'),
-                api.get('/api/game/forge/recipes'),
-                api.get('/api/game/talisman/recipes')
-            ]);
+        if (!api) {
+            log('API 未就绪，稍后重试', 'warn');
+            return;
+        }
 
-            if (alchemyRes.code === 200 && alchemyRes.data) {
-                CACHE.alchemy = alchemyRes.data.recipes || [];
+        try {
+            // 尝试多种可能的 API 路径
+            const endpoints = {
+                alchemy: ['/api/game/alchemy/recipes', '/api/alchemy/recipes', '/api/craft/alchemy/recipes'],
+                forge: ['/api/game/forge/recipes', '/api/forge/recipes', '/api/craft/forge/recipes'],
+                talisman: ['/api/game/talisman/recipes', '/api/talisman/recipes', '/api/craft/talisman/recipes']
+            };
+
+            // 尝试获取炼丹配方
+            for (const endpoint of endpoints.alchemy) {
+                try {
+                    const res = await api.get(endpoint);
+                    if (res && (res.code === 200 || res.success) && res.data) {
+                        CACHE.alchemy = res.data.recipes || res.data.list || res.data || [];
+                        log(`炼丹配方加载成功: ${CACHE.alchemy.length}个`, 'success');
+                        break;
+                    }
+                } catch (e) {}
             }
-            if (forgeRes.code === 200 && forgeRes.data) {
-                CACHE.forge = forgeRes.data.recipes || [];
+
+            // 尝试获取炼器配方
+            for (const endpoint of endpoints.forge) {
+                try {
+                    const res = await api.get(endpoint);
+                    if (res && (res.code === 200 || res.success) && res.data) {
+                        CACHE.forge = res.data.recipes || res.data.list || res.data || [];
+                        log(`炼器配方加载成功: ${CACHE.forge.length}个`, 'success');
+                        break;
+                    }
+                } catch (e) {}
             }
-            if (talismanRes.code === 200 && talismanRes.data) {
-                CACHE.talisman = talismanRes.data.recipes || [];
+
+            // 尝试获取制符配方
+            for (const endpoint of endpoints.talisman) {
+                try {
+                    const res = await api.get(endpoint);
+                    if (res && (res.code === 200 || res.success) && res.data) {
+                        CACHE.talisman = res.data.recipes || res.data.list || res.data || [];
+                        log(`制符配方加载成功: ${CACHE.talisman.length}个`, 'success');
+                        break;
+                    }
+                } catch (e) {}
             }
+
+            // 如果都为空，尝试从页面数据获取
+            if (CACHE.alchemy.length === 0 && _win.craftData && _win.craftData.alchemy) {
+                CACHE.alchemy = _win.craftData.alchemy.recipes || [];
+            }
+            if (CACHE.forge.length === 0 && _win.craftData && _win.craftData.forge) {
+                CACHE.forge = _win.craftData.forge.recipes || [];
+            }
+            if (CACHE.talisman.length === 0 && _win.craftData && _win.craftData.talisman) {
+                CACHE.talisman = _win.craftData.talisman.recipes || [];
+            }
+
         } catch (e) {
-            log('加载配方列表失败', 'error');
+            log('加载配方列表失败: ' + e.message, 'error');
         }
     }
 
@@ -114,9 +158,9 @@
         panel.style.cssText = `
             position:fixed;top:50%;left:50%;transform:translate(-50%,-50%);
             width:92%;max-width:400px;max-height:85vh;z-index:100000;
-            background:linear-gradient(180deg,#0d1320 0%,#151d2e 100%);
-            border:1px solid rgba(201,153,58,0.4);border-radius:12px;
-            font-size:12px;color:#e8e0d0;box-shadow:0 8px 32px rgba(0,0,0,0.8);
+            background:linear-gradient(180deg,#f5f0e6 0%,#ebe5d8 100%);
+            border:2px solid #c9993a;border-radius:12px;
+            font-size:12px;color:#3a3228;box-shadow:0 8px 32px rgba(0,0,0,0.4);
             display:none;flex-direction:column;overflow:hidden;
             font-family:KaiTi,楷体,STKaiti,"Noto Serif SC",serif;
         `;
@@ -128,13 +172,13 @@
 
         panel.innerHTML = `
             <!-- 标题栏 -->
-            <div id="lv-panel-header" style="background:linear-gradient(90deg,rgba(201,153,58,0.25) 0%,rgba(201,153,58,0.1) 100%);padding:12px 16px;border-bottom:1px solid rgba(201,153,58,0.2);display:flex;justify-content:space-between;align-items:center;cursor:move;-webkit-user-select:none;user-select:none;">
+            <div id="lv-panel-header" style="background:linear-gradient(90deg,#c9993a 0%,#d4a84a 50%,#c9993a 100%);padding:12px 16px;border-bottom:2px solid #b88a2e;display:flex;justify-content:space-between;align-items:center;cursor:move;-webkit-user-select:none;user-select:none;">
                 <div style="display:flex;align-items:center;gap:8px;">
                     <span style="font-size:18px;">🔥</span>
-                    <span style="font-weight:bold;color:#c9993a;letter-spacing:1px;">自动炼造</span>
-                    <span id="lv-craft-run-status" style="margin-left:8px;font-size:10px;color:#6a6560;background:rgba(0,0,0,0.3);padding:2px 6px;border-radius:4px;">未运行</span>
+                    <span style="font-weight:bold;color:#fff;text-shadow:1px 1px 2px rgba(0,0,0,0.3);letter-spacing:1px;">自动炼造</span>
+                    <span id="lv-craft-run-status" style="margin-left:8px;font-size:10px;color:#5a4a30;background:rgba(255,255,255,0.9);padding:2px 8px;border-radius:4px;font-weight:bold;">未运行</span>
                 </div>
-                <button id="lv-panel-close" style="background:rgba(255,255,255,0.05);border:1px solid rgba(255,255,255,0.1);color:#888;width:28px;height:28px;border-radius:50%;cursor:pointer;font-size:16px;display:flex;align-items:center;justify-content:center;-webkit-tap-highlight-color:transparent;">×</button>
+                <button id="lv-panel-close" style="background:rgba(255,255,255,0.2);border:1px solid rgba(255,255,255,0.4);color:#fff;width:28px;height:28px;border-radius:50%;cursor:pointer;font-size:16px;display:flex;align-items:center;justify-content:center;-webkit-tap-highlight-color:transparent;text-shadow:1px 1px 2px rgba(0,0,0,0.3);">×</button>
             </div>
 
             <!-- 内容区 -->
@@ -142,10 +186,10 @@
                 
                 <!-- 炼丹 -->
                 <div style="margin-bottom:12px;">
-                    <div style="font-size:11px;color:#3dab97;margin-bottom:4px;display:flex;align-items:center;gap:4px;">
+                    <div style="font-size:11px;color:#2a8a7a;margin-bottom:4px;display:flex;align-items:center;gap:4px;font-weight:bold;">
                         <span>💊</span>炼丹目标
                     </div>
-                    <select id="lv-target-alchemy" style="width:100%;background:rgba(0,0,0,0.3);border:1px solid rgba(61,171,151,0.4);color:#e8e0d0;padding:8px 10px;border-radius:6px;font-size:12px;outline:none;">
+                    <select id="lv-target-alchemy" style="width:100%;background:#fff;border:2px solid #3dab97;color:#3a3228;padding:10px 12px;border-radius:6px;font-size:13px;outline:none;box-shadow:inset 0 1px 3px rgba(0,0,0,0.1);">
                         <option value="">-- 不自动炼丹 --</option>
                         ${alchemyOptions}
                     </select>
@@ -153,10 +197,10 @@
 
                 <!-- 炼器 -->
                 <div style="margin-bottom:12px;">
-                    <div style="font-size:11px;color:#c9993a;margin-bottom:4px;display:flex;align-items:center;gap:4px;">
+                    <div style="font-size:11px;color:#b88a2e;margin-bottom:4px;display:flex;align-items:center;gap:4px;font-weight:bold;">
                         <span>⚔️</span>炼器目标
                     </div>
-                    <select id="lv-target-forge" style="width:100%;background:rgba(0,0,0,0.3);border:1px solid rgba(201,153,58,0.4);color:#e8e0d0;padding:8px 10px;border-radius:6px;font-size:12px;outline:none;">
+                    <select id="lv-target-forge" style="width:100%;background:#fff;border:2px solid #c9993a;color:#3a3228;padding:10px 12px;border-radius:6px;font-size:13px;outline:none;box-shadow:inset 0 1px 3px rgba(0,0,0,0.1);">
                         <option value="">-- 不自动炼器 --</option>
                         ${forgeOptions}
                     </select>
@@ -164,10 +208,10 @@
 
                 <!-- 制符 -->
                 <div style="margin-bottom:14px;">
-                    <div style="font-size:11px;color:#9a6ae0;margin-bottom:4px;display:flex;align-items:center;gap:4px;">
+                    <div style="font-size:11px;color:#7a4ab0;margin-bottom:4px;display:flex;align-items:center;gap:4px;font-weight:bold;">
                         <span>📜</span>制符目标
                     </div>
-                    <select id="lv-target-talisman" style="width:100%;background:rgba(0,0,0,0.3);border:1px solid rgba(154,106,224,0.4);color:#e8e0d0;padding:8px 10px;border-radius:6px;font-size:12px;outline:none;">
+                    <select id="lv-target-talisman" style="width:100%;background:#fff;border:2px solid #9a6ae0;color:#3a3228;padding:10px 12px;border-radius:6px;font-size:13px;outline:none;box-shadow:inset 0 1px 3px rgba(0,0,0,0.1);">
                         <option value="">-- 不自动制符 --</option>
                         ${talismanOptions}
                     </select>
@@ -175,35 +219,35 @@
 
                 <!-- 刷新按钮 -->
                 <div style="margin-bottom:14px;text-align:center;">
-                    <button id="lv-btn-refresh" style="background:rgba(255,255,255,0.05);border:1px solid rgba(255,255,255,0.1);color:#888;padding:6px 16px;border-radius:6px;cursor:pointer;font-size:11px;-webkit-tap-highlight-color:transparent;">🔄 刷新配方列表</button>
+                    <button id="lv-btn-refresh" style="background:linear-gradient(135deg,#f0ebe0 0%,#e8e0d0 100%);border:2px solid #c9993a;color:#8a6a20;padding:8px 20px;border-radius:6px;cursor:pointer;font-size:12px;font-weight:bold;-webkit-tap-highlight-color:transparent;box-shadow:0 2px 4px rgba(0,0,0,0.1);">🔄 刷新配方列表</button>
                 </div>
 
                 <!-- 自动售卖 -->
-                <div style="margin-bottom:14px;padding:10px;background:rgba(0,0,0,0.2);border-radius:6px;border:1px solid rgba(255,255,255,0.05);">
-                    <div style="font-size:11px;color:#6a6560;margin-bottom:8px;">自动售卖（勾选启用）</div>
-                    <div style="display:flex;flex-direction:column;gap:8px;">
-                        <label style="display:flex;align-items:center;gap:8px;cursor:pointer;font-size:12px;color:#a8a090;">
-                            <input type="checkbox" id="lv-autosell-pills" style="accent-color:#3dab97;width:16px;height:16px;">
-                            <span style="color:#3dab97;">💊 卖丹药 ≤</span>
-                            <select id="lv-autosell-pills-rarity" style="flex:1;background:rgba(0,0,0,0.3);border:1px solid rgba(255,255,255,0.1);color:#e8e0d0;padding:4px 8px;border-radius:4px;font-size:11px;">
+                <div style="margin-bottom:14px;padding:12px;background:#fff;border-radius:8px;border:2px solid #d4c8b0;box-shadow:0 2px 4px rgba(0,0,0,0.05);">
+                    <div style="font-size:12px;color:#8a7a60;margin-bottom:10px;font-weight:bold;">自动售卖（勾选启用）</div>
+                    <div style="display:flex;flex-direction:column;gap:10px;">
+                        <label style="display:flex;align-items:center;gap:8px;cursor:pointer;font-size:13px;color:#5a4a30;">
+                            <input type="checkbox" id="lv-autosell-pills" style="accent-color:#3dab97;width:18px;height:18px;">
+                            <span style="color:#2a8a7a;font-weight:bold;">💊 卖丹药 ≤</span>
+                            <select id="lv-autosell-pills-rarity" style="flex:1;background:#f5f0e6;border:1px solid #d4c8b0;color:#3a3228;padding:6px 10px;border-radius:4px;font-size:12px;">
                                 <option value="1">普通</option>
                                 <option value="2" selected>优良</option>
                                 <option value="3">稀有</option>
                             </select>
                         </label>
-                        <label style="display:flex;align-items:center;gap:8px;cursor:pointer;font-size:12px;color:#a8a090;">
-                            <input type="checkbox" id="lv-autosell-equip" style="accent-color:#c9993a;width:16px;height:16px;">
-                            <span style="color:#c9993a;">⚔️ 卖装备 ≤</span>
-                            <select id="lv-autosell-equip-rarity" style="flex:1;background:rgba(0,0,0,0.3);border:1px solid rgba(255,255,255,0.1);color:#e8e0d0;padding:4px 8px;border-radius:4px;font-size:11px;">
+                        <label style="display:flex;align-items:center;gap:8px;cursor:pointer;font-size:13px;color:#5a4a30;">
+                            <input type="checkbox" id="lv-autosell-equip" style="accent-color:#c9993a;width:18px;height:18px;">
+                            <span style="color:#b88a2e;font-weight:bold;">⚔️ 卖装备 ≤</span>
+                            <select id="lv-autosell-equip-rarity" style="flex:1;background:#f5f0e6;border:1px solid #d4c8b0;color:#3a3228;padding:6px 10px;border-radius:4px;font-size:12px;">
                                 <option value="1">普通</option>
                                 <option value="2" selected>优良</option>
                                 <option value="3">稀有</option>
                             </select>
                         </label>
-                        <label style="display:flex;align-items:center;gap:8px;cursor:pointer;font-size:12px;color:#a8a090;">
-                            <input type="checkbox" id="lv-autosell-talismans" style="accent-color:#9a6ae0;width:16px;height:16px;">
-                            <span style="color:#9a6ae0;">📜 卖符箓 ≤</span>
-                            <select id="lv-autosell-talismans-rarity" style="flex:1;background:rgba(0,0,0,0.3);border:1px solid rgba(255,255,255,0.1);color:#e8e0d0;padding:4px 8px;border-radius:4px;font-size:11px;">
+                        <label style="display:flex;align-items:center;gap:8px;cursor:pointer;font-size:13px;color:#5a4a30;">
+                            <input type="checkbox" id="lv-autosell-talismans" style="accent-color:#9a6ae0;width:18px;height:18px;">
+                            <span style="color:#7a4ab0;font-weight:bold;">📜 卖符箓 ≤</span>
+                            <select id="lv-autosell-talismans-rarity" style="flex:1;background:#f5f0e6;border:1px solid #d4c8b0;color:#3a3228;padding:6px 10px;border-radius:4px;font-size:12px;">
                                 <option value="1">普通</option>
                                 <option value="2" selected>优良</option>
                                 <option value="3">稀有</option>
@@ -213,26 +257,26 @@
                 </div>
 
                 <!-- 其他设置 -->
-                <div style="display:flex;gap:12px;align-items:center;margin-bottom:14px;">
-                    <label style="display:flex;align-items:center;gap:6px;cursor:pointer;font-size:12px;color:#a8a090;flex:1;">
-                        <input type="checkbox" id="lv-wishlock" style="accent-color:#c9993a;width:16px;height:16px;">
-                        <span>许愿锁定</span>
+                <div style="display:flex;gap:12px;align-items:center;margin-bottom:14px;padding:10px;background:#fff;border-radius:6px;border:1px solid #d4c8b0;">
+                    <label style="display:flex;align-items:center;gap:6px;cursor:pointer;font-size:13px;color:#5a4a30;flex:1;">
+                        <input type="checkbox" id="lv-wishlock" style="accent-color:#c9993a;width:18px;height:18px;">
+                        <span style="font-weight:bold;">许愿锁定</span>
                     </label>
-                    <label style="display:flex;align-items:center;gap:6px;font-size:12px;color:#a8a090;">
-                        <span>批量</span>
-                        <input type="number" id="lv-batch" value="10" min="1" max="50" style="width:50px;background:rgba(0,0,0,0.3);border:1px solid rgba(255,255,255,0.1);color:#e8e0d0;padding:4px 8px;border-radius:4px;font-size:11px;">
+                    <label style="display:flex;align-items:center;gap:6px;font-size:13px;color:#5a4a30;">
+                        <span style="font-weight:bold;">批量</span>
+                        <input type="number" id="lv-batch" value="10" min="1" max="50" style="width:55px;background:#f5f0e6;border:1px solid #d4c8b0;color:#3a3228;padding:6px 10px;border-radius:4px;font-size:12px;font-weight:bold;">
                     </label>
                 </div>
 
                 <!-- 操作按钮 -->
                 <div style="display:flex;gap:10px;">
-                    <button id="lv-btn-start" style="flex:1;background:linear-gradient(135deg,#8a6a20 0%,#c9993a 50%,#8a6a20 100%);border:none;color:#fff;padding:10px 16px;border-radius:6px;cursor:pointer;font-size:13px;font-weight:bold;-webkit-tap-highlight-color:transparent;">开始炼造</button>
-                    <button id="lv-btn-save" style="background:rgba(255,255,255,0.05);border:1px solid rgba(255,255,255,0.1);color:#a8a090;padding:10px 16px;border-radius:6px;cursor:pointer;font-size:12px;-webkit-tap-highlight-color:transparent;">保存</button>
-                    <button id="lv-btn-once" style="background:rgba(61,171,151,0.15);border:1px solid rgba(61,171,151,0.3);color:#3dab97;padding:10px 16px;border-radius:6px;cursor:pointer;font-size:12px;-webkit-tap-highlight-color:transparent;">执行</button>
+                    <button id="lv-btn-start" style="flex:1;background:linear-gradient(135deg,#c9993a 0%,#d4a84a 50%,#c9993a 100%);border:none;color:#fff;padding:12px 16px;border-radius:8px;cursor:pointer;font-size:14px;font-weight:bold;-webkit-tap-highlight-color:transparent;box-shadow:0 3px 8px rgba(201,153,58,0.4);text-shadow:1px 1px 2px rgba(0,0,0,0.2);">开始炼造</button>
+                    <button id="lv-btn-save" style="background:linear-gradient(135deg,#e8e0d0 0%,#f5f0e6 100%);border:2px solid #c9993a;color:#8a6a20;padding:10px 16px;border-radius:8px;cursor:pointer;font-size:13px;font-weight:bold;-webkit-tap-highlight-color:transparent;">保存</button>
+                    <button id="lv-btn-once" style="background:linear-gradient(135deg,#e0f0e8 0%,#d0e8e0 100%);border:2px solid #3dab97;color:#2a8a7a;padding:10px 16px;border-radius:8px;cursor:pointer;font-size:13px;font-weight:bold;-webkit-tap-highlight-color:transparent;">执行</button>
                 </div>
 
                 <!-- 日志 -->
-                <div id="lv-craft-log" style="margin-top:12px;max-height:100px;overflow-y:auto;font-size:11px;color:#888;background:rgba(0,0,0,0.25);padding:8px;border-radius:6px;display:none;-webkit-overflow-scrolling:touch;"></div>
+                <div id="lv-craft-log" style="margin-top:12px;max-height:100px;overflow-y:auto;font-size:11px;color:#5a4a30;background:#fff;border:1px solid #d4c8b0;padding:10px;border-radius:6px;display:none;-webkit-overflow-scrolling:touch;box-shadow:inset 0 1px 3px rgba(0,0,0,0.1);"></div>
             </div>
         `;
 
