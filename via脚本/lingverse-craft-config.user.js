@@ -1,7 +1,7 @@
 // ==UserScript==
 // @name         灵界 LingVerse 炼造配置面板
 // @namespace    lingverse-craft-config
-// @version      2.3.0  // 版本号升级
+// @version      2.3.1
 // @description  炼造自动化配置：支持炼丹/炼器/制符/化身炼造、许愿锁定、自动售卖、深色/浅色模式跟随游戏主题
 // @author       LingVerse
 // @match        https://ling.muge.info/*
@@ -915,7 +915,7 @@
 
             const btn = document.createElement('button');
             btn.id = 'lv-craft-sidebar-btn';
-            innerHTML = '打开炼造面板';
+            btn.innerHTML = '打开炼造面板';
             btn.style.cssText = `
                 width: 100%;
                 padding: 10px 12px;
@@ -1852,6 +1852,7 @@
 
         bindPanelEvents() {
             // 关闭按钮
+            // 关闭按钮 - 使用直接关闭而非toggle，避免状态不一致
             $('#lv-btn-close')?.addEventListener('click', (e) => {
                 e.preventDefault();
                 e.stopPropagation();
@@ -2374,7 +2375,7 @@
 
             STATE.running = false;
             if (STATE.autoCraftTimer) {
-                clearTimeout(STATE.autoCraftTimer);  // 改为clearTimeout，因为使用的是setTimeout
+                clearTimeout(STATE.autoCraftTimer);  // 使用 clearTimeout 因为定时器是 setTimeout
                 STATE.autoCraftTimer = null;
             }
 
