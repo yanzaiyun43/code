@@ -1,7 +1,7 @@
 // ==UserScript==
 // @name         灵界 LingVerse 炼造配置面板
 // @namespace    lingverse-craft-config
-// @version      1.4.2
+// @version      1.4.3
 // @description  炼造自动化配置：下拉选择物品，自动售卖丹药/装备/符，修复配方加载和面板样式
 // @author       You
 // @match        https://ling.muge.info/*
@@ -594,6 +594,12 @@
     async function doCraftOnce() {
         const api = getApi();
 
+        // 检查是否在冥想状态
+        if (isMeditating()) {
+            appendLog('冥想中无法炼制，请先停止冥想', 'warn');
+            return;
+        }
+
         if (CONFIG.targets.alchemy) {
             await craftByName(api, 'alchemy', CONFIG.targets.alchemy, '/api/game/alchemy/recipes', '/api/game/alchemy/batch-craft', 'pillId');
         }
@@ -624,14 +630,38 @@
             if (!target) { appendLog(`未找到: ${name}`, 'warn'); return; }
 
             const canCraft = target.canCraft || target.canForge;
-            if (!canCraft) { appendLog(`${name} 不可制作`, 'warn'); return; }
+            const canQuickBuy = target.canQuickBuy;
 
+            // 如果不能直接炼制，检查是否可以用灵石补充
+            if (!canCraft) {
+                if (canQuickBuy && CONFIG.general.useQuickBuy) {
+                    // 可以用灵石补充，继续执行
+                    appendLog(`${name} 材料不足，将使用灵石补充`, 'info');
+                } else {
+                    appendLog(`${name} 不可制作`, 'warn');
+                    return;
+                }
+            }
+
+            // 检查是否需要补充材料
             const needBuy = target.materials && target.materials.some(m => m.have < m.need);
-            if (needBuy && CONFIG.general.useQuickBuy && target.canQuickBuy) {
+            if (needBuy && CONFIG.general.useQuickBuy && canQuickBuy) {
                 if (target.quickBuyCost <= CONFIG.general.maxQuickBuyCost) {
-                    await api.post('/api/game/craft/quick-buy-mats', { type: type, id: target.pillId || target.recipeId, amount: 1 });
+                    appendLog(`${name} 补充材料中...`, 'info');
+                    const buyRes = await api.post('/api/game/craft/quick-buy-mats', { type: type, id: target.pillId || target.recipeId, amount: 1 });
+                    if (buyRes.code !== 200) {
+                        appendLog(`${name} 补充材料失败: ${buyRes.message}`, 'error');
+                        return;
+                    }
                     STATE.stats.spent += target.quickBuyCost;
-                } else { appendLog(`补充费用过高(${target.quickBuyCost})`, 'warn'); return; }
+                    appendLog(`${name} 材料补充成功`, 'success');
+                } else {
+                    appendLog(`${name} 补充费用过高(${target.quickBuyCost}灵石)`, 'warn');
+                    return;
+                }
+            } else if (needBuy && !canQuickBuy) {
+                appendLog(`${name} 材料不足且无法补充`, 'warn');
+                return;
             }
 
             const batchSize = Math.min(CONFIG.general.batchSize, 50);
@@ -704,6 +734,25 @@
         log(`typeof api: ${typeof api}`, 'info');
         log(`getApi() 结果: ${api ? '成功' : '失败'}`, api ? 'success' : 'error');
         return api;
+    }
+
+    // ============================================================
+    // 检查是否在冥想状态
+    // ============================================================
+    function isMeditating() {
+        // 方法1: 检查全局变量 meditationStartTime
+        if (_win.meditationStartTime && _win.meditationStartTime > 0) return true;
+        if (window.meditationStartTime && window.meditationStartTime > 0) return true;
+
+        // 方法2: 检查冥想按钮的类名
+        const meditateBtn = document.getElementById('meditateBtn');
+        if (meditateBtn && meditateBtn.classList.contains('meditating')) return true;
+
+        // 方法3: 检查冥想条是否显示
+        const meditationBar = document.getElementById('meditationBar');
+        if (meditationBar && !meditationBar.classList.contains('hidden')) return true;
+
+        return false;
     }
 
     // ============================================================
