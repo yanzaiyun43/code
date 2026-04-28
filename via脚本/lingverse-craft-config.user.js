@@ -37,7 +37,14 @@
     const $ = (sel) => document.querySelector(sel);
     const wait = (ms) => new Promise(r => setTimeout(r, ms));
 
-    function getApi() { return _win.api || window.api; }
+    function getApi() {
+        // 尝试多种方式获取 API 对象
+        if (_win.api) return _win.api;
+        if (window.api) return window.api;
+        // 如果 api 是 const 定义的，可能在全局作用域
+        if (typeof api !== 'undefined') return api;
+        return null;
+    }
     function log(msg, type = 'info') {
         const color = type === 'error' ? '#ff4444' : type === 'success' ? '#44ff44' : type === 'warn' ? '#ffaa00' : '#44aaff';
         console.log(`%c[炼造助手] %c${msg}`, 'color:#888', `color:${color}`);
@@ -166,9 +173,9 @@
         `;
 
         // 生成下拉选项
-        const alchemyOptions = generateOptions(CACHE.alchemy, 'pillName');
-        const forgeOptions = generateOptions(CACHE.forge, 'name');
-        const talismanOptions = generateOptions(CACHE.talisman, 'talismanName');
+        const alchemyOptions = generateOptions(CACHE.alchemy, 'pillName', 'alchemy');
+        const forgeOptions = generateOptions(CACHE.forge, 'name', 'forge');
+        const talismanOptions = generateOptions(CACHE.talisman, 'name', 'talisman');
 
         panel.innerHTML = `
             <!-- 标题栏 -->
@@ -286,7 +293,7 @@
         makePanelDraggable();
     }
 
-    function generateOptions(recipes, nameField) {
+    function generateOptions(recipes, nameField, type) {
         if (!recipes || recipes.length === 0) {
             return '<option value="">暂无可用配方</option>';
         }
@@ -294,7 +301,8 @@
         // 按分类分组
         const groups = {};
         recipes.forEach(r => {
-            const category = r.category || r.type || '其他';
+            // 炼丹用 category，炼器用 slot，制符用 category
+            const category = r.category || r.slot || r.type || '其他';
             if (!groups[category]) groups[category] = [];
             groups[category].push(r);
         });
@@ -304,8 +312,9 @@
             html += `<optgroup label="${getCategoryName(category)}">`;
             items.forEach(r => {
                 const name = r[nameField] || r.name || '未知';
-                const canCraft = r.canCraft || r.canForge ? '' : ' [未解锁]';
-                html += `<option value="${name}">${name}${canCraft}</option>`;
+                // 炼丹用 canCraft，炼器用 canForge，制符用 canCraft
+                const canDo = r.canCraft || r.canForge ? '' : ' [未解锁]';
+                html += `<option value="${name}">${name}${canDo}</option>`;
             });
             html += '</optgroup>';
         }
@@ -314,10 +323,22 @@
 
     function getCategoryName(cat) {
         const map = {
-            'cultivation': '修为丹', 'heal_hp': '回血丹', 'heal_mp': '回灵丹',
-            'breakthrough': '突破丹', 'special': '特殊丹',
-            'weapon': '武器', 'armor': '防具', 'accessory': '饰品', 'ring': '储物戒',
-            'combat': '战斗符', 'support': '辅助符', 'special': '特殊符'
+            // 炼丹分类
+            'HEAL_HP': '回血丹药', 'HEAL_MP': '回灵丹药', 'HEAL_SPIRIT': '回神识丹药',
+            'BREAKTHROUGH': '突破丹药',
+            'COMBAT_ATK': '战斗丹(攻)', 'COMBAT_DEF': '战斗丹(防)',
+            'SPECIAL_ANTIDOTE': '解毒丹', 'SPECIAL_PERMANENT_HP': '永久HP丹',
+            'SPECIAL_PERMANENT_ATK': '永久攻击丹', 'SPECIAL_MEDITATION': '清心丹',
+            'SPECIAL_FIVE_ROOT': '五行通灵丹',
+            'ENCOUNTER_BOOST': '招妖丹药', 'ENCOUNTER_REPEL': '避妖丹药',
+            'INCARNATION_CULTIVATION': '化身修为丹药',
+            'PET_HEAL_HP': '灵兽回血丹', 'PET_HEAL_MP': '灵兽回灵丹', 'PET_HEAL_BOTH': '灵兽双补丹',
+            // 炼器分类
+            'WEAPON': '武器', 'ARMOR': '防具', 'ACCESSORY': '饰品', 'RING': '储物戒',
+            // 制符分类
+            'ATTACK': '攻伐符箓', 'DEFENSE': '防御符箓', 'UTILITY': '功能符箓',
+            // 其他
+            '秘传图纸': '秘传图纸'
         };
         return map[cat] || cat;
     }
@@ -338,17 +359,17 @@
 
         if (alchemySelect) {
             const current = alchemySelect.value;
-            alchemySelect.innerHTML = '<option value="">-- 不自动炼丹 --</option>' + generateOptions(CACHE.alchemy, 'pillName');
+            alchemySelect.innerHTML = '<option value="">-- 不自动炼丹 --</option>' + generateOptions(CACHE.alchemy, 'pillName', 'alchemy');
             alchemySelect.value = current;
         }
         if (forgeSelect) {
             const current = forgeSelect.value;
-            forgeSelect.innerHTML = '<option value="">-- 不自动炼器 --</option>' + generateOptions(CACHE.forge, 'name');
+            forgeSelect.innerHTML = '<option value="">-- 不自动炼器 --</option>' + generateOptions(CACHE.forge, 'name', 'forge');
             forgeSelect.value = current;
         }
         if (talismanSelect) {
             const current = talismanSelect.value;
-            talismanSelect.innerHTML = '<option value="">-- 不自动制符 --</option>' + generateOptions(CACHE.talisman, 'talismanName');
+            talismanSelect.innerHTML = '<option value="">-- 不自动制符 --</option>' + generateOptions(CACHE.talisman, 'name', 'talisman');
             talismanSelect.value = current;
         }
 
@@ -579,7 +600,8 @@
 
             const recipes = res.data.recipes || [];
             const target = recipes.find(r => {
-                const itemName = r.pillName || r.name || r.talismanName || '';
+                // 炼丹用 pillName，炼器/制符用 name
+                const itemName = r.pillName || r.name || '';
                 return itemName === name;
             });
 
@@ -656,12 +678,41 @@
     }
 
     // ============================================================
+    // 诊断功能
+    // ============================================================
+    function diagnoseApi() {
+        const api = getApi();
+        log('=== API 诊断 ===', 'info');
+        log(`_win.api: ${_win.api ? '存在' : '不存在'}`, 'info');
+        log(`window.api: ${window.api ? '存在' : '不存在'}`, 'info');
+        log(`typeof api: ${typeof api}`, 'info');
+        log(`getApi() 结果: ${api ? '成功' : '失败'}`, api ? 'success' : 'error');
+        return api;
+    }
+
+    // ============================================================
     // 初始化
     // ============================================================
     function init() {
         if (!location.href.includes('ling.muge.info')) return;
         createFloatButton();
         log('炼造助手已加载，点击右下角 🔥 按钮打开配置面板');
+
+        // 延迟预加载配方（确保游戏API已就绪）
+        setTimeout(async () => {
+            // 先诊断 API
+            const api = diagnoseApi();
+            if (!api) {
+                log('API 对象未找到！请确保已登录游戏', 'error');
+                return;
+            }
+            await loadRecipes();
+            if (CACHE.alchemy.length > 0 || CACHE.forge.length > 0 || CACHE.talisman.length > 0) {
+                log(`预加载完成: 炼丹${CACHE.alchemy.length}个, 炼器${CACHE.forge.length}个, 制符${CACHE.talisman.length}个`, 'success');
+            } else {
+                log('配方预加载失败，请打开面板后点击刷新', 'warn');
+            }
+        }, 3000);
     }
 
     if (document.readyState === 'loading') {
