@@ -1,7 +1,7 @@
 // ==UserScript==
 // @name         灵界 LingVerse 炼造配置面板
 // @namespace    lingverse-craft-config
-// @version      2.1.20
+// @version      2.1.21
 // @description  炼造自动化配置：支持炼丹/炼器/制符/化身炼造、许愿锁定、自动售卖、深色/浅色模式跟随游戏主题
 // @author       LingVerse
 // @match        https://ling.muge.info/*
@@ -2827,7 +2827,8 @@
             const idField = type === 'alchemy' ? 'pillId' : 'recipeId';
             const id = recipe[idField];
             const canCraft = recipe.canCraft || recipe.canForge;
-            const canQuickBuy = recipe.canQuickBuy;
+            // 优先使用API返回的canQuickBuy，如果没有则根据quickBuyCost判断
+            const canQuickBuy = recipe.canQuickBuy !== undefined ? recipe.canQuickBuy : (recipe.quickBuyCost > 0);
 
             if (!canCraft) {
                 if (!canQuickBuy || !CONFIG.general.useQuickBuy) {
