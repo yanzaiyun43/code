@@ -1,7 +1,7 @@
 // ==UserScript==
 // @name         灵界 LingVerse 炼造配置面板 v3.0
 // @namespace    lingverse-craft-config
-// @version      2.1.6
+// @version      2.1.7
 // @description  炼造自动化配置：支持炼丹/炼器/制符/化身炼造、许愿锁定、自动售卖、深色/浅色模式跟随游戏主题
 // @author       LingVerse
 // @match        https://ling.muge.info/*
@@ -442,16 +442,16 @@
             const v = Theme.getVars();
             const btn = document.createElement('button');
             btn.id = 'lv-craft-sidebar-btn';
-            btn.innerHTML = '<span style="font-size:16px;margin-right:6px;">🔥</span>炼造';
+            btn.innerHTML = '<span style="font-size:14px;margin-right:4px;">🔥</span>炼造';
             btn.style.cssText = `
-                width: 100%;
-                padding: 10px 12px;
-                margin-top: 12px;
+                width: calc(100% - 32px);
+                margin: 12px 16px 0 16px;
+                padding: 8px 10px;
                 background: ${v.isDark ? 'rgba(201, 153, 58, 0.15)' : 'rgba(184, 70, 62, 0.1)'};
                 border: 1px solid ${v.isDark ? 'rgba(201, 153, 58, 0.3)' : 'rgba(184, 70, 62, 0.25)'};
-                border-radius: 8px;
+                border-radius: 6px;
                 color: ${v.textGold};
-                font-size: 13px;
+                font-size: 12px;
                 font-weight: bold;
                 cursor: pointer;
                 transition: all 0.2s ease;
@@ -460,6 +460,7 @@
                 justify-content: center;
                 -webkit-tap-highlight-color: transparent;
                 font-family: KaiTi, 楷体, STKaiti, "Noto Serif SC", serif;
+                box-sizing: border-box;
             `;
 
             btn.addEventListener('mouseenter', () => {
@@ -477,7 +478,6 @@
                 this.togglePanel();
             });
 
-            // 插入到侧边栏底部
             this.insertToSidebar(btn);
         },
 
@@ -487,22 +487,10 @@
             if (playerPanel) {
                 const firstSection = playerPanel.querySelector('.panel-section');
                 if (firstSection) {
-                    // 检查是否已有该按钮
-                    if (playerPanel.querySelector('#lv-craft-sidebar-btn')) {
-                        return;
+                    // 在角色信息栏后面插入按钮
+                    if (!playerPanel.querySelector('#lv-craft-sidebar-btn')) {
+                        firstSection.insertAdjacentElement('afterend', btn);
                     }
-
-                    // 创建按钮容器，放在panel-section内部，避免被边框截断
-                    const btnContainer = document.createElement('div');
-                    btnContainer.style.cssText = `
-                        padding: 0 16px 16px 16px;
-                        margin: -10px 0 0 0;
-                        border-bottom: 1px solid var(--border-color);
-                    `;
-                    btnContainer.appendChild(btn);
-
-                    // 在第一个panel-section内部末尾插入
-                    firstSection.appendChild(btnContainer);
                     return;
                 }
             }
@@ -521,10 +509,10 @@
         },
 
         async createPanel() {
-            if ($('#lv-craft-panel')) {
-                this.togglePanel();
-                return;
-            }
+            if ($('#lv-craft-panel')) return;
+
+            await CraftManager.loadRecipes();
+            await CraftManager.loadIncarnationStatus();
 
             const v = Theme.getVars();
             const panel = document.createElement('div');
@@ -551,7 +539,6 @@
                 transition: all 0.3s ease;
             `;
 
-            // 先生成面板HTML（使用空数据）
             panel.innerHTML = this.generatePanelHTML();
             document.body.appendChild(panel);
 
@@ -559,48 +546,6 @@
             this.loadConfigToPanel();
             this.makePanelDraggable();
             this.updateTheme();
-
-            // 显示面板
-            this.togglePanel();
-
-            // 异步加载数据并更新下拉框
-            this.loadRecipesAsync();
-        },
-
-        async loadRecipesAsync() {
-            try {
-                Logger.info('正在加载配方数据...');
-                await CraftManager.loadRecipes();
-                await CraftManager.loadIncarnationStatus();
-
-                // 更新下拉框选项
-                this.updateRecipeSelects();
-                Logger.success('配方数据加载完成');
-            } catch (e) {
-                Logger.error('加载配方失败: ' + e.message);
-            }
-        },
-
-        updateRecipeSelects() {
-            const alchemySelect = $('#lv-alchemy-target');
-            const forgeSelect = $('#lv-forge-target');
-            const talismanSelect = $('#lv-talisman-target');
-
-            if (alchemySelect) {
-                const currentValue = alchemySelect.value;
-                alchemySelect.innerHTML = this.generateRecipeOptions(CACHE.alchemy, 'pillName', 'alchemy');
-                if (currentValue) alchemySelect.value = currentValue;
-            }
-            if (forgeSelect) {
-                const currentValue = forgeSelect.value;
-                forgeSelect.innerHTML = this.generateRecipeOptions(CACHE.forge, 'name', 'forge');
-                if (currentValue) forgeSelect.value = currentValue;
-            }
-            if (talismanSelect) {
-                const currentValue = talismanSelect.value;
-                talismanSelect.innerHTML = this.generateRecipeOptions(CACHE.talisman, 'name', 'talisman');
-                if (currentValue) talismanSelect.value = currentValue;
-            }
         },
 
         generatePanelHTML() {
@@ -1646,7 +1591,7 @@
         },
 
         async executeOnce() {
-            if (this.isMeditating()) {
+            if (await this.isMeditating()) {
                 Logger.warn('冥想中无法炼造，跳过本次执行');
                 return;
             }
@@ -1957,33 +1902,30 @@
             }
         },
 
-        isMeditating() {
-            // 优先通过DOM元素判断，这是最准确的实时状态
+        async isMeditating() {
+            // 方法1: 检查全局变量
+            if (_win.meditationStartTime && _win.meditationStartTime > 0) return true;
+            if (window.meditationStartTime && window.meditationStartTime > 0) return true;
+
+            // 方法2: 检查DOM元素
             const meditateBtn = document.getElementById('meditateBtn');
+            if (meditateBtn?.classList.contains('meditating')) return true;
+
             const meditationBar = document.getElementById('meditationBar');
+            if (meditationBar && !meditationBar.classList.contains('hidden')) return true;
 
-            // 检查冥想按钮状态
-            if (meditateBtn) {
-                // 按钮显示"冥想中..."或有meditating类
-                if (meditateBtn.classList.contains('meditating')) return true;
-                if (meditateBtn.textContent?.includes('冥想中')) return true;
-            }
-
-            // 检查冥想进度条是否显示
-            if (meditationBar) {
-                const isVisible = !meditationBar.classList.contains('hidden') &&
-                                 meditationBar.style.display !== 'none';
-                if (isVisible) return true;
-            }
-
-            // 备用：检查全局变量（但可能不准确）
-            const win = unsafeWindow || window;
-            if (win.meditationStartTime && win.meditationStartTime > 0) {
-                // 额外检查：如果开始时间超过8小时，可能已经结束了
-                const elapsed = Date.now() - win.meditationStartTime;
-                if (elapsed < 28800000) { // 8小时内
-                    return true;
+            // 方法3: 通过API获取实时状态
+            try {
+                const res = await API.getPlayerInfo();
+                if (res.code === 200 && res.data) {
+                    // 检查玩家状态，如果正在冥想会有相关字段
+                    const player = res.data;
+                    if (player.isMeditating || player.meditationEndTime > Date.now()) {
+                        return true;
+                    }
                 }
+            } catch (e) {
+                // API调用失败时，依赖前面的检测方法
             }
 
             return false;
@@ -2013,6 +1955,14 @@
         setTimeout(() => {
             CraftManager.loadRecipes();
         }, 3000);
+
+        // 启动定时刷新（每60秒刷新一次配方和玩家状态）
+        setInterval(() => {
+            if (!STATE.running) {
+                CraftManager.loadRecipes();
+                CraftManager.loadIncarnationStatus();
+            }
+        }, 60000);
 
         // 自动开始
         setTimeout(() => {
