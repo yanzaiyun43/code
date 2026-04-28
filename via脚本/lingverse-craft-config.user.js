@@ -1,7 +1,7 @@
 // ==UserScript==
 // @name         灵界 LingVerse 炼造配置面板 v3.0
 // @namespace    lingverse-craft-config
-// @version      2.1.8
+// @version      2.1.9
 // @description  炼造自动化配置：支持炼丹/炼器/制符/化身炼造、许愿锁定、自动售卖、深色/浅色模式跟随游戏主题
 // @author       LingVerse
 // @match        https://ling.muge.info/*
@@ -440,18 +440,40 @@
             if ($('#lv-craft-sidebar-btn')) return;
 
             const v = Theme.getVars();
+
+            // 创建一个 panel-section 包裹按钮
+            const section = document.createElement('div');
+            section.className = 'panel-section';
+            section.id = 'lv-craft-section';
+            section.style.cssText = `
+                margin-bottom: 20px;
+                padding-bottom: 16px;
+                border-bottom: 1px solid var(--border-color);
+            `;
+
+            const title = document.createElement('h3');
+            title.className = 'panel-title';
+            title.textContent = '炼造助手';
+            title.style.cssText = `
+                font-size: 13px;
+                color: var(--text-gold);
+                letter-spacing: 2px;
+                margin-bottom: 12px;
+                padding-bottom: 6px;
+                border-bottom: 1px solid rgba(201, 153, 58, 0.15);
+            `;
+
             const btn = document.createElement('button');
             btn.id = 'lv-craft-sidebar-btn';
-            btn.innerHTML = '🔥炼造';
+            btn.innerHTML = '🔥 打开炼造面板';
             btn.style.cssText = `
                 width: 100%;
-                margin-top: 10px;
-                padding: 6px 8px;
-                background: ${v.isDark ? 'rgba(201, 153, 58, 0.15)' : 'rgba(184, 70, 62, 0.1)'};
-                border: 1px solid ${v.isDark ? 'rgba(201, 153, 58, 0.3)' : 'rgba(184, 70, 62, 0.25)'};
-                border-radius: 4px;
+                padding: 10px 12px;
+                background: ${v.isDark ? 'rgba(201, 153, 58, 0.2)' : 'rgba(184, 70, 62, 0.15)'};
+                border: 1px solid ${v.isDark ? 'rgba(201, 153, 58, 0.4)' : 'rgba(184, 70, 62, 0.3)'};
+                border-radius: 6px;
                 color: ${v.textGold};
-                font-size: 11px;
+                font-size: 13px;
                 font-weight: bold;
                 cursor: pointer;
                 transition: all 0.2s ease;
@@ -459,16 +481,15 @@
                 text-align: center;
                 -webkit-tap-highlight-color: transparent;
                 font-family: KaiTi, 楷体, STKaiti, "Noto Serif SC", serif;
-                line-height: 1.4;
             `;
 
             btn.addEventListener('mouseenter', () => {
-                btn.style.background = v.isDark ? 'rgba(201, 153, 58, 0.25)' : 'rgba(184, 70, 62, 0.2)';
-                btn.style.borderColor = v.isDark ? 'rgba(201, 153, 58, 0.5)' : 'rgba(184, 70, 62, 0.4)';
+                btn.style.background = v.isDark ? 'rgba(201, 153, 58, 0.35)' : 'rgba(184, 70, 62, 0.25)';
+                btn.style.borderColor = v.isDark ? 'rgba(201, 153, 58, 0.6)' : 'rgba(184, 70, 62, 0.4)';
             });
             btn.addEventListener('mouseleave', () => {
-                btn.style.background = v.isDark ? 'rgba(201, 153, 58, 0.15)' : 'rgba(184, 70, 62, 0.1)';
-                btn.style.borderColor = v.isDark ? 'rgba(201, 153, 58, 0.3)' : 'rgba(184, 70, 62, 0.25)';
+                btn.style.background = v.isDark ? 'rgba(201, 153, 58, 0.2)' : 'rgba(184, 70, 62, 0.15)';
+                btn.style.borderColor = v.isDark ? 'rgba(201, 153, 58, 0.4)' : 'rgba(184, 70, 62, 0.3)';
             });
 
             btn.addEventListener('click', (e) => {
@@ -477,18 +498,20 @@
                 this.togglePanel();
             });
 
-            this.insertToSidebar(btn);
+            section.appendChild(title);
+            section.appendChild(btn);
+            this.insertToSidebar(section);
         },
 
-        insertToSidebar(btn) {
+        insertToSidebar(section) {
             // 尝试找到角色信息栏（第一个 panel-section）
             const playerPanel = $('.player-panel') || $('#playerPanel');
             if (playerPanel) {
                 const firstSection = playerPanel.querySelector('.panel-section');
                 if (firstSection) {
-                    // 在角色信息栏后面插入按钮
-                    if (!playerPanel.querySelector('#lv-craft-sidebar-btn')) {
-                        firstSection.insertAdjacentElement('afterend', btn);
+                    // 在角色信息栏后面插入新的section
+                    if (!playerPanel.querySelector('#lv-craft-section')) {
+                        firstSection.insertAdjacentElement('afterend', section);
                     }
                     return;
                 }
@@ -497,14 +520,14 @@
             // 备用方案：插入到侧边栏底部
             const sidebar = $('.player-panel') || $('#playerPanel') || $('.sidebar') || $('#sidebar');
             if (sidebar) {
-                if (!sidebar.querySelector('#lv-craft-sidebar-btn')) {
-                    sidebar.appendChild(btn);
+                if (!sidebar.querySelector('#lv-craft-section')) {
+                    sidebar.appendChild(section);
                 }
                 return;
             }
 
             // 如果找不到侧边栏，延迟重试
-            setTimeout(() => this.insertToSidebar(btn), 1000);
+            setTimeout(() => this.insertToSidebar(section), 1000);
         },
 
         async createPanel() {
