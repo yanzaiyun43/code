@@ -1,7 +1,7 @@
 // ==UserScript==
 // @name         灵界 LingVerse 炼造配置面板
 // @namespace    lingverse-craft-config
-// @version      2.1.18
+// @version      2.1.19
 // @description  炼造自动化配置：支持炼丹/炼器/制符/化身炼造、许愿锁定、自动售卖、深色/浅色模式跟随游戏主题
 // @author       LingVerse
 // @match        https://ling.muge.info/*
@@ -128,11 +128,12 @@
             // API返回的是lowerStone（下品灵石），不是spiritStones
             this.monitor.spiritStones = playerInfo.lowerStone || playerInfo.spiritStones || 0;
             this.monitor.maxSpiritStones = playerInfo.maxLowerStone || playerInfo.maxSpiritStones || 0;
-            // API返回的是spirit（神识），不是mp
-            this.monitor.mp = playerInfo.spirit || playerInfo.mp || 0;
-            this.monitor.maxMp = playerInfo.maxSpirit || playerInfo.maxMp || 0;
-            this.monitor.stamina = playerInfo.stamina || 0;
-            this.monitor.maxStamina = playerInfo.maxStamina || 0;
+            // API返回的是mp（灵力），不是stamina
+            this.monitor.mp = playerInfo.mp || 0;
+            this.monitor.maxMp = playerInfo.maxMp || 0;
+            // API返回的是spirit（神识）
+            this.monitor.spirit = playerInfo.spirit || 0;
+            this.monitor.maxSpirit = playerInfo.maxSpirit || 0;
             // API返回的是inventoryUsed（已使用格子数）和inventoryCapacity（容量上限）
             this.monitor.inventoryCount = playerInfo.inventoryUsed || playerInfo.inventoryCount || 0;
             this.monitor.inventoryLimit = playerInfo.inventoryCapacity || playerInfo.inventoryLimit || 100;
@@ -201,14 +202,14 @@
                 return { shouldStop: true, reason: `灵石不足(${this.monitor.spiritStones}<${autoStop.spiritThreshold || 100})，请补充灵石` };
             }
 
-            // 神识不足检测
+            // 灵力不足检测 (mp是灵力)
             if (autoStop.onInsufficientMp && this.monitor.mp < (autoStop.mpThreshold || 10)) {
-                return { shouldStop: true, reason: `神识不足(${this.monitor.mp}<${autoStop.mpThreshold || 10})，请等待恢复` };
+                return { shouldStop: true, reason: `灵力不足(${this.monitor.mp}<${autoStop.mpThreshold || 10})，请等待恢复` };
             }
 
-            // 灵力不足检测
-            if (autoStop.onInsufficientStamina && this.monitor.stamina < (autoStop.staminaThreshold || 10)) {
-                return { shouldStop: true, reason: `灵力不足(${this.monitor.stamina}<${autoStop.staminaThreshold || 10})，请等待恢复` };
+            // 神识不足检测 (spirit是神识)
+            if (autoStop.onInsufficientStamina && this.monitor.spirit < (autoStop.staminaThreshold || 10)) {
+                return { shouldStop: true, reason: `神识不足(${this.monitor.spirit}<${autoStop.staminaThreshold || 10})，请等待恢复` };
             }
 
             if (autoStop.onInventoryFull && this.monitor.inventoryCount >= this.monitor.inventoryLimit - 5) {
@@ -1759,11 +1760,11 @@
                                     </label>
                                     <label style="display: flex; align-items: center; gap: 6px; cursor: pointer; font-size: 11px;">
                                         <input type="checkbox" id="lv-autostop-mp" checked style="accent-color: ${v.accentGold};">
-                                        <span>神识不足</span>
+                                        <span>灵力不足</span>
                                     </label>
                                     <label style="display: flex; align-items: center; gap: 6px; cursor: pointer; font-size: 11px;">
                                         <input type="checkbox" id="lv-autostop-stamina" checked style="accent-color: ${v.accentGold};">
-                                        <span>灵力不足</span>
+                                        <span>神识不足</span>
                                     </label>
                                     <label style="display: flex; align-items: center; gap: 6px; cursor: pointer; font-size: 11px;">
                                         <input type="checkbox" id="lv-autostop-inventory" checked style="accent-color: ${v.accentGold};">
@@ -1799,7 +1800,7 @@
                                         " title="灵石低于此值时停止">
                                     </div>
                                     <div>
-                                        <span style="font-size: 11px; color: ${v.textSecondary};">神识阈值</span>
+                                        <span style="font-size: 11px; color: ${v.textSecondary};">灵力阈值</span>
                                         <input type="number" id="lv-mp-threshold" value="10" min="0" step="1" style="
                                             width: 100%;
                                             background: ${v.bgInput};
@@ -1809,10 +1810,10 @@
                                             border-radius: 6px;
                                             font-size: 12px;
                                             margin-top: 4px;
-                                        " title="神识低于此值时停止">
+                                        " title="灵力低于此值时停止">
                                     </div>
                                     <div>
-                                        <span style="font-size: 11px; color: ${v.textSecondary};">灵力阈值</span>
+                                        <span style="font-size: 11px; color: ${v.textSecondary};">神识阈值</span>
                                         <input type="number" id="lv-stamina-threshold" value="10" min="0" step="1" style="
                                             width: 100%;
                                             background: ${v.bgInput};
@@ -1822,7 +1823,7 @@
                                             border-radius: 6px;
                                             font-size: 12px;
                                             margin-top: 4px;
-                                        " title="灵力低于此值时停止">
+                                        " title="神识低于此值时停止">
                                     </div>
                                 </div>
                                 
