@@ -1,7 +1,7 @@
 // ==UserScript==
 // @name         灵界 LingVerse 炼造配置面板
 // @namespace    lingverse-craft-config
-// @version      2.1.16
+// @version      2.1.17
 // @description  炼造自动化配置：支持炼丹/炼器/制符/化身炼造、许愿锁定、自动售卖、深色/浅色模式跟随游戏主题
 // @author       LingVerse
 // @match        https://ling.muge.info/*
@@ -1417,132 +1417,6 @@
                         </div>
                     </div>
 
-                    <!-- 自动售卖区 -->
-                    <div class="lv-card" style="
-                        margin-bottom: 16px;
-                        padding: 14px;
-                        background: ${v.bgCard};
-                        border: 1px solid ${v.borderColor};
-                        border-radius: 12px;
-                    ">
-                        <div style="
-                            font-size: 13px;
-                            color: ${v.textGold};
-                            margin-bottom: 12px;
-                            font-weight: bold;
-                            display: flex;
-                            align-items: center;
-                            gap: 6px;
-                            padding-bottom: 8px;
-                            border-bottom: 1px solid ${v.borderColor};
-                        ">
-                            自动售卖
-                        </div>
-
-                        <!-- 批量出售模式切换 -->
-                        <label style="
-                            display: flex;
-                            align-items: center;
-                            gap: 10px;
-                            margin-bottom: 12px;
-                            padding: 8px;
-                            background: ${v.isDark ? 'rgba(201,153,58,0.1)' : 'rgba(184,70,62,0.08)'};
-                            border-radius: 8px;
-                            cursor: pointer;
-                        ">
-                            <input type="checkbox" id="lv-autosell-batch-mode" style="
-                                width: 18px;
-                                height: 18px;
-                                accent-color: ${v.accentGold};
-                            ">
-                            <div style="flex: 1;">
-                                <div style="color: ${v.textGold}; font-weight: bold; font-size: 12px;">批量出售模式</div>
-                                <div style="color: ${v.textMuted}; font-size: 11px;">一键出售所有类型物品（更快）</div>
-                            </div>
-                            <select id="lv-autosell-batch-rarity" class="lv-select" style="
-                                width: 80px;
-                                background: ${v.bgInput};
-                                border: 1px solid ${v.borderColor};
-                                color: ${v.textPrimary};
-                                padding: 6px 10px;
-                                border-radius: 6px;
-                                font-size: 12px;
-                            ">
-                                <option value="1">普通</option>
-                                <option value="2" selected>优良</option>
-                                <option value="3">稀有</option>
-                            </select>
-                        </label>
-
-                        <!-- 分隔线 -->
-                        <div id="lv-autosell-separator" style="
-                            height: 1px;
-                            background: ${v.borderColor};
-                            margin: 12px 0;
-                        "></div>
-
-                        <!-- 卖丹药 -->
-                        <label id="lv-autosell-pills-row" style="
-                            display: flex;
-                            align-items: center;
-                            gap: 10px;
-                            margin-bottom: 10px;
-                            cursor: pointer;
-                        ">
-                            <input type="checkbox" id="lv-autosell-pills" style="
-                                width: 18px;
-                                height: 18px;
-                                accent-color: ${v.accentJade};
-                            ">
-                            <span style="color: ${v.textJade}; font-weight: bold; font-size: 12px;">丹药</span>
-                            <span style="color: ${v.textMuted}; font-size: 11px;">≤</span>
-                            <select id="lv-autosell-pills-rarity" class="lv-select" style="
-                                flex: 1;
-                                background: ${v.bgInput};
-                                border: 1px solid ${v.borderColor};
-                                color: ${v.textPrimary};
-                                padding: 6px 10px;
-                                border-radius: 6px;
-                                font-size: 12px;
-                            ">
-                                <option value="1">普通</option>
-                                <option value="2" selected>优良</option>
-                                <option value="3">稀有</option>
-                            </select>
-                        </label>
-
-                        <!-- 卖装备 -->
-                        <label id="lv-autosell-equip-row" style="
-                            display: flex;
-                            align-items: center;
-                            gap: 10px;
-                            margin-bottom: 10px;
-                            cursor: pointer;
-                        ">
-                            <input type="checkbox" id="lv-autosell-equip" style="
-                                width: 18px;
-                                height: 18px;
-                                accent-color: ${v.accentGold};
-                            ">
-                            <span style="color: ${v.textGold}; font-weight: bold; font-size: 12px;">装备</span>
-                            <span style="color: ${v.textMuted}; font-size: 11px;">≤</span>
-                            <select id="lv-autosell-equip-rarity" class="lv-select" style="
-                                flex: 1;
-                                background: ${v.bgInput};
-                                border: 1px solid ${v.borderColor};
-                                color: ${v.textPrimary};
-                                padding: 6px 10px;
-                                border-radius: 6px;
-                                font-size: 12px;
-                            ">
-                                <option value="1">普通</option>
-                                <option value="2" selected>优良</option>
-                                <option value="3">稀有</option>
-                            </select>
-                        </label>
-
-                    </div>
-
                     <!-- 设置区 -->
                     <div class="lv-card" style="
                         margin-bottom: 16px;
@@ -1716,45 +1590,156 @@
                             <!-- 分隔线 -->
                             <div style="height: 1px; background: ${v.borderColor}; margin: 12px 0;"></div>
 
-                            <!-- 自动售卖警告 -->
-                            <div style="
-                                background: ${v.isDark ? 'rgba(184,70,62,0.15)' : 'rgba(184,70,62,0.1)'};
-                                border: 1px solid ${v.accentRed};
-                                border-radius: 8px;
-                                padding: 12px;
-                                margin-bottom: 16px;
-                            ">
+                            <!-- 自动售卖设置 -->
+                            <div style="margin-bottom: 16px;">
                                 <div style="
-                                    display: flex;
-                                    align-items: center;
-                                    gap: 8px;
-                                    margin-bottom: 8px;
-                                    color: ${v.accentRed};
-                                    font-weight: bold;
-                                    font-size: 12px;
+                                    background: ${v.isDark ? 'rgba(184,70,62,0.15)' : 'rgba(184,70,62,0.1)'};
+                                    border: 1px solid ${v.accentRed};
+                                    border-radius: 8px;
+                                    padding: 12px;
+                                    margin-bottom: 12px;
                                 ">
-                                    <span style="font-size: 16px;">⚠️</span>
-                                    <span>自动售卖风险提示</span>
+                                    <div style="
+                                        display: flex;
+                                        align-items: center;
+                                        gap: 8px;
+                                        margin-bottom: 8px;
+                                        color: ${v.accentRed};
+                                        font-weight: bold;
+                                        font-size: 12px;
+                                    ">
+                                        <span style="font-size: 16px;">⚠️</span>
+                                        <span>自动售卖风险提示</span>
+                                    </div>
+                                    <div style="
+                                        font-size: 11px;
+                                        color: ${v.textSecondary};
+                                        line-height: 1.6;
+                                    ">
+                                        启用自动售卖后，系统会出售背包中<strong style="color: ${v.textPrimary};">所有</strong>符合条件的物品，<strong style="color: ${v.accentRed};">不仅仅是本次炼制的</strong>。请谨慎设置品质上限，避免误售珍贵物品。
+                                    </div>
+                                    <label style="
+                                        display: flex;
+                                        align-items: center;
+                                        gap: 8px;
+                                        margin-top: 10px;
+                                        cursor: pointer;
+                                        font-size: 11px;
+                                        color: ${v.textPrimary};
+                                    ">
+                                        <input type="checkbox" id="lv-autosell-confirm" style="accent-color: ${v.accentRed};">
+                                        <span style="font-weight: bold;">我已了解风险，启用自动售卖</span>
+                                    </label>
                                 </div>
-                                <div style="
-                                    font-size: 11px;
-                                    color: ${v.textSecondary};
-                                    line-height: 1.6;
-                                ">
-                                    启用自动售卖后，系统会出售背包中<strong style="color: ${v.textPrimary};">所有</strong>符合条件的物品，<strong style="color: ${v.accentRed};">不仅仅是本次炼制的</strong>。请谨慎设置品质上限，避免误售珍贵物品。
+
+                                <!-- 自动售卖配置区域（默认禁用，需确认后才可编辑） -->
+                                <div id="lv-autosell-config" style="opacity: 0.5; pointer-events: none;">
+                                    <div style="font-size: 12px; color: ${v.textGold}; font-weight: bold; margin-bottom: 10px;">
+                                        自动售卖配置
+                                    </div>
+                                    
+                                    <!-- 批量出售模式 -->
+                                    <label style="
+                                        display: flex;
+                                        align-items: center;
+                                        gap: 10px;
+                                        margin-bottom: 10px;
+                                        padding: 8px;
+                                        background: ${v.isDark ? 'rgba(201,153,58,0.1)' : 'rgba(184,70,62,0.08)'};
+                                        border-radius: 8px;
+                                        cursor: pointer;
+                                    ">
+                                        <input type="checkbox" id="lv-autosell-batch-mode" style="
+                                            width: 18px;
+                                            height: 18px;
+                                            accent-color: ${v.accentGold};
+                                        ">
+                                        <div style="flex: 1;">
+                                            <div style="color: ${v.textGold}; font-weight: bold; font-size: 12px;">批量出售模式</div>
+                                            <div style="color: ${v.textMuted}; font-size: 11px;">一键出售所有类型物品（更快）</div>
+                                        </div>
+                                        <select id="lv-autosell-batch-rarity" class="lv-select" style="
+                                            width: 80px;
+                                            background: ${v.bgInput};
+                                            border: 1px solid ${v.borderColor};
+                                            color: ${v.textPrimary};
+                                            padding: 6px 10px;
+                                            border-radius: 6px;
+                                            font-size: 12px;
+                                        ">
+                                            <option value="1">普通</option>
+                                            <option value="2" selected>优良</option>
+                                            <option value="3">稀有</option>
+                                        </select>
+                                    </label>
+
+                                    <!-- 分隔线 -->
+                                    <div id="lv-autosell-separator" style="
+                                        height: 1px;
+                                        background: ${v.borderColor};
+                                        margin: 10px 0;
+                                    "></div>
+
+                                    <!-- 卖丹药 -->
+                                    <label id="lv-autosell-pills-row" style="
+                                        display: flex;
+                                        align-items: center;
+                                        gap: 10px;
+                                        margin-bottom: 8px;
+                                        cursor: pointer;
+                                    ">
+                                        <input type="checkbox" id="lv-autosell-pills" style="
+                                            width: 18px;
+                                            height: 18px;
+                                            accent-color: ${v.accentJade};
+                                        ">
+                                        <span style="color: ${v.textJade}; font-weight: bold; font-size: 12px;">丹药</span>
+                                        <span style="color: ${v.textMuted}; font-size: 11px;">≤</span>
+                                        <select id="lv-autosell-pills-rarity" class="lv-select" style="
+                                            flex: 1;
+                                            background: ${v.bgInput};
+                                            border: 1px solid ${v.borderColor};
+                                            color: ${v.textPrimary};
+                                            padding: 6px 10px;
+                                            border-radius: 6px;
+                                            font-size: 12px;
+                                        ">
+                                            <option value="1">普通</option>
+                                            <option value="2" selected>优良</option>
+                                            <option value="3">稀有</option>
+                                        </select>
+                                    </label>
+
+                                    <!-- 卖装备 -->
+                                    <label id="lv-autosell-equip-row" style="
+                                        display: flex;
+                                        align-items: center;
+                                        gap: 10px;
+                                        margin-bottom: 8px;
+                                        cursor: pointer;
+                                    ">
+                                        <input type="checkbox" id="lv-autosell-equip" style="
+                                            width: 18px;
+                                            height: 18px;
+                                            accent-color: ${v.accentGold};
+                                        ">
+                                        <span style="color: ${v.textGold}; font-weight: bold; font-size: 12px;">装备</span>
+                                        <span style="color: ${v.textMuted}; font-size: 11px;">≤</span>
+                                        <select id="lv-autosell-equip-rarity" class="lv-select" style="
+                                            flex: 1;
+                                            background: ${v.bgInput};
+                                            border: 1px solid ${v.borderColor};
+                                            color: ${v.textPrimary};
+                                            padding: 6px 10px;
+                                            border-radius: 6px;
+                                            font-size: 12px;
+                                        ">
+                                            <option value="1">普通</option>
+                                            <option value="2" selected>优良</option>
+                                            <option value="3">稀有</option>
+                                        </select>
+                                    </label>
                                 </div>
-                                <label style="
-                                    display: flex;
-                                    align-items: center;
-                                    gap: 8px;
-                                    margin-top: 10px;
-                                    cursor: pointer;
-                                    font-size: 11px;
-                                    color: ${v.textPrimary};
-                                ">
-                                    <input type="checkbox" id="lv-autosell-confirm" style="accent-color: ${v.accentRed};">
-                                    <span>我已了解风险，启用自动售卖</span>
-                                </label>
                             </div>
 
                             <!-- 自动停止设置 -->
@@ -2095,6 +2080,10 @@
                 Logger.success('配置已保存');
             });
 
+            $('#lv-autosell-confirm')?.addEventListener('change', () => {
+                this.updateAutoSellEnabled();
+            });
+
             $('#lv-autosell-batch-mode')?.addEventListener('change', () => {
                 this.updateBatchSellMode();
             });
@@ -2118,6 +2107,28 @@
             });
         },
 
+        updateAutoSellEnabled() {
+            const confirmed = $('#lv-autosell-confirm')?.checked || false;
+            const configArea = $('#lv-autosell-config');
+            if (configArea) {
+                if (confirmed) {
+                    configArea.style.opacity = '1';
+                    configArea.style.pointerEvents = 'auto';
+                } else {
+                    configArea.style.opacity = '0.5';
+                    configArea.style.pointerEvents = 'none';
+                    // 取消勾选时，同时禁用所有自动售卖选项
+                    const batchMode = $('#lv-autosell-batch-mode');
+                    const pills = $('#lv-autosell-pills');
+                    const equip = $('#lv-autosell-equip');
+                    if (batchMode) batchMode.checked = false;
+                    if (pills) pills.checked = false;
+                    if (equip) equip.checked = false;
+                    this.updateBatchSellMode();
+                }
+            }
+        },
+
         updateBatchSellMode() {
             const isBatchMode = $('#lv-autosell-batch-mode')?.checked || false;
             const separator = $('#lv-autosell-separator');
@@ -2125,12 +2136,10 @@
             const equipRow = $('#lv-autosell-equip-row');
 
             if (isBatchMode) {
-
                 if (separator) separator.style.display = 'none';
                 if (pillsRow) pillsRow.style.display = 'none';
                 if (equipRow) equipRow.style.display = 'none';
             } else {
-
                 if (separator) separator.style.display = 'block';
                 if (pillsRow) pillsRow.style.display = 'flex';
                 if (equipRow) equipRow.style.display = 'flex';
@@ -2351,6 +2360,7 @@
 
             // 自动售卖确认
             setChecked('#lv-autosell-confirm', getVal(CONFIG.autoSell, 'confirmed', false));
+            this.updateAutoSellEnabled();
 
             // 许愿锁定设置
             setChecked('#lv-wish-enabled', getVal(CONFIG.wishLock, 'enabled', false));
