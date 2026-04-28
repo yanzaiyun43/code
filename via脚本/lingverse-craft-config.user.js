@@ -1,7 +1,7 @@
 // ==UserScript==
 // @name         灵界 LingVerse 炼造配置面板
 // @namespace    lingverse-craft-config
-// @version      2.1.17
+// @version      2.1.18
 // @description  炼造自动化配置：支持炼丹/炼器/制符/化身炼造、许愿锁定、自动售卖、深色/浅色模式跟随游戏主题
 // @author       LingVerse
 // @match        https://ling.muge.info/*
@@ -3049,7 +3049,21 @@
         },
 
         async isMeditating() {
+            // 优先使用API获取最新的冥想状态，避免页面变量未更新
+            try {
+                const res = await API.getMeditateStatus();
+                if (res.code === 200 && res.data) {
+                    if (res.data.isMeditating || res.data.startTime > 0) {
+                        return true;
+                    }
+                    // API返回未冥想，直接返回false（优先相信API）
+                    return false;
+                }
+            } catch (e) {
+                // API失败时回退到页面变量检测
+            }
 
+            // 回退：使用页面变量和DOM检测
             if (_win.meditationStartTime && _win.meditationStartTime > 0) return true;
             if (window.meditationStartTime && window.meditationStartTime > 0) return true;
 
@@ -3058,18 +3072,6 @@
 
             const meditationBar = document.getElementById('meditationBar');
             if (meditationBar && !meditationBar.classList.contains('hidden')) return true;
-
-            try {
-                const res = await API.getMeditateStatus();
-                if (res.code === 200 && res.data) {
-
-                    if (res.data.isMeditating || res.data.startTime > 0) {
-                        return true;
-                    }
-                }
-            } catch (e) {
-
-            }
 
             return false;
         }
