@@ -1,59 +1,137 @@
 <!doctype html>
 <html lang="zh-CN">
 <head>
-<meta charset="UTF-8">
-<title>循环打字机</title>
-<style>
-  body{background:#fff;color:#000;font:20px/1.6 'Courier New',monospace;padding:40px;}
-  /* 光标闪烁 */
-  .cursor{display:inline-block;width:2px;height:1em;background:#000;vertical-align:text-bottom;animation:blink .9s steps(1) infinite;}
-  @keyframes blink{50%{opacity:0;}}
-</style>
+    <meta charset="UTF-8">
+    <title>循环打字机</title>
+    <style>
+        body {
+            background: #fff;
+            color: #000;
+            font: 20px/1.6 'Courier New', monospace;
+            padding: 40px;
+        }
+
+        /* 光标闪烁效果 */
+        .cursor {
+            display: inline-block;
+            width: 2px;
+            height: 1em;
+            background: #000;
+            vertical-align: text-bottom;
+            animation: blink .9s steps(1) infinite;
+        }
+
+        @keyframes blink {
+            50% {
+                opacity: 0;
+            }
+        }
+    </style>
 </head>
 <body>
-<div id="typer"></div>
+    <div id="typer"></div>
 
-<script>
-const lines = [
-  '第一行文案，打完就删。',
-  '第二行文案，删完换下一行。',
-  '第三行文案，循环往复。'
-];
-const typeSpeed = 120;
-const delSpeed  = 120;
-const holdDelay = 800;
-const box = document.getElementById('typer');
-let idx = 0;
+    <script>
+        // 配置参数
+        const CONFIG = {
+            // 文案列表 - 可在此处修改要显示的内容
+            lines: [
+                '第一行文案，打字效果。',
+                '第二行文案，继续展示。',
+                '第三行文案，循环播放。'
+            ],
+            // 打字速度（毫秒）
+            typeSpeed: 120,
+            // 删除速度（毫秒）
+            delSpeed: 120,
+            // 停留时间（毫秒）
+            holdDelay: 800
+        };
 
-async function sleep(ms){ return new Promise(r=>setTimeout(r,ms)); }
-async function type(text){
-  const cursor = document.createElement('span');
-  cursor.className = 'cursor';
-  box.appendChild(cursor);
-  for(const ch of text){
-    cursor.insertAdjacentText('beforebegin', ch);
-    await sleep(typeSpeed);
-  }
-}
-async function del(){
-  const cursor = box.querySelector('.cursor');
-  while(cursor.previousSibling){
-    cursor.previousSibling.remove();
-    await sleep(delSpeed);
-  }
-  cursor.remove();
-}
-async function loop(){
-  while(true){
-    await type(lines[idx]);
-    await sleep(holdDelay);
-    await del();
-    await sleep(500)
-    idx = (idx + 1) % lines.length;
-  }
-}
+        // 获取显示容器元素
+        const displayBox = document.getElementById('typer');
+        // 当前显示的文案索引
+        let currentIndex = 0;
 
-loop();
-</script>
+        /**
+         * 延时函数
+         * @param {number} ms - 延时毫秒数
+         * @returns {Promise} - 延时Promise对象
+         */
+        function delay(ms) {
+            return new Promise(resolve => setTimeout(resolve, ms));
+        }
+
+        /**
+         * 打字动画函数
+         * @param {string} text - 要逐字显示的文本
+         */
+        async function typeText(text) {
+            // 创建光标元素
+            const cursorElement = document.createElement('span');
+            cursorElement.className = 'cursor';
+            
+            // 将光标元素添加到显示容器中
+            displayBox.appendChild(cursorElement);
+            
+            // 遍历文本中的每个字符，实现逐字显示效果
+            for (const char of text) {
+                // 在光标前插入字符
+                cursorElement.insertAdjacentText('beforebegin', char);
+                
+                // 等待指定时间（模拟打字速度）
+                await delay(CONFIG.typeSpeed);
+            }
+        }
+
+        /**
+         * 删除动画函数
+         * 清除当前显示的所有字符
+         */
+        async function deleteText() {
+            // 获取光标元素
+            const cursorElement = displayBox.querySelector('.cursor');
+            
+            // 从后往前逐个删除字符，直到没有前一个兄弟节点
+            while (cursorElement && cursorElement.previousSibling) {
+                // 删除前一个兄弟节点（即最后一个字符）
+                cursorElement.previousSibling.remove();
+                
+                // 等待指定时间（模拟删除速度）
+                await delay(CONFIG.delSpeed);
+            }
+            
+            // 删除光标元素本身
+            if (cursorElement) {
+                cursorElement.remove();
+            }
+        }
+
+        /**
+         * 主循环函数
+         * 循环执行打字、停留、删除操作
+         */
+        async function startLoop() {
+            while (true) {
+                // 执行打字动画
+                await typeText(CONFIG.lines[currentIndex]);
+                
+                // 停留一段时间
+                await delay(CONFIG.holdDelay);
+                
+                // 执行删除动画
+                await deleteText();
+                
+                // 短暂暂停后开始下一个循环
+                await delay(500);
+                
+                // 更新索引，循环显示下一个文案
+                currentIndex = (currentIndex + 1) % CONFIG.lines.length;
+            }
+        }
+
+        // 启动主循环
+        startLoop();
+    </script>
 </body>
 </html>
