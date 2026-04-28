@@ -1,7 +1,7 @@
 // ==UserScript==
 // @name         灵界 LingVerse 炼造配置面板
 // @namespace    lingverse-craft-config
-// @version      2.1.15
+// @version      2.1.16
 // @description  炼造自动化配置：支持炼丹/炼器/制符/化身炼造、许愿锁定、自动售卖、深色/浅色模式跟随游戏主题
 // @author       LingVerse
 // @match        https://ling.muge.info/*
@@ -578,12 +578,16 @@
             return this.request('POST', '/api/game/inventory/sell', { items });
         },
 
-        async previewBatchSell(maxRarity) {
-            return this.request('POST', '/api/game/sell-batch/preview', { maxRarity });
+        async previewBatchSell(maxRarity, scope = null) {
+            const payload = { maxRarity };
+            if (scope && scope !== 'all') payload.scope = scope;
+            return this.request('POST', '/api/game/sell-batch/preview', payload);
         },
 
-        async batchSell(maxRarity) {
-            return this.request('POST', '/api/game/sell-batch', { maxRarity });
+        async batchSell(maxRarity, scope = null) {
+            const payload = { maxRarity };
+            if (scope && scope !== 'all') payload.scope = scope;
+            return this.request('POST', '/api/game/sell-batch', payload);
         },
 
         async sellItem(itemId, count = 1) {
@@ -2973,7 +2977,7 @@
                 if (CONFIG.autoSell.useBatchAPI) {
                     const maxRarity = CONFIG.autoSell.batchMaxRarity;
 
-                    const previewRes = await API.previewBatchSell(maxRarity);
+                    const previewRes = await API.previewBatchSell(maxRarity, 'all');
                     if (previewRes.code === 200 && previewRes.data && previewRes.data.count > 0) {
                         const { count, totalGold, items } = previewRes.data;
                         Logger.info(`批量出售预览: ${count}件，预计获得${totalGold}灵石`);
@@ -2985,7 +2989,7 @@
                         });
                         Logger.info(`包含 - 丹药:${pillCount} 装备:${equipCount}`);
 
-                        const sellRes = await API.batchSell(maxRarity);
+                        const sellRes = await API.batchSell(maxRarity, 'all');
                         if (sellRes.code === 200 && sellRes.data) {
                             const { count: soldCount, totalGold: gotGold } = sellRes.data;
                             STATE.stats.soldPills += pillCount;
@@ -2998,14 +3002,13 @@
 
                 if (CONFIG.autoSell.equipment.enabled) {
                     const maxRarity = CONFIG.autoSell.equipment.maxRarity;
-                    const previewRes = await API.previewBatchSell(maxRarity);
+                    const previewRes = await API.previewBatchSell(maxRarity, 'equip');
                     if (previewRes.code === 200 && previewRes.data && previewRes.data.count > 0) {
 
-                        const equipItems = (previewRes.data.items || []).filter(i => i.type === 'equipment');
-                        const equipCount = equipItems.reduce((sum, i) => sum + i.count, 0);
+                        const equipCount = previewRes.data.count || 0;
 
                         if (equipCount > 0) {
-                            const sellRes = await API.batchSell(maxRarity);
+                            const sellRes = await API.batchSell(maxRarity, 'equip');
                             if (sellRes.code === 200 && sellRes.data) {
                                 STATE.stats.soldEquip += equipCount;
                                 Logger.success(`自动售出 ${equipCount} 件装备`);
@@ -3014,29 +3017,20 @@
                     }
                 }
 
-                const res = await API.getInventory();
-                if (res.code !== 200 || !res.data) return;
+                if (CONFIG.autoSell.pills.enabled) {
+                    const maxRarity = CONFIG.autoSell.pills.maxRarity;
+                    const previewRes = await API.previewBatchSell(maxRarity, 'pill');
+                    if (previewRes.code === 200 && previewRes.data && previewRes.data.count > 0) {
+                        const pillCount = previewRes.data.count || 0;
 
-                const items = res.data;
-                let soldPills = 0;
-
-                for (const item of items) {
-                    try {
-
-                        if (CONFIG.autoSell.pills.enabled && item.type === 'pill') {
-                            if (item.rarity <= CONFIG.autoSell.pills.maxRarity) {
-                                await API.sellItem(item.itemId, item.quantity);
-                                soldPills += item.quantity;
-                                STATE.stats.soldPills += item.quantity;
+                        if (pillCount > 0) {
+                            const sellRes = await API.batchSell(maxRarity, 'pill');
+                            if (sellRes.code === 200 && sellRes.data) {
+                                STATE.stats.soldPills += pillCount;
+                                Logger.success(`自动售出 ${pillCount} 个丹药`);
                             }
                         }
-                    } catch (e) {
-
                     }
-                }
-
-                if (soldPills > 0) {
-                    Logger.success(`自动售出 ${soldPills} 个丹药`);
                 }
 
             } catch (e) {
