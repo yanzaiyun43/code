@@ -1,7 +1,7 @@
 // ==UserScript==
 // @name         灵界 LingVerse 炼造配置面板 v3.0
 // @namespace    lingverse-craft-config
-// @version      2.1.5
+// @version      2.1.6
 // @description  炼造自动化配置：支持炼丹/炼器/制符/化身炼造、许愿锁定、自动售卖、深色/浅色模式跟随游戏主题
 // @author       LingVerse
 // @match        https://ling.muge.info/*
@@ -588,17 +588,17 @@
 
             if (alchemySelect) {
                 const currentValue = alchemySelect.value;
-                alchemySelect.innerHTML = this.generateOptions(CACHE.alchemy, 'pillName');
+                alchemySelect.innerHTML = this.generateRecipeOptions(CACHE.alchemy, 'pillName', 'alchemy');
                 if (currentValue) alchemySelect.value = currentValue;
             }
             if (forgeSelect) {
                 const currentValue = forgeSelect.value;
-                forgeSelect.innerHTML = this.generateOptions(CACHE.forge, 'name');
+                forgeSelect.innerHTML = this.generateRecipeOptions(CACHE.forge, 'name', 'forge');
                 if (currentValue) forgeSelect.value = currentValue;
             }
             if (talismanSelect) {
                 const currentValue = talismanSelect.value;
-                talismanSelect.innerHTML = this.generateOptions(CACHE.talisman, 'name');
+                talismanSelect.innerHTML = this.generateRecipeOptions(CACHE.talisman, 'name', 'talisman');
                 if (currentValue) talismanSelect.value = currentValue;
             }
         },
