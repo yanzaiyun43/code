@@ -1,7 +1,7 @@
 // ==UserScript==
 // @name         灵界 LingVerse 炼造配置面板
 // @namespace    lingverse-craft-config
-// @version      2.1.11
+// @version      2.3.0  // 版本号升级
 // @description  炼造自动化配置：支持炼丹/炼器/制符/化身炼造、许愿锁定、自动售卖、深色/浅色模式跟随游戏主题
 // @author       LingVerse
 // @match        https://ling.muge.info/*
@@ -58,7 +58,27 @@
             autoStart: false,
             autoCraftInterval: 30,     // 自动炼制间隔(秒)
             enableLogging: true,
-            minimizePanel: false       // 面板最小化
+            minimizePanel: false,      // 面板最小化
+            
+            // 动态间隔调整
+            adaptiveInterval: true,    // 启用自适应间隔
+            minInterval: 10,           // 最小间隔(秒)
+            maxInterval: 60,           // 最大间隔(秒)
+            successDecrease: 2,        // 成功时减少间隔(秒)
+            errorIncrease: 5,          // 失败时增加间隔(秒)
+            
+            // 自动停止条件
+            autoStop: {
+                enabled: true,
+                onInsufficientSpirit: true,      // 灵石不足时停止
+                onInsufficientMp: true,          // 神识不足时停止
+                onInventoryFull: true,           // 背包满时停止
+                onMeditating: true,              // 冥想时停止
+                onMaxCostReached: true,          // 达到最大花费时停止
+                maxCraftCost: 100000,            // 最大炼制花费(灵石)
+                stopOnError: true,               // 连续错误时停止
+                maxConsecutiveErrors: 5          // 最大连续错误次数
+            }
         }
     };
 
@@ -75,14 +95,133 @@
             crafted: 0,
             soldPills: 0,
             soldEquip: 0,
-
             spent: 0,
             incarnationCrafted: 0,
-            pillsFed: 0
+            pillsFed: 0,
+            errors: 0,                    // 连续错误次数
+            lastErrorTime: 0,             // 上次错误时间
+            lastSuccessTime: 0            // 上次成功时间
         },
         logs: [],
         playerInfo: null,
-        incarnationInfo: null
+        incarnationInfo: null,
+        
+        // 实时监控状态
+        monitor: {
+            spiritStones: 0,              // 当前灵石
+            maxSpiritStones: 0,           // 灵石上限
+            mp: 0,                        // 当前神识
+            maxMp: 0,                     // 神识上限
+            inventoryCount: 0,            // 背包物品数
+            inventoryLimit: 0,            // 背包上限
+            isMeditating: false,          // 是否冥想中
+            consecutiveErrors: 0,         // 连续错误次数
+            currentInterval: 30,          // 当前间隔(秒)
+            totalSpent: 0,                // 总花费
+            lastUpdate: 0                 // 上次更新时间
+        },
+        
+        // 更新监控状态
+        updateMonitor(playerInfo) {
+            if (!playerInfo) return;
+            this.monitor.spiritStones = playerInfo.spiritStones || 0;
+            this.monitor.maxSpiritStones = playerInfo.maxSpiritStones || 0;
+            this.monitor.mp = playerInfo.mp || 0;
+            this.monitor.maxMp = playerInfo.maxMp || 0;
+            this.monitor.inventoryCount = playerInfo.inventoryCount || 0;
+            this.monitor.inventoryLimit = playerInfo.inventoryLimit || 0;
+            this.monitor.lastUpdate = Date.now();
+        },
+        
+        // 记录成功
+        recordSuccess() {
+            this.stats.crafted++;
+            this.stats.lastSuccessTime = Date.now();
+            this.monitor.consecutiveErrors = 0;
+            
+            // 自适应间隔调整 - 成功时减少间隔
+            if (CONFIG.general.adaptiveInterval) {
+                this.monitor.currentInterval = Math.max(
+                    CONFIG.general.minInterval,
+                    this.monitor.currentInterval - CONFIG.general.successDecrease
+                );
+            }
+        },
+        
+        // 记录错误
+        recordError(errorType = null) {
+            this.stats.errors++;
+            this.monitor.consecutiveErrors++;
+            this.stats.lastErrorTime = Date.now();
+            
+            // 自适应间隔调整 - 失败时增加间隔
+            if (CONFIG.general.adaptiveInterval) {
+                this.monitor.currentInterval = Math.min(
+                    CONFIG.general.maxInterval,
+                    this.monitor.currentInterval + CONFIG.general.errorIncrease
+                );
+            }
+            
+            return this.monitor.consecutiveErrors;
+        },
+        
+        // 记录花费
+        recordSpent(amount) {
+            this.stats.spent += amount;
+            this.monitor.totalSpent += amount;
+        },
+        
+        // 重置统计
+        resetStats() {
+            this.stats.crafted = 0;
+            this.stats.soldPills = 0;
+            this.stats.soldEquip = 0;
+            this.stats.spent = 0;
+            this.stats.incarnationCrafted = 0;
+            this.stats.pillsFed = 0;
+            this.stats.errors = 0;
+            this.monitor.consecutiveErrors = 0;
+            this.monitor.totalSpent = 0;
+            this.monitor.currentInterval = CONFIG.general.autoCraftInterval;
+        },
+        
+        // 检查是否应该停止
+        shouldStop() {
+            const autoStop = CONFIG.general.autoStop;
+            if (!autoStop.enabled) return { shouldStop: false, reason: null };
+            
+            // 灵石不足检查
+            if (autoStop.onInsufficientSpirit && this.monitor.spiritStones < 100) {
+                return { shouldStop: true, reason: '灵石不足，请补充灵石' };
+            }
+            
+            // 神识不足检查
+            if (autoStop.onInsufficientMp && this.monitor.mp < 10) {
+                return { shouldStop: true, reason: '神识不足，请等待恢复' };
+            }
+            
+            // 背包满检查
+            if (autoStop.onInventoryFull && this.monitor.inventoryCount >= this.monitor.inventoryLimit - 5) {
+                return { shouldStop: true, reason: '背包即将满，请清理背包' };
+            }
+            
+            // 冥想中检查
+            if (autoStop.onMeditating && this.monitor.isMeditating) {
+                return { shouldStop: true, reason: '正在冥想中，无法炼造' };
+            }
+            
+            // 最大花费检查
+            if (autoStop.onMaxCostReached && this.monitor.totalSpent >= autoStop.maxCraftCost) {
+                return { shouldStop: true, reason: `已达到最大炼制花费限制(${autoStop.maxCraftCost}灵石)` };
+            }
+            
+            // 连续错误检查
+            if (autoStop.stopOnError && this.monitor.consecutiveErrors >= autoStop.maxConsecutiveErrors) {
+                return { shouldStop: true, reason: `连续错误${this.monitor.consecutiveErrors}次，已自动停止` };
+            }
+            
+            return { shouldStop: false, reason: null };
+        }
     };
 
     // ============================================================
@@ -95,7 +234,104 @@
         inventory: [],
         playerInfo: null,
         incarnationStatus: null,
-        lastUpdate: 0
+        lastUpdate: 0,
+        
+        // 缓存配置
+        config: {
+            recipesTTL: 5 * 60 * 1000,      // 配方缓存5分钟
+            inventoryTTL: 30 * 1000,         // 背包缓存30秒
+            playerInfoTTL: 10 * 1000,        // 玩家信息缓存10秒
+            shopTTL: 60 * 1000,              // 商店缓存1分钟
+            maxRetries: 3                    // 缓存加载最大重试次数
+        },
+        
+        // 缓存元数据
+        meta: {
+            alchemy: { timestamp: 0, loading: false, error: null, retryCount: 0 },
+            forge: { timestamp: 0, loading: false, error: null, retryCount: 0 },
+            talisman: { timestamp: 0, loading: false, error: null, retryCount: 0 },
+            inventory: { timestamp: 0, loading: false, error: null, retryCount: 0 },
+            playerInfo: { timestamp: 0, loading: false, error: null, retryCount: 0 },
+            shop: { timestamp: 0, loading: false, error: null, retryCount: 0 }
+        },
+        
+        // 缓存管理方法
+        isValid(type) {
+            const meta = this.meta[type];
+            const ttl = this.config[type + 'TTL'] || 60000;
+            return meta && !meta.error && (Date.now() - meta.timestamp) < ttl;
+        },
+        
+        set(type, data) {
+            this[type] = data;
+            this.meta[type].timestamp = Date.now();
+            this.meta[type].error = null;
+            this.meta[type].retryCount = 0;
+        },
+        
+        setError(type, error) {
+            this.meta[type].error = error;
+            this.meta[type].retryCount++;
+        },
+        
+        clear(type) {
+            this[type] = Array.isArray(this[type]) ? [] : null;
+            this.meta[type].timestamp = 0;
+            this.meta[type].error = null;
+            this.meta[type].retryCount = 0;
+        },
+        
+        clearAll() {
+            ['alchemy', 'forge', 'talisman', 'inventory', 'playerInfo', 'shop'].forEach(type => this.clear(type));
+        },
+        
+        // 智能获取 - 带缓存
+        async getOrFetch(type, fetchFn, forceRefresh = false) {
+            // 检查缓存是否有效
+            if (!forceRefresh && this.isValid(type)) {
+                Logger.info(`使用缓存的${type}数据`);
+                return { code: 200, data: this[type] };
+            }
+            
+            // 检查是否正在加载中
+            if (this.meta[type].loading) {
+                Logger.info(`等待${type}数据加载...`);
+                let waitCount = 0;
+                while (this.meta[type].loading && waitCount < 50) {
+                    await wait(100);
+                    waitCount++;
+                }
+                if (this.isValid(type)) {
+                    return { code: 200, data: this[type] };
+                }
+            }
+            
+            // 检查重试次数
+            if (this.meta[type].retryCount >= this.config.maxRetries) {
+                Logger.error(`${type}数据加载失败次数过多，请刷新页面重试`);
+                return { code: 500, message: '加载失败次数过多' };
+            }
+            
+            // 开始加载
+            this.meta[type].loading = true;
+            this.meta[type].error = null;
+            
+            try {
+                const res = await fetchFn();
+                if (res.code === 200) {
+                    this.set(type, res.data);
+                    return res;
+                } else {
+                    this.setError(type, res.message);
+                    return res;
+                }
+            } catch (e) {
+                this.setError(type, e.message);
+                throw e;
+            } finally {
+                this.meta[type].loading = false;
+            }
+        }
     };
 
     // ============================================================
@@ -109,9 +345,86 @@
             return null;
         },
 
-        async request(method, endpoint, data = null, retryCount = 0) {
+        // 错误分类
+        ErrorTypes: {
+            NETWORK: 'network',           // 网络错误
+            AUTH: 'auth',                 // 认证错误
+            SIGNATURE: 'signature',       // 签名错误
+            SERVER: 'server',             // 服务器错误
+            CLIENT: 'client',             // 客户端错误
+            RATE_LIMIT: 'rate_limit',     // 频率限制
+            INSUFFICIENT: 'insufficient', // 资源不足
+            COOLDOWN: 'cooldown',         // 冷却中
+            MEDITATING: 'meditating',     // 冥想中
+            UNKNOWN: 'unknown'            // 未知错误
+        },
+
+        // 解析错误类型
+        parseError(error, response = null) {
+            const msg = error.message || '';
+            
+            // 网络错误
+            if (msg.includes('fetch') || msg.includes('network') || msg.includes('timeout') || 
+                msg.includes('Failed to fetch') || msg.includes('NetworkError')) {
+                return { type: this.ErrorTypes.NETWORK, message: '网络连接失败', retryable: true };
+            }
+            
+            // 认证错误
+            if (msg.includes('401') || msg.includes('未登录') || msg.includes('登录已过期') || 
+                msg.includes('token') || msg.includes('Token')) {
+                return { type: this.ErrorTypes.AUTH, message: '登录已过期，请刷新页面', retryable: false };
+            }
+            
+            // 签名错误
+            if (msg.includes('403') || msg.includes('签名') || msg.includes('signature') || 
+                msg.includes('Signature')) {
+                return { type: this.ErrorTypes.SIGNATURE, message: 'API签名错误', retryable: true };
+            }
+            
+            // 频率限制
+            if (msg.includes('429') || msg.includes('too many') || msg.includes('频率') || 
+                msg.includes('过快') || msg.includes('请稍后再试')) {
+                return { type: this.ErrorTypes.RATE_LIMIT, message: '操作过于频繁，请稍后再试', retryable: true };
+            }
+            
+            // 服务器错误
+            if (msg.includes('500') || msg.includes('502') || msg.includes('503') || msg.includes('504') ||
+                msg.includes('服务器') || msg.includes('server')) {
+                return { type: this.ErrorTypes.SERVER, message: '服务器错误', retryable: true };
+            }
+            
+            // 资源不足
+            if (msg.includes('灵石不足') || msg.includes('材料不足') || msg.includes('神识不足') || 
+                msg.includes('不足') || msg.includes('insufficient') || msg.includes('not enough')) {
+                return { type: this.ErrorTypes.INSUFFICIENT, message: msg, retryable: false };
+            }
+            
+            // 冷却中
+            if (msg.includes('冷却') || msg.includes('cooldown') || msg.includes('cd') || 
+                msg.includes('请等待') || msg.includes('稍后')) {
+                return { type: this.ErrorTypes.COOLDOWN, message: msg, retryable: true };
+            }
+            
+            // 冥想中
+            if (msg.includes('冥想') || msg.includes('meditat') || msg.includes('修炼中')) {
+                return { type: this.ErrorTypes.MEDITATING, message: '正在冥想中，无法操作', retryable: false };
+            }
+            
+            // 客户端错误
+            if (msg.includes('400') || msg.includes('404') || msg.includes('参数') || 
+                msg.includes('无效') || msg.includes('不存在')) {
+                return { type: this.ErrorTypes.CLIENT, message: msg, retryable: false };
+            }
+            
+            return { type: this.ErrorTypes.UNKNOWN, message: msg || '未知错误', retryable: false };
+        },
+
+        async request(method, endpoint, data = null, retryCount = 0, maxRetries = 2) {
             const api = this.get();
-            if (!api) throw new Error('API not available');
+            if (!api) {
+                const error = { type: this.ErrorTypes.CLIENT, message: 'API不可用', retryable: false };
+                throw error;
+            }
 
             try {
                 const res = method === 'GET'
@@ -125,14 +438,59 @@
 
                 // 处理 401 未授权（Token过期）
                 if (res.code === 401) {
-                    throw new Error('登录已过期，请刷新页面重新登录');
+                    const error = new Error('登录已过期，请刷新页面重新登录');
+                    error.errorType = this.ErrorTypes.AUTH;
+                    error.retryable = false;
+                    throw error;
                 }
 
-                // 处理 403 签名错误 - 可能是盐值更新，重试一次
-                if (res.code === 403 && retryCount < 1) {
-                    Logger.warn(`API签名错误，正在重试...`);
-                    await new Promise(r => setTimeout(r, 500));
-                    return this.request(method, endpoint, data, retryCount + 1);
+                // 处理 403 签名错误 - 可能是盐值更新，重试
+                if (res.code === 403) {
+                    if (retryCount < maxRetries) {
+                        Logger.warn(`API签名错误，正在重试(${retryCount + 1}/${maxRetries})...`);
+                        await new Promise(r => setTimeout(r, 500 * (retryCount + 1)));
+                        return this.request(method, endpoint, data, retryCount + 1, maxRetries);
+                    }
+                    const error = new Error(res.message || 'API签名验证失败');
+                    error.errorType = this.ErrorTypes.SIGNATURE;
+                    error.retryable = false;
+                    throw error;
+                }
+
+                // 处理 429 频率限制
+                if (res.code === 429) {
+                    if (retryCount < maxRetries) {
+                        const delay = 2000 * (retryCount + 1);
+                        Logger.warn(`操作过于频繁，${delay/1000}秒后重试...`);
+                        await new Promise(r => setTimeout(r, delay));
+                        return this.request(method, endpoint, data, retryCount + 1, maxRetries);
+                    }
+                    const error = new Error(res.message || '操作过于频繁，请稍后再试');
+                    error.errorType = this.ErrorTypes.RATE_LIMIT;
+                    error.retryable = false;
+                    throw error;
+                }
+
+                // 处理 500+ 服务器错误
+                if (res.code >= 500) {
+                    if (retryCount < maxRetries) {
+                        Logger.warn(`服务器错误，正在重试(${retryCount + 1}/${maxRetries})...`);
+                        await new Promise(r => setTimeout(r, 1000 * (retryCount + 1)));
+                        return this.request(method, endpoint, data, retryCount + 1, maxRetries);
+                    }
+                    const error = new Error(res.message || '服务器错误');
+                    error.errorType = this.ErrorTypes.SERVER;
+                    error.retryable = false;
+                    throw error;
+                }
+
+                // 处理业务错误 (code !== 200 但 < 500)
+                if (res.code !== 200) {
+                    const error = new Error(res.message || `请求失败: ${endpoint}`);
+                    const parsed = this.parseError(error, res);
+                    error.errorType = parsed.type;
+                    error.retryable = parsed.retryable;
+                    throw error;
                 }
 
                 // 有些API返回的不是标准格式，直接返回
@@ -140,25 +498,34 @@
                     return { code: 200, data: res };
                 }
 
-                if (res.code !== 200) {
-                    throw new Error(res.message || `Request failed: ${endpoint}`);
-                }
                 return res;
             } catch (e) {
-                // 网络错误时重试一次
-                if (e.message && (e.message.includes('fetch') || e.message.includes('network')) && retryCount < 1) {
-                    Logger.warn(`网络错误，正在重试...`);
-                    await new Promise(r => setTimeout(r, 1000));
-                    return this.request(method, endpoint, data, retryCount + 1);
+                // 如果已经是分类过的错误，直接抛出
+                if (e.errorType) throw e;
+                
+                // 解析错误类型
+                const parsed = this.parseError(e);
+                const error = new Error(parsed.message);
+                error.errorType = parsed.type;
+                error.retryable = parsed.retryable;
+                error.originalError = e;
+                
+                // 可重试的错误
+                if (parsed.retryable && retryCount < maxRetries) {
+                    const delay = 1000 * (retryCount + 1);
+                    Logger.warn(`${parsed.message}，${delay/1000}秒后重试(${retryCount + 1}/${maxRetries})...`);
+                    await new Promise(r => setTimeout(r, delay));
+                    return this.request(method, endpoint, data, retryCount + 1, maxRetries);
                 }
-                Logger.error(`API ${method} ${endpoint}: ${e.message}`);
-                throw e;
+                
+                Logger.error(`API ${method} ${endpoint}: ${parsed.message}`);
+                throw error;
             }
         },
 
         // ==================== 玩家信息 ====================
         async getPlayerInfo() {
-            return this.request('GET', '/api/game/player');
+            return this.request('GET', '/api/player/info');
         },
 
         async getInventory() {
@@ -287,6 +654,43 @@
         // ==================== 师徒炼造目标 ====================
         async getMasterCraftTargets() {
             return this.request('GET', '/api/master/craft-targets');
+        },
+
+        // ==================== 冥想状态 ====================
+        async getMeditateStatus() {
+            return this.request('GET', '/api/game/meditate/status');
+        },
+
+        // ==================== 玩家设置 ====================
+        async getPlayerSettings() {
+            return this.request('GET', '/api/player/settings');
+        },
+
+        // ==================== 装备系统 ====================
+        async getCurrentEquipment() {
+            return this.request('GET', '/api/game/equipment/current');
+        },
+
+        async equipItem(itemId) {
+            return this.request('POST', '/api/player/equip', { itemId });
+        },
+
+        async unequipItem(itemId) {
+            return this.request('POST', '/api/player/unequip', { itemId });
+        },
+
+        // ==================== 商店系统 ====================
+        async getShop() {
+            return this.request('GET', '/api/game/shop');
+        },
+
+        async buyItem(templateId, quantity = 1) {
+            return this.request('POST', '/api/game/buy', { templateId, quantity });
+        },
+
+        // ==================== 突破 ====================
+        async breakthrough() {
+            return this.request('POST', '/api/game/breakthrough');
         }
     };
 
@@ -511,7 +915,7 @@
 
             const btn = document.createElement('button');
             btn.id = 'lv-craft-sidebar-btn';
-            btn.innerHTML = '打开炼造面板';
+            innerHTML = '打开炼造面板';
             btn.style.cssText = `
                 width: 100%;
                 padding: 10px 12px;
@@ -541,6 +945,15 @@
             btn.addEventListener('click', (e) => {
                 e.preventDefault();
                 e.stopPropagation();
+
+                // 检查API是否可用
+                const api = API.get();
+                const salt = _win.__S || window.__S;
+                if (!api || !salt) {
+                    Logger.warn('游戏正在加载中，请稍后再试');
+                    return;
+                }
+
                 this.togglePanel();
             });
 
@@ -579,8 +992,21 @@
         async createPanel() {
             if ($('#lv-craft-panel')) return;
 
-            await CraftManager.loadRecipes();
-            await CraftManager.loadIncarnationStatus();
+            // 检查API是否可用
+            const api = API.get();
+            const salt = _win.__S || window.__S;
+            if (!api || !salt) {
+                Logger.warn('游戏正在加载中，请稍后再试');
+                return;
+            }
+
+            // 如果配方还没加载，先加载
+            if (CACHE.alchemy.length === 0) {
+                await CraftManager.loadRecipes();
+            }
+            if (CACHE.incarnation === null) {
+                await CraftManager.loadIncarnationStatus();
+            }
 
             const v = Theme.getVars();
             const panel = document.createElement('div');
@@ -676,6 +1102,7 @@
                             justify-content: center;
                             -webkit-tap-highlight-color: transparent;
                             transition: all 0.2s;
+                            user-select: none;
                         ">×</button>
                     </div>
                 </div>
@@ -1110,6 +1537,170 @@
                         </div>
                     </div>
 
+                    <!-- 高级设置折叠面板 -->
+                    <div class="lv-card" style="
+                        margin-bottom: 16px;
+                        background: ${v.bgCard};
+                        border: 1px solid ${v.borderColor};
+                        border-radius: 12px;
+                        overflow: hidden;
+                    ">
+                        <div id="lv-advanced-toggle" style="
+                            padding: 14px;
+                            cursor: pointer;
+                            display: flex;
+                            align-items: center;
+                            justify-content: space-between;
+                            background: ${v.isDark ? 'rgba(201,153,58,0.08)' : 'rgba(184,70,62,0.05)'};
+                            transition: all 0.2s;
+                        " onmouseover="this.style.background='${v.isDark ? 'rgba(201,153,58,0.15)' : 'rgba(184,70,62,0.1)'}'" onmouseout="this.style.background='${v.isDark ? 'rgba(201,153,58,0.08)' : 'rgba(184,70,62,0.05)'}'">
+                            <div style="
+                                font-size: 13px;
+                                color: ${v.textGold};
+                                font-weight: bold;
+                                display: flex;
+                                align-items: center;
+                                gap: 6px;
+                            ">
+                                <span id="lv-advanced-icon">▶</span> 高级设置
+                            </div>
+                            <span style="font-size: 11px; color: ${v.textMuted};">自适应间隔 / 自动停止</span>
+                        </div>
+                        
+                        <div id="lv-advanced-content" style="display: none; padding: 14px; border-top: 1px solid ${v.borderColor};">
+                            <!-- 自适应间隔设置 -->
+                            <div style="margin-bottom: 16px;">
+                                <label style="display: flex; align-items: center; gap: 8px; cursor: pointer; margin-bottom: 12px;">
+                                    <input type="checkbox" id="lv-adaptive-interval" checked style="accent-color: ${v.accentGold};">
+                                    <span style="font-size: 12px; font-weight: bold; color: ${v.textPrimary};">启用自适应间隔</span>
+                                    <span style="font-size: 11px; color: ${v.textMuted};">(成功加速/失败减速)</span>
+                                </label>
+                                
+                                <div style="display: grid; grid-template-columns: 1fr 1fr; gap: 10px; margin-left: 26px;">
+                                    <div>
+                                        <span style="font-size: 11px; color: ${v.textSecondary};">最小间隔</span>
+                                        <input type="number" id="lv-min-interval" value="10" min="5" max="60" style="
+                                            width: 100%;
+                                            background: ${v.bgInput};
+                                            border: 1px solid ${v.borderColor};
+                                            color: ${v.textPrimary};
+                                            padding: 6px 10px;
+                                            border-radius: 6px;
+                                            font-size: 12px;
+                                            margin-top: 4px;
+                                        ">
+                                    </div>
+                                    <div>
+                                        <span style="font-size: 11px; color: ${v.textSecondary};">最大间隔</span>
+                                        <input type="number" id="lv-max-interval" value="60" min="10" max="300" style="
+                                            width: 100%;
+                                            background: ${v.bgInput};
+                                            border: 1px solid ${v.borderColor};
+                                            color: ${v.textPrimary};
+                                            padding: 6px 10px;
+                                            border-radius: 6px;
+                                            font-size: 12px;
+                                            margin-top: 4px;
+                                        ">
+                                    </div>
+                                    <div>
+                                        <span style="font-size: 11px; color: ${v.textSecondary};">成功加速(秒)</span>
+                                        <input type="number" id="lv-success-decrease" value="2" min="0" max="10" style="
+                                            width: 100%;
+                                            background: ${v.bgInput};
+                                            border: 1px solid ${v.borderColor};
+                                            color: ${v.textPrimary};
+                                            padding: 6px 10px;
+                                            border-radius: 6px;
+                                            font-size: 12px;
+                                            margin-top: 4px;
+                                        ">
+                                    </div>
+                                    <div>
+                                        <span style="font-size: 11px; color: ${v.textSecondary};">失败减速(秒)</span>
+                                        <input type="number" id="lv-error-increase" value="5" min="0" max="20" style="
+                                            width: 100%;
+                                            background: ${v.bgInput};
+                                            border: 1px solid ${v.borderColor};
+                                            color: ${v.textPrimary};
+                                            padding: 6px 10px;
+                                            border-radius: 6px;
+                                            font-size: 12px;
+                                            margin-top: 4px;
+                                        ">
+                                    </div>
+                                </div>
+                            </div>
+
+                            <!-- 分隔线 -->
+                            <div style="height: 1px; background: ${v.borderColor}; margin: 12px 0;"></div>
+
+                            <!-- 自动停止设置 -->
+                            <div>
+                                <label style="display: flex; align-items: center; gap: 8px; cursor: pointer; margin-bottom: 12px;">
+                                    <input type="checkbox" id="lv-autostop-enabled" checked style="accent-color: ${v.accentRed};">
+                                    <span style="font-size: 12px; font-weight: bold; color: ${v.textPrimary};">启用自动停止</span>
+                                </label>
+                                
+                                <div style="margin-left: 26px; display: grid; grid-template-columns: 1fr 1fr; gap: 8px;">
+                                    <label style="display: flex; align-items: center; gap: 6px; cursor: pointer; font-size: 11px;">
+                                        <input type="checkbox" id="lv-autostop-spirit" checked style="accent-color: ${v.accentGold};">
+                                        <span>灵石不足</span>
+                                    </label>
+                                    <label style="display: flex; align-items: center; gap: 6px; cursor: pointer; font-size: 11px;">
+                                        <input type="checkbox" id="lv-autostop-mp" checked style="accent-color: ${v.accentGold};">
+                                        <span>神识不足</span>
+                                    </label>
+                                    <label style="display: flex; align-items: center; gap: 6px; cursor: pointer; font-size: 11px;">
+                                        <input type="checkbox" id="lv-autostop-inventory" checked style="accent-color: ${v.accentGold};">
+                                        <span>背包满</span>
+                                    </label>
+                                    <label style="display: flex; align-items: center; gap: 6px; cursor: pointer; font-size: 11px;">
+                                        <input type="checkbox" id="lv-autostop-meditating" checked style="accent-color: ${v.accentGold};">
+                                        <span>冥想中</span>
+                                    </label>
+                                    <label style="display: flex; align-items: center; gap: 6px; cursor: pointer; font-size: 11px;">
+                                        <input type="checkbox" id="lv-autostop-cost" checked style="accent-color: ${v.accentGold};">
+                                        <span>达到最大花费</span>
+                                    </label>
+                                    <label style="display: flex; align-items: center; gap: 6px; cursor: pointer; font-size: 11px;">
+                                        <input type="checkbox" id="lv-autostop-error" checked style="accent-color: ${v.accentGold};">
+                                        <span>连续错误</span>
+                                    </label>
+                                </div>
+                                
+                                <div style="margin-left: 26px; margin-top: 12px; display: flex; gap: 10px;">
+                                    <div style="flex: 1;">
+                                        <span style="font-size: 11px; color: ${v.textSecondary};">最大花费(灵石)</span>
+                                        <input type="number" id="lv-max-craft-cost" value="100000" min="1000" step="1000" style="
+                                            width: 100%;
+                                            background: ${v.bgInput};
+                                            border: 1px solid ${v.borderColor};
+                                            color: ${v.textPrimary};
+                                            padding: 6px 10px;
+                                            border-radius: 6px;
+                                            font-size: 12px;
+                                            margin-top: 4px;
+                                        ">
+                                    </div>
+                                    <div style="flex: 1;">
+                                        <span style="font-size: 11px; color: ${v.textSecondary};">最大连续错误</span>
+                                        <input type="number" id="lv-max-errors" value="5" min="1" max="20" style="
+                                            width: 100%;
+                                            background: ${v.bgInput};
+                                            border: 1px solid ${v.borderColor};
+                                            color: ${v.textPrimary};
+                                            padding: 6px 10px;
+                                            border-radius: 6px;
+                                            font-size: 12px;
+                                            margin-top: 4px;
+                                        ">
+                                    </div>
+                                </div>
+                            </div>
+                        </div>
+                    </div>
+
                     <!-- 操作按钮 -->
                     <div style="display: flex; gap: 10px; margin-bottom: 12px;">
                         <button id="lv-btn-start" class="lv-btn-primary" style="
@@ -1261,7 +1852,18 @@
 
         bindPanelEvents() {
             // 关闭按钮
-            $('#lv-btn-close')?.addEventListener('click', () => this.togglePanel());
+            $('#lv-btn-close')?.addEventListener('click', (e) => {
+                e.preventDefault();
+                e.stopPropagation();
+                this.closePanel();
+            });
+
+            // 点击面板外部关闭
+            $('#lv-craft-panel')?.addEventListener('click', (e) => {
+                if (e.target.id === 'lv-craft-panel') {
+                    this.closePanel();
+                }
+            });
 
             // 最小化按钮
             $('#lv-btn-minimize')?.addEventListener('click', () => this.toggleMinimize());
@@ -1331,6 +1933,26 @@
             // 批量出售模式切换
             $('#lv-autosell-batch-mode')?.addEventListener('change', () => {
                 this.updateBatchSellMode();
+            });
+
+            // 高级设置折叠面板
+            $('#lv-advanced-toggle')?.addEventListener('click', () => {
+                const content = $('#lv-advanced-content');
+                const icon = $('#lv-advanced-icon');
+                if (content.style.display === 'none') {
+                    content.style.display = 'block';
+                    icon.textContent = '▼';
+                } else {
+                    content.style.display = 'none';
+                    icon.textContent = '▶';
+                }
+            });
+
+            // ESC键关闭面板
+            document.addEventListener('keydown', (e) => {
+                if (e.key === 'Escape' && STATE.panelOpen) {
+                    this.closePanel();
+                }
             });
         },
 
@@ -1416,6 +2038,14 @@
             }
         },
 
+        closePanel() {
+            const panel = $('#lv-craft-panel');
+            if (panel) {
+                STATE.panelOpen = false;
+                panel.style.display = 'none';
+            }
+        },
+
         toggleMinimize() {
             const content = $('#lv-panel-content');
             const btn = $('#lv-btn-minimize');
@@ -1449,6 +2079,24 @@
             CONFIG.general.batchSize = parseInt($('#lv-batch-size')?.value || '10');
             CONFIG.general.maxQuickBuyCost = parseInt($('#lv-max-cost')?.value || '5000');
             CONFIG.general.autoCraftInterval = parseInt($('#lv-interval')?.value || '30');
+
+            // 高级设置 - 自适应间隔
+            CONFIG.general.adaptiveInterval = $('#lv-adaptive-interval')?.checked !== false;
+            CONFIG.general.minInterval = parseInt($('#lv-min-interval')?.value || '10');
+            CONFIG.general.maxInterval = parseInt($('#lv-max-interval')?.value || '60');
+            CONFIG.general.successDecrease = parseInt($('#lv-success-decrease')?.value || '2');
+            CONFIG.general.errorIncrease = parseInt($('#lv-error-increase')?.value || '5');
+
+            // 高级设置 - 自动停止
+            CONFIG.general.autoStop.enabled = $('#lv-autostop-enabled')?.checked !== false;
+            CONFIG.general.autoStop.onInsufficientSpirit = $('#lv-autostop-spirit')?.checked !== false;
+            CONFIG.general.autoStop.onInsufficientMp = $('#lv-autostop-mp')?.checked !== false;
+            CONFIG.general.autoStop.onInventoryFull = $('#lv-autostop-inventory')?.checked !== false;
+            CONFIG.general.autoStop.onMeditating = $('#lv-autostop-meditating')?.checked !== false;
+            CONFIG.general.autoStop.onMaxCostReached = $('#lv-autostop-cost')?.checked !== false;
+            CONFIG.general.autoStop.stopOnError = $('#lv-autostop-error')?.checked !== false;
+            CONFIG.general.autoStop.maxCraftCost = parseInt($('#lv-max-craft-cost')?.value || '100000');
+            CONFIG.general.autoStop.maxConsecutiveErrors = parseInt($('#lv-max-errors')?.value || '5');
 
             localStorage.setItem('lv_craft_config_v3', JSON.stringify(CONFIG));
         },
@@ -1499,6 +2147,24 @@
             setValue('#lv-batch-size', CONFIG.general.batchSize);
             setValue('#lv-max-cost', CONFIG.general.maxQuickBuyCost);
             setValue('#lv-interval', CONFIG.general.autoCraftInterval);
+
+            // 高级设置 - 自适应间隔
+            setChecked('#lv-adaptive-interval', CONFIG.general.adaptiveInterval);
+            setValue('#lv-min-interval', CONFIG.general.minInterval);
+            setValue('#lv-max-interval', CONFIG.general.maxInterval);
+            setValue('#lv-success-decrease', CONFIG.general.successDecrease);
+            setValue('#lv-error-increase', CONFIG.general.errorIncrease);
+
+            // 高级设置 - 自动停止
+            setChecked('#lv-autostop-enabled', CONFIG.general.autoStop.enabled);
+            setChecked('#lv-autostop-spirit', CONFIG.general.autoStop.onInsufficientSpirit);
+            setChecked('#lv-autostop-mp', CONFIG.general.autoStop.onInsufficientMp);
+            setChecked('#lv-autostop-inventory', CONFIG.general.autoStop.onInventoryFull);
+            setChecked('#lv-autostop-meditating', CONFIG.general.autoStop.onMeditating);
+            setChecked('#lv-autostop-cost', CONFIG.general.autoStop.onMaxCostReached);
+            setChecked('#lv-autostop-error', CONFIG.general.autoStop.stopOnError);
+            setValue('#lv-max-craft-cost', CONFIG.general.autoStop.maxCraftCost);
+            setValue('#lv-max-errors', CONFIG.general.autoStop.maxConsecutiveErrors);
         },
 
         refreshRecipeSelects() {
@@ -1606,12 +2272,19 @@
     // 炼造管理
     // ============================================================
     const CraftManager = {
-        async loadRecipes() {
+        async loadRecipes(forceRefresh = false) {
             try {
+                if (!forceRefresh && CACHE.isValid('alchemy') && CACHE.isValid('forge') && CACHE.isValid('talisman')) {
+                    Logger.info('使用缓存的配方数据');
+                    UI.updateRecipeSelects();
+                    return;
+                }
+
                 Logger.info('正在加载配方...');
 
+                // 使用缓存系统加载配方
                 try {
-                    const res = await API.getAlchemyRecipes();
+                    const res = await CACHE.getOrFetch('alchemy', () => API.getAlchemyRecipes(), forceRefresh);
                     if (res.data?.recipes) {
                         CACHE.alchemy = res.data.recipes;
                         Logger.success(`炼丹配方: ${CACHE.alchemy.length}个`);
@@ -1621,7 +2294,7 @@
                 }
 
                 try {
-                    const res = await API.getForgeRecipes();
+                    const res = await CACHE.getOrFetch('forge', () => API.getForgeRecipes(), forceRefresh);
                     if (res.data?.recipes) {
                         CACHE.forge = res.data.recipes;
                         Logger.success(`炼器配方: ${CACHE.forge.length}个`);
@@ -1631,7 +2304,7 @@
                 }
 
                 try {
-                    const res = await API.getTalismanRecipes();
+                    const res = await CACHE.getOrFetch('talisman', () => API.getTalismanRecipes(), forceRefresh);
                     if (res.data?.recipes) {
                         CACHE.talisman = res.data.recipes;
                         Logger.success(`制符配方: ${CACHE.talisman.length}个`);
@@ -1641,6 +2314,7 @@
                 }
 
                 CACHE.lastUpdate = Date.now();
+                UI.updateRecipeSelects();
             } catch (e) {
                 Logger.error('加载配方失败: ' + e.message);
             }
@@ -1672,14 +2346,27 @@
             }
 
             STATE.running = true;
+            STATE.resetStats(); // 重置统计
             UI.updateRunStatus();
             Logger.success('自动炼造已启动');
 
-            this.executeOnce();
-
-            STATE.autoCraftTimer = setInterval(() => {
-                this.executeOnce();
-            }, CONFIG.general.autoCraftInterval * 1000);
+            // 使用递归定时器实现动态间隔
+            const runWithAdaptiveInterval = async () => {
+                if (!STATE.running) return;
+                
+                await this.executeOnce();
+                
+                if (STATE.running) {
+                    // 使用当前动态间隔
+                    const interval = CONFIG.general.adaptiveInterval 
+                        ? STATE.monitor.currentInterval 
+                        : CONFIG.general.autoCraftInterval;
+                    
+                    STATE.autoCraftTimer = setTimeout(runWithAdaptiveInterval, interval * 1000);
+                }
+            };
+            
+            runWithAdaptiveInterval();
         },
 
         stop(reason = null) {
@@ -1687,7 +2374,7 @@
 
             STATE.running = false;
             if (STATE.autoCraftTimer) {
-                clearInterval(STATE.autoCraftTimer);
+                clearTimeout(STATE.autoCraftTimer);  // 改为clearTimeout，因为使用的是setTimeout
                 STATE.autoCraftTimer = null;
             }
 
@@ -1700,38 +2387,96 @@
         },
 
         async executeOnce() {
-            if (await this.isMeditating()) {
+            // 检查冥想状态并更新监控
+            const isMeditating = await this.isMeditating();
+            STATE.monitor.isMeditating = isMeditating;
+            if (isMeditating) {
                 Logger.warn('冥想中无法炼造，跳过本次执行');
+                if (CONFIG.general.autoStop.onMeditating) {
+                    this.stop('正在冥想中，无法炼造');
+                }
                 return;
             }
 
-            // 检查玩家状态
+            // 检查玩家状态并更新监控数据
             const statusCheck = await this.checkPlayerStatus();
             if (!statusCheck.canCraft) {
                 this.stop(statusCheck.reason);
                 return;
             }
 
+            // 使用新的自动停止检查
+            const stopCheck = STATE.shouldStop();
+            if (stopCheck.shouldStop) {
+                this.stop(stopCheck.reason);
+                return;
+            }
+
             try {
                 let craftedCount = 0;
+                let hasError = false;
 
                 if (CONFIG.targets.alchemy) {
-                    const result = await this.craftByName('alchemy', CONFIG.targets.alchemy);
-                    if (result && result.count) craftedCount += result.count;
+                    try {
+                        const result = await this.craftByName('alchemy', CONFIG.targets.alchemy);
+                        if (result && result.count) {
+                            craftedCount += result.count;
+                            STATE.recordSuccess();
+                        }
+                    } catch (e) {
+                        hasError = true;
+                        const errorCount = STATE.recordError(e.errorType);
+                        Logger.error(`炼丹失败: ${e.message}`);
+                        
+                        // 检查是否需要停止
+                        if (e.errorType === API.ErrorTypes.INSUFFICIENT && 
+                            (e.message.includes('灵石') || e.message.includes('神识'))) {
+                            const stopCheck = STATE.shouldStop();
+                            if (stopCheck.shouldStop) {
+                                this.stop(stopCheck.reason);
+                                return;
+                            }
+                        }
+                    }
                 }
 
                 if (CONFIG.targets.forge) {
-                    const result = await this.craftByName('forge', CONFIG.targets.forge);
-                    if (result && result.count) craftedCount += result.count;
+                    try {
+                        const result = await this.craftByName('forge', CONFIG.targets.forge);
+                        if (result && result.count) {
+                            craftedCount += result.count;
+                            STATE.recordSuccess();
+                        }
+                    } catch (e) {
+                        hasError = true;
+                        const errorCount = STATE.recordError(e.errorType);
+                        Logger.error(`炼器失败: ${e.message}`);
+                    }
                 }
 
                 if (CONFIG.targets.talisman) {
-                    const result = await this.craftByName('talisman', CONFIG.targets.talisman);
-                    if (result && result.count) craftedCount += result.count;
+                    try {
+                        const result = await this.craftByName('talisman', CONFIG.targets.talisman);
+                        if (result && result.count) {
+                            craftedCount += result.count;
+                            STATE.recordSuccess();
+                        }
+                    } catch (e) {
+                        hasError = true;
+                        const errorCount = STATE.recordError(e.errorType);
+                        Logger.error(`制符失败: ${e.message}`);
+                    }
                 }
 
                 if (CONFIG.targets.incarnation.enabled && CONFIG.targets.incarnation.target) {
-                    await this.craftIncarnation();
+                    try {
+                        await this.craftIncarnation();
+                        STATE.recordSuccess();
+                    } catch (e) {
+                        hasError = true;
+                        STATE.recordError(e.errorType);
+                        Logger.error(`化身炼造失败: ${e.message}`);
+                    }
                 }
 
                 await this.autoSell();
@@ -1749,8 +2494,19 @@
                     STATE.consecutiveEmptyCrafts = 0;
                 }
 
+                // 成功时重置连续错误计数（如果没有错误）
+                if (!hasError && craftedCount > 0) {
+                    STATE.monitor.consecutiveErrors = 0;
+                }
+
+                // 显示当前间隔信息
+                if (CONFIG.general.adaptiveInterval) {
+                    Logger.info(`当前炼制间隔: ${STATE.monitor.currentInterval}秒`);
+                }
+
             } catch (e) {
                 Logger.error('执行失败: ' + e.message);
+                STATE.recordError();
             }
         },
 
@@ -1762,6 +2518,9 @@
                 }
 
                 const player = res.data;
+                
+                // 更新监控数据
+                STATE.updateMonitor(player);
 
                 // 检查神识
                 if (player.spirit !== undefined && player.maxSpirit !== undefined) {
@@ -2066,13 +2825,12 @@
             const meditationBar = document.getElementById('meditationBar');
             if (meditationBar && !meditationBar.classList.contains('hidden')) return true;
 
-            // 方法3: 通过API获取实时状态
+            // 方法3: 通过冥想状态API获取实时状态
             try {
-                const res = await API.getPlayerInfo();
+                const res = await API.getMeditateStatus();
                 if (res.code === 200 && res.data) {
-                    // 检查玩家状态，如果正在冥想会有相关字段
-                    const player = res.data;
-                    if (player.isMeditating || player.meditationEndTime > Date.now()) {
+                    // 检查是否正在冥想
+                    if (res.data.isMeditating || res.data.startTime > 0) {
                         return true;
                     }
                 }
@@ -2093,10 +2851,7 @@
         Theme.initObserver();
         Logger.info('炼造助手 v3.0.0 已加载');
 
-        // 等待API可用
-        await waitForAPI();
-
-        // 等待游戏DOM完全加载后再创建按钮
+        // 立即创建按钮（不等待API）
         waitForElement('.player-panel', 10000)
             .then(() => {
                 UI.createSidebarButton();
@@ -2106,17 +2861,16 @@
                 Logger.warn('未找到侧边栏，按钮可能无法显示');
             });
 
-        // 延迟加载配方（仅初始化时加载一次）
-        setTimeout(() => {
+        // 后台等待API可用
+        waitForAPI().then(() => {
+            // API可用后加载配方
             CraftManager.loadRecipes();
-        }, 1500);
 
-        // 自动开始
-        setTimeout(() => {
+            // 自动开始
             if (CONFIG.general.autoStart) {
                 CraftManager.start();
             }
-        }, 5000);
+        });
     }
 
     // 等待API可用的辅助函数
