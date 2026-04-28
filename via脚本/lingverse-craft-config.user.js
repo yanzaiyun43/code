@@ -1,7 +1,7 @@
 // ==UserScript==
 // @name         灵界 LingVerse 炼造配置面板
 // @namespace    lingverse-craft-config
-// @version      2.1.14
+// @version      2.1.15
 // @description  炼造自动化配置：支持炼丹/炼器/制符/化身炼造、许愿锁定、自动售卖、深色/浅色模式跟随游戏主题
 // @author       LingVerse
 // @match        https://ling.muge.info/*
@@ -33,14 +33,14 @@
         },
 
         autoSell: {
-
             useBatchAPI: false,
             batchMaxRarity: 2,
             pills: { enabled: false, maxRarity: 2 },
-            equipment: { enabled: false, maxRarity: 2, excludeSlots: [], minEnhanceLevel: 0, keepWithAffix: true }
+            equipment: { enabled: false, maxRarity: 2, excludeSlots: [], minEnhanceLevel: 0, keepWithAffix: true },
+            confirmed: false
         },
 
-        wishLock: { enabled: false, targetName: '', targetRarity: 4 },
+        wishLock: { enabled: false, type: 'alchemy', targetName: '', targetRarity: 4 },
 
         incarnation: {
             autoFeedPills: false,
@@ -68,7 +68,11 @@
             autoStop: {
                 enabled: true,
                 onInsufficientSpirit: true,
+                spiritThreshold: 100,
                 onInsufficientMp: true,
+                mpThreshold: 10,
+                onInsufficientStamina: true,
+                staminaThreshold: 10,
                 onInventoryFull: true,
                 onMeditating: true,
                 onMaxCostReached: true,
@@ -107,6 +111,8 @@
             maxSpiritStones: 0,
             mp: 0,
             maxMp: 0,
+            stamina: 0,
+            maxStamina: 0,
             inventoryCount: 0,
             inventoryLimit: 0,
             isMeditating: false,
@@ -123,6 +129,8 @@
             this.monitor.maxSpiritStones = playerInfo.maxSpiritStones || 0;
             this.monitor.mp = playerInfo.mp || 0;
             this.monitor.maxMp = playerInfo.maxMp || 0;
+            this.monitor.stamina = playerInfo.stamina || 0;
+            this.monitor.maxStamina = playerInfo.maxStamina || 0;
             this.monitor.inventoryCount = playerInfo.inventoryCount || 0;
             this.monitor.inventoryLimit = playerInfo.inventoryLimit || 0;
             this.monitor.lastUpdate = Date.now();
@@ -184,27 +192,29 @@
         shouldStop() {
             const autoStop = CONFIG.general.autoStop;
             if (!autoStop.enabled) return { shouldStop: false, reason: null };
-            
 
-            if (autoStop.onInsufficientSpirit && this.monitor.spiritStones < 100) {
-                return { shouldStop: true, reason: '灵石不足，请补充灵石' };
+            // 灵石不足检测
+            if (autoStop.onInsufficientSpirit && this.monitor.spiritStones < (autoStop.spiritThreshold || 100)) {
+                return { shouldStop: true, reason: `灵石不足(${this.monitor.spiritStones}<${autoStop.spiritThreshold || 100})，请补充灵石` };
             }
-            
 
-            if (autoStop.onInsufficientMp && this.monitor.mp < 10) {
-                return { shouldStop: true, reason: '神识不足，请等待恢复' };
+            // 神识不足检测
+            if (autoStop.onInsufficientMp && this.monitor.mp < (autoStop.mpThreshold || 10)) {
+                return { shouldStop: true, reason: `神识不足(${this.monitor.mp}<${autoStop.mpThreshold || 10})，请等待恢复` };
             }
-            
+
+            // 灵力不足检测
+            if (autoStop.onInsufficientStamina && this.monitor.stamina < (autoStop.staminaThreshold || 10)) {
+                return { shouldStop: true, reason: `灵力不足(${this.monitor.stamina}<${autoStop.staminaThreshold || 10})，请等待恢复` };
+            }
 
             if (autoStop.onInventoryFull && this.monitor.inventoryCount >= this.monitor.inventoryLimit - 5) {
                 return { shouldStop: true, reason: '背包即将满，请清理背包' };
             }
-            
 
             if (autoStop.onMeditating && this.monitor.isMeditating) {
                 return { shouldStop: true, reason: '正在冥想中，无法炼造' };
             }
-            
 
             if (autoStop.onMaxCostReached && this.monitor.totalSpent >= autoStop.maxCraftCost) {
                 return { shouldStop: true, reason: `已达到最大炼制花费限制(${autoStop.maxCraftCost}灵石)` };
@@ -1305,6 +1315,104 @@
                         </div>
                     </div>
 
+                    <!-- 许愿锁定区 -->
+                    <div class="lv-card" style="
+                        margin-bottom: 16px;
+                        padding: 14px;
+                        background: ${v.bgCard};
+                        border: 1px solid ${v.borderColor};
+                        border-radius: 12px;
+                    ">
+                        <div style="
+                            font-size: 13px;
+                            color: ${v.textJade};
+                            margin-bottom: 12px;
+                            font-weight: bold;
+                            display: flex;
+                            align-items: center;
+                            gap: 6px;
+                            padding-bottom: 8px;
+                            border-bottom: 1px solid ${v.borderColor};
+                        ">
+                            <span>⭐</span> 许愿锁定
+                        </div>
+
+                        <label style="
+                            display: flex;
+                            align-items: center;
+                            gap: 10px;
+                            margin-bottom: 12px;
+                            padding: 8px;
+                            background: ${v.isDark ? 'rgba(76,175,80,0.1)' : 'rgba(76,175,80,0.08)'};
+                            border-radius: 8px;
+                            cursor: pointer;
+                        ">
+                            <input type="checkbox" id="lv-wish-enabled" style="
+                                width: 18px;
+                                height: 18px;
+                                accent-color: ${v.accentJade};
+                            ">
+                            <div style="flex: 1;">
+                                <div style="color: ${v.textJade}; font-weight: bold; font-size: 12px;">启用许愿锁定</div>
+                                <div style="color: ${v.textMuted}; font-size: 11px;">自动设置许愿目标提高成功率</div>
+                            </div>
+                        </label>
+
+                        <div style="margin-bottom: 10px;">
+                            <span style="font-size: 11px; color: ${v.textSecondary};">许愿类型:</span>
+                            <select id="lv-wish-type" class="lv-select" style="
+                                width: 100%;
+                                margin-top: 6px;
+                                background: ${v.bgInput};
+                                border: 1px solid ${v.borderColor};
+                                color: ${v.textPrimary};
+                                padding: 8px 10px;
+                                border-radius: 6px;
+                                font-size: 12px;
+                            ">
+                                <option value="alchemy">炼丹</option>
+                                <option value="forge">炼器</option>
+                                <option value="talisman">制符</option>
+                            </select>
+                        </div>
+
+                        <div style="margin-bottom: 10px;">
+                            <span style="font-size: 11px; color: ${v.textSecondary};">许愿目标:</span>
+                            <select id="lv-wish-target" class="lv-select" style="
+                                width: 100%;
+                                margin-top: 6px;
+                                background: ${v.bgInput};
+                                border: 1px solid ${v.borderColor};
+                                color: ${v.textPrimary};
+                                padding: 8px 10px;
+                                border-radius: 6px;
+                                font-size: 12px;
+                            ">
+                                <option value="">-- 选择许愿目标 --</option>
+                            </select>
+                        </div>
+
+                        <div style="margin-bottom: 10px;">
+                            <span style="font-size: 11px; color: ${v.textSecondary};">目标品质:</span>
+                            <select id="lv-wish-rarity" class="lv-select" style="
+                                width: 100%;
+                                margin-top: 6px;
+                                background: ${v.bgInput};
+                                border: 1px solid ${v.borderColor};
+                                color: ${v.textPrimary};
+                                padding: 8px 10px;
+                                border-radius: 6px;
+                                font-size: 12px;
+                            ">
+                                <option value="1">普通</option>
+                                <option value="2">优秀</option>
+                                <option value="3">稀有</option>
+                                <option value="4" selected>史诗</option>
+                                <option value="5">传说</option>
+                            </select>
+                        </div>
+                    </div>
+
                     <!-- 自动售卖区 -->
                     <div class="lv-card" style="
                         margin-bottom: 16px;
@@ -1604,6 +1712,47 @@
                             <!-- 分隔线 -->
                             <div style="height: 1px; background: ${v.borderColor}; margin: 12px 0;"></div>
 
+                            <!-- 自动售卖警告 -->
+                            <div style="
+                                background: ${v.isDark ? 'rgba(184,70,62,0.15)' : 'rgba(184,70,62,0.1)'};
+                                border: 1px solid ${v.accentRed};
+                                border-radius: 8px;
+                                padding: 12px;
+                                margin-bottom: 16px;
+                            ">
+                                <div style="
+                                    display: flex;
+                                    align-items: center;
+                                    gap: 8px;
+                                    margin-bottom: 8px;
+                                    color: ${v.accentRed};
+                                    font-weight: bold;
+                                    font-size: 12px;
+                                ">
+                                    <span style="font-size: 16px;">⚠️</span>
+                                    <span>自动售卖风险提示</span>
+                                </div>
+                                <div style="
+                                    font-size: 11px;
+                                    color: ${v.textSecondary};
+                                    line-height: 1.6;
+                                ">
+                                    启用自动售卖后，系统会出售背包中<strong style="color: ${v.textPrimary};">所有</strong>符合条件的物品，<strong style="color: ${v.accentRed};">不仅仅是本次炼制的</strong>。请谨慎设置品质上限，避免误售珍贵物品。
+                                </div>
+                                <label style="
+                                    display: flex;
+                                    align-items: center;
+                                    gap: 8px;
+                                    margin-top: 10px;
+                                    cursor: pointer;
+                                    font-size: 11px;
+                                    color: ${v.textPrimary};
+                                ">
+                                    <input type="checkbox" id="lv-autosell-confirm" style="accent-color: ${v.accentRed};">
+                                    <span>我已了解风险，启用自动售卖</span>
+                                </label>
+                            </div>
+
                             <!-- 自动停止设置 -->
                             <div>
                                 <label style="display: flex; align-items: center; gap: 8px; cursor: pointer; margin-bottom: 12px;">
@@ -1621,6 +1770,10 @@
                                         <span>神识不足</span>
                                     </label>
                                     <label style="display: flex; align-items: center; gap: 6px; cursor: pointer; font-size: 11px;">
+                                        <input type="checkbox" id="lv-autostop-stamina" checked style="accent-color: ${v.accentGold};">
+                                        <span>灵力不足</span>
+                                    </label>
+                                    <label style="display: flex; align-items: center; gap: 6px; cursor: pointer; font-size: 11px;">
                                         <input type="checkbox" id="lv-autostop-inventory" checked style="accent-color: ${v.accentGold};">
                                         <span>背包满</span>
                                     </label>
@@ -1636,6 +1789,49 @@
                                         <input type="checkbox" id="lv-autostop-error" checked style="accent-color: ${v.accentGold};">
                                         <span>连续错误</span>
                                     </label>
+                                </div>
+
+                                <!-- 阈值设置 -->
+                                <div style="margin-left: 26px; margin-top: 12px; display: grid; grid-template-columns: 1fr 1fr 1fr; gap: 10px;">
+                                    <div>
+                                        <span style="font-size: 11px; color: ${v.textSecondary};">灵石阈值</span>
+                                        <input type="number" id="lv-spirit-threshold" value="100" min="0" step="100" style="
+                                            width: 100%;
+                                            background: ${v.bgInput};
+                                            border: 1px solid ${v.borderColor};
+                                            color: ${v.textPrimary};
+                                            padding: 6px 10px;
+                                            border-radius: 6px;
+                                            font-size: 12px;
+                                            margin-top: 4px;
+                                        " title="灵石低于此值时停止">
+                                    </div>
+                                    <div>
+                                        <span style="font-size: 11px; color: ${v.textSecondary};">神识阈值</span>
+                                        <input type="number" id="lv-mp-threshold" value="10" min="0" step="1" style="
+                                            width: 100%;
+                                            background: ${v.bgInput};
+                                            border: 1px solid ${v.borderColor};
+                                            color: ${v.textPrimary};
+                                            padding: 6px 10px;
+                                            border-radius: 6px;
+                                            font-size: 12px;
+                                            margin-top: 4px;
+                                        " title="神识低于此值时停止">
+                                    </div>
+                                    <div>
+                                        <span style="font-size: 11px; color: ${v.textSecondary};">灵力阈值</span>
+                                        <input type="number" id="lv-stamina-threshold" value="10" min="0" step="1" style="
+                                            width: 100%;
+                                            background: ${v.bgInput};
+                                            border: 1px solid ${v.borderColor};
+                                            color: ${v.textPrimary};
+                                            padding: 6px 10px;
+                                            border-radius: 6px;
+                                            font-size: 12px;
+                                            margin-top: 4px;
+                                        " title="灵力低于此值时停止">
+                                    </div>
                                 </div>
                                 
                                 <div style="margin-left: 26px; margin-top: 12px; display: flex; gap: 10px;">
@@ -1849,6 +2045,10 @@
                 this.updateIncarnationTargetSelect();
             });
 
+            $('#lv-wish-type')?.addEventListener('change', () => {
+                this.updateWishTargetSelect();
+            });
+
             $('#lv-btn-incarnation-condense')?.addEventListener('click', async () => {
                 try {
                     const res = await API.condenseIncarnation();
@@ -1946,6 +2146,19 @@
                 this.generateRecipeOptions(cache, nameField, type);
         },
 
+        updateWishTargetSelect() {
+            const type = $('#lv-wish-type')?.value || 'alchemy';
+            const select = $('#lv-wish-target');
+            if (!select) return;
+
+            const cache = type === 'alchemy' ? CACHE.alchemy :
+                         type === 'forge' ? CACHE.forge : CACHE.talisman;
+            const nameField = type === 'alchemy' ? 'pillName' : 'name';
+
+            select.innerHTML = '<option value="">-- 选择许愿目标 --</option>' +
+                this.generateRecipeOptions(cache, nameField, type);
+        },
+
         makePanelDraggable() {
             const header = $('#lv-panel-header');
             const panel = $('#lv-craft-panel');
@@ -2039,7 +2252,13 @@
             CONFIG.autoSell.pills.maxRarity = parseInt($('#lv-autosell-pills-rarity')?.value || '2');
 
             CONFIG.autoSell.equipment.enabled = $('#lv-autosell-equip')?.checked || false;
+            CONFIG.autoSell.confirmed = $('#lv-autosell-confirm')?.checked || false;
             CONFIG.autoSell.equipment.maxRarity = parseInt($('#lv-autosell-equip-rarity')?.value || '2');
+
+            CONFIG.wishLock.enabled = $('#lv-wish-enabled')?.checked || false;
+            CONFIG.wishLock.type = $('#lv-wish-type')?.value || 'alchemy';
+            CONFIG.wishLock.targetName = $('#lv-wish-target')?.value || '';
+            CONFIG.wishLock.targetRarity = parseInt($('#lv-wish-rarity')?.value || '4');
 
             CONFIG.general.useQuickBuy = $('#lv-use-quickbuy')?.checked !== false;
             CONFIG.general.autoStart = $('#lv-auto-start')?.checked || false;
@@ -2055,7 +2274,11 @@
 
             CONFIG.general.autoStop.enabled = $('#lv-autostop-enabled')?.checked !== false;
             CONFIG.general.autoStop.onInsufficientSpirit = $('#lv-autostop-spirit')?.checked !== false;
+            CONFIG.general.autoStop.spiritThreshold = parseInt($('#lv-spirit-threshold')?.value || '100');
             CONFIG.general.autoStop.onInsufficientMp = $('#lv-autostop-mp')?.checked !== false;
+            CONFIG.general.autoStop.mpThreshold = parseInt($('#lv-mp-threshold')?.value || '10');
+            CONFIG.general.autoStop.onInsufficientStamina = $('#lv-autostop-stamina')?.checked !== false;
+            CONFIG.general.autoStop.staminaThreshold = parseInt($('#lv-stamina-threshold')?.value || '10');
             CONFIG.general.autoStop.onInventoryFull = $('#lv-autostop-inventory')?.checked !== false;
             CONFIG.general.autoStop.onMeditating = $('#lv-autostop-meditating')?.checked !== false;
             CONFIG.general.autoStop.onMaxCostReached = $('#lv-autostop-cost')?.checked !== false;
@@ -2122,6 +2345,16 @@
             setChecked('#lv-autosell-equip', getVal(CONFIG.autoSell.equipment, 'enabled', false));
             setValue('#lv-autosell-equip-rarity', getVal(CONFIG.autoSell.equipment, 'maxRarity', 2));
 
+            // 自动售卖确认
+            setChecked('#lv-autosell-confirm', getVal(CONFIG.autoSell, 'confirmed', false));
+
+            // 许愿锁定设置
+            setChecked('#lv-wish-enabled', getVal(CONFIG.wishLock, 'enabled', false));
+            setValue('#lv-wish-type', getVal(CONFIG.wishLock, 'type', 'alchemy'));
+            this.updateWishTargetSelect();
+            setValue('#lv-wish-target', getVal(CONFIG.wishLock, 'targetName', ''));
+            setValue('#lv-wish-rarity', getVal(CONFIG.wishLock, 'targetRarity', 4));
+
             UI.updateBatchSellMode();
 
             setChecked('#lv-use-quickbuy', getVal(CONFIG.general, 'useQuickBuy', true));
@@ -2140,14 +2373,17 @@
             const autoStop = CONFIG.general.autoStop || {};
             setChecked('#lv-autostop-enabled', getVal(autoStop, 'enabled', true));
             setChecked('#lv-autostop-spirit', getVal(autoStop, 'onInsufficientSpirit', true));
+            setValue('#lv-spirit-threshold', getVal(autoStop, 'spiritThreshold', 100));
             setChecked('#lv-autostop-mp', getVal(autoStop, 'onInsufficientMp', true));
+            setValue('#lv-mp-threshold', getVal(autoStop, 'mpThreshold', 10));
+            setChecked('#lv-autostop-stamina', getVal(autoStop, 'onInsufficientStamina', true));
+            setValue('#lv-stamina-threshold', getVal(autoStop, 'staminaThreshold', 10));
             setChecked('#lv-autostop-inventory', getVal(autoStop, 'onInventoryFull', true));
             setChecked('#lv-autostop-meditating', getVal(autoStop, 'onMeditating', true));
             setChecked('#lv-autostop-cost', getVal(autoStop, 'onMaxCostReached', true));
             setChecked('#lv-autostop-error', getVal(autoStop, 'stopOnError', true));
             setValue('#lv-max-craft-cost', getVal(autoStop, 'maxCraftCost', 100000));
             setValue('#lv-max-errors', getVal(autoStop, 'maxConsecutiveErrors', 5));
-            setValue('#lv-max-errors', CONFIG.general.autoStop.maxConsecutiveErrors);
         },
 
         refreshRecipeSelects() {
@@ -2371,14 +2607,12 @@
         },
 
         async executeOnce() {
-
+            // 检测冥想状态 - 冥想中跳过本次但不停止，下次继续检测
             const isMeditating = await this.isMeditating();
             STATE.monitor.isMeditating = isMeditating;
             if (isMeditating) {
-                Logger.warn('冥想中无法炼造，跳过本次执行');
-                if (CONFIG.general.autoStop.onMeditating) {
-                    this.stop('正在冥想中，无法炼造');
-                }
+                Logger.warn('冥想中无法炼造，跳过本次执行，退出冥想后将自动恢复');
+                // 冥想时不停止，只是跳过本次，下次执行时重新检测
                 return;
             }
 
@@ -2393,6 +2627,9 @@
                 this.stop(stopCheck.reason);
                 return;
             }
+
+            // 设置许愿目标
+            await this.setWishTarget();
 
             try {
                 let craftedCount = 0;
@@ -2497,32 +2734,61 @@
                 }
 
                 const player = res.data;
-                
 
+                // 更新状态监控
                 STATE.updateMonitor(player);
 
-                if (player.spirit !== undefined && player.maxSpirit !== undefined) {
-                    if (player.spirit < 10) {
-                        return { canCraft: false, reason: '神识不足（需要至少10点）' };
-                    }
+                // 使用 shouldStop 的统一检测逻辑
+                const stopCheck = STATE.shouldStop();
+                if (stopCheck.shouldStop) {
+                    return { canCraft: false, reason: stopCheck.reason };
                 }
 
-                if (player.mp !== undefined && player.maxMp !== undefined) {
-                    if (player.mp < 10) {
-                        return { canCraft: false, reason: '灵力不足（需要至少10点）' };
-                    }
-                }
-
+                // 快速购买模式下的额外灵石检查
                 if (CONFIG.general.useQuickBuy) {
-                    const stones = player.lowerSpiritStone || 0;
-                    if (stones < 100) {
-                        return { canCraft: false, reason: '灵石不足（需要至少100点用于补充材料）' };
+                    const stones = player.lowerSpiritStone || player.spiritStones || 0;
+                    const threshold = CONFIG.general.autoStop.spiritThreshold || 100;
+                    if (stones < threshold) {
+                        return { canCraft: false, reason: `灵石不足(${stones}<${threshold})，无法快速购买材料` };
                     }
                 }
 
                 return { canCraft: true, reason: null };
             } catch (e) {
+                // API 调用失败时允许继续，避免网络问题中断炼造
                 return { canCraft: true, reason: null };
+            }
+        },
+
+        // 设置许愿目标
+        async setWishTarget() {
+            if (!CONFIG.wishLock.enabled || !CONFIG.wishLock.targetName) return;
+
+            const type = CONFIG.wishLock.type || 'alchemy';
+            const cache = type === 'alchemy' ? CACHE.alchemy :
+                         type === 'forge' ? CACHE.forge : CACHE.talisman;
+            const nameField = type === 'alchemy' ? 'pillName' : 'name';
+            const idField = type === 'alchemy' ? 'pillId' : 'recipeId';
+
+            try {
+                // 在对应配方中查找目标
+                const recipe = cache.find(r => r[nameField] === CONFIG.wishLock.targetName);
+                if (!recipe || !recipe[idField]) {
+                    Logger.warn(`许愿目标未找到: ${CONFIG.wishLock.targetName}`);
+                    return;
+                }
+
+                // targetId格式: id_品质 (如 pill123_4)
+                const targetId = `${recipe[idField]}_${CONFIG.wishLock.targetRarity}`;
+                const res = await API.setWishTarget(targetId);
+                if (res.code === 200) {
+                    const typeName = type === 'alchemy' ? '炼丹' : type === 'forge' ? '炼器' : '制符';
+                    Logger.info(`已设置${typeName}许愿目标: ${CONFIG.wishLock.targetName} (品质${CONFIG.wishLock.targetRarity})`);
+                } else {
+                    Logger.warn(`设置许愿目标失败: ${res.message || '未知错误'}`);
+                }
+            } catch (e) {
+                Logger.warn(`设置许愿目标失败: ${e.message}`);
             }
         },
 
