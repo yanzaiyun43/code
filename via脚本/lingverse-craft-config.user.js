@@ -1,7 +1,7 @@
 // ==UserScript==
 // @name         灵界 LingVerse 炼造配置面板 v3.0
 // @namespace    lingverse-craft-config
-// @version      2.1.3
+// @version      2.1.4
 // @description  炼造自动化配置：支持炼丹/炼器/制符/化身炼造、许愿锁定、自动售卖、深色/浅色模式跟随游戏主题
 // @author       You
 // @match        https://ling.muge.info/*
@@ -487,10 +487,22 @@
             if (playerPanel) {
                 const firstSection = playerPanel.querySelector('.panel-section');
                 if (firstSection) {
-                    // 在角色信息栏后面插入按钮
-                    if (!playerPanel.querySelector('#lv-craft-sidebar-btn')) {
-                        firstSection.insertAdjacentElement('afterend', btn);
+                    // 检查是否已有该按钮
+                    if (playerPanel.querySelector('#lv-craft-sidebar-btn')) {
+                        return;
                     }
+
+                    // 创建按钮容器，放在panel-section内部，避免被边框截断
+                    const btnContainer = document.createElement('div');
+                    btnContainer.style.cssText = `
+                        padding: 0 16px 16px 16px;
+                        margin: -10px 0 0 0;
+                        border-bottom: 1px solid var(--border-color);
+                    `;
+                    btnContainer.appendChild(btn);
+
+                    // 在第一个panel-section内部末尾插入
+                    firstSection.appendChild(btnContainer);
                     return;
                 }
             }
@@ -509,10 +521,10 @@
         },
 
         async createPanel() {
-            if ($('#lv-craft-panel')) return;
-
-            await CraftManager.loadRecipes();
-            await CraftManager.loadIncarnationStatus();
+            if ($('#lv-craft-panel')) {
+                this.togglePanel();
+                return;
+            }
 
             const v = Theme.getVars();
             const panel = document.createElement('div');
@@ -539,6 +551,7 @@
                 transition: all 0.3s ease;
             `;
 
+            // 先生成面板HTML（使用空数据）
             panel.innerHTML = this.generatePanelHTML();
             document.body.appendChild(panel);
 
@@ -546,6 +559,48 @@
             this.loadConfigToPanel();
             this.makePanelDraggable();
             this.updateTheme();
+
+            // 显示面板
+            this.togglePanel();
+
+            // 异步加载数据并更新下拉框
+            this.loadRecipesAsync();
+        },
+
+        async loadRecipesAsync() {
+            try {
+                Logger.info('正在加载配方数据...');
+                await CraftManager.loadRecipes();
+                await CraftManager.loadIncarnationStatus();
+
+                // 更新下拉框选项
+                this.updateRecipeSelects();
+                Logger.success('配方数据加载完成');
+            } catch (e) {
+                Logger.error('加载配方失败: ' + e.message);
+            }
+        },
+
+        updateRecipeSelects() {
+            const alchemySelect = $('#lv-alchemy-target');
+            const forgeSelect = $('#lv-forge-target');
+            const talismanSelect = $('#lv-talisman-target');
+
+            if (alchemySelect) {
+                const currentValue = alchemySelect.value;
+                alchemySelect.innerHTML = this.generateOptions(CACHE.alchemy, 'pillName');
+                if (currentValue) alchemySelect.value = currentValue;
+            }
+            if (forgeSelect) {
+                const currentValue = forgeSelect.value;
+                forgeSelect.innerHTML = this.generateOptions(CACHE.forge, 'name');
+                if (currentValue) forgeSelect.value = currentValue;
+            }
+            if (talismanSelect) {
+                const currentValue = talismanSelect.value;
+                talismanSelect.innerHTML = this.generateOptions(CACHE.talisman, 'name');
+                if (currentValue) talismanSelect.value = currentValue;
+            }
         },
 
         generatePanelHTML() {
