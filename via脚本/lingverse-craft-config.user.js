@@ -1,7 +1,7 @@
 // ==UserScript==
 // @name         灵界 LingVerse 炼造配置面板 v3.0
 // @namespace    lingverse-craft-config
-// @version      2.1.1
+// @version      2.1.2
 // @description  炼造自动化配置：支持炼丹/炼器/制符/化身炼造、许愿锁定、自动售卖、深色/浅色模式跟随游戏主题
 // @author       You
 // @match        https://ling.muge.info/*
@@ -1717,8 +1717,20 @@
 
                 if (res.code === 200) {
                     // 从API返回获取实际炼制数量
-                    const actualCount = res.data?.count || res.data?.crafted || 1;
-                    Logger.success(`${name} x${actualCount} 炼制成功`);
+                    // 优先从data.count/crafted读取，否则从message解析
+                    let actualCount = res.data?.count || res.data?.crafted;
+                    if (!actualCount && res.data?.message) {
+                        // 从message解析，如 "批量炼丹: 10次「回春丹」 (史诗x1、稀有x2、优良x3、普通x5)"
+                        const match = res.data.message.match(/(\d+)次/);
+                        if (match) {
+                            actualCount = parseInt(match[1]);
+                        }
+                    }
+                    actualCount = actualCount || 1;
+
+                    // 显示API返回的完整消息
+                    const msg = res.data?.message || `${name} x${actualCount} 炼制成功`;
+                    Logger.success(msg);
                     STATE.stats.crafted += actualCount;
                 } else {
                     Logger.error(`${name} 炼制失败: ${res.message}`);
@@ -1756,8 +1768,18 @@
                 }
 
                 if (res.code === 200) {
-                    const actualCount = res.data?.count || res.data?.crafted || 1;
-                    Logger.success(`${name} x${actualCount} 单次炼制成功`);
+                    // 优先从data.count/crafted读取，否则从message解析
+                    let actualCount = res.data?.count || res.data?.crafted;
+                    if (!actualCount && res.data?.message) {
+                        const match = res.data.message.match(/成功炼制.*?x(\d+)/);
+                        if (match) {
+                            actualCount = parseInt(match[1]);
+                        }
+                    }
+                    actualCount = actualCount || 1;
+
+                    const msg = res.data?.message || `${name} x${actualCount} 单次炼制成功`;
+                    Logger.success(msg);
                     STATE.stats.crafted += actualCount;
                 } else {
                     Logger.error(`${name} 单次炼制失败: ${res.message}`);
