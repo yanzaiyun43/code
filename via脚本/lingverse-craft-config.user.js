@@ -1,7 +1,7 @@
 // ==UserScript==
 // @name         灵界 LingVerse 炼造配置面板
 // @namespace    lingverse-craft-config
-// @version      2.3.1
+// @version      2.1.11
 // @description  炼造自动化配置：支持炼丹/炼器/制符/化身炼造、许愿锁定、自动售卖、深色/浅色模式跟随游戏主题
 // @author       LingVerse
 // @match        https://ling.muge.info/*
@@ -915,23 +915,50 @@
 
             const btn = document.createElement('button');
             btn.id = 'lv-craft-sidebar-btn';
-            btn.innerHTML = '打开炼造面板';
+            btn.innerHTML = '<span id="lv-btn-text">加载中...</span>';
+            btn.disabled = true;
             btn.style.cssText = `
                 width: 100%;
                 padding: 10px 12px;
-                background: ${v.isDark ? 'rgba(201, 153, 58, 0.2)' : 'rgba(184, 70, 62, 0.15)'};
-                border: 1px solid ${v.isDark ? 'rgba(201, 153, 58, 0.4)' : 'rgba(184, 70, 62, 0.3)'};
+                background: ${v.isDark ? 'rgba(128, 128, 128, 0.2)' : 'rgba(128, 128, 128, 0.15)'};
+                border: 1px solid ${v.isDark ? 'rgba(128, 128, 128, 0.4)' : 'rgba(128, 128, 128, 0.3)'};
                 border-radius: 6px;
-                color: ${v.textGold};
+                color: ${v.textMuted};
                 font-size: 13px;
                 font-weight: bold;
-                cursor: pointer;
+                cursor: not-allowed;
                 transition: all 0.2s ease;
                 display: block;
                 text-align: center;
                 -webkit-tap-highlight-color: transparent;
                 font-family: KaiTi, 楷体, STKaiti, "Noto Serif SC", serif;
             `;
+
+            btn.addEventListener('click', (e) => {
+                e.preventDefault();
+                e.stopPropagation();
+                this.togglePanel();
+            });
+
+            section.appendChild(title);
+            section.appendChild(btn);
+            this.insertToSidebar(section);
+        },
+
+        // 启用侧边栏按钮（配方加载完成后调用）
+        enableSidebarButton() {
+            const btn = $('#lv-craft-sidebar-btn');
+            const btnText = $('#lv-btn-text');
+            if (!btn || !btnText) return;
+
+            const v = Theme.getVars();
+
+            btn.disabled = false;
+            btnText.textContent = '打开炼造面板';
+            btn.style.cursor = 'pointer';
+            btn.style.color = v.textGold;
+            btn.style.background = v.isDark ? 'rgba(201, 153, 58, 0.2)' : 'rgba(184, 70, 62, 0.15)';
+            btn.style.borderColor = v.isDark ? 'rgba(201, 153, 58, 0.4)' : 'rgba(184, 70, 62, 0.3)';
 
             btn.addEventListener('mouseenter', () => {
                 btn.style.background = v.isDark ? 'rgba(201, 153, 58, 0.35)' : 'rgba(184, 70, 62, 0.25)';
@@ -942,24 +969,7 @@
                 btn.style.borderColor = v.isDark ? 'rgba(201, 153, 58, 0.4)' : 'rgba(184, 70, 62, 0.3)';
             });
 
-            btn.addEventListener('click', (e) => {
-                e.preventDefault();
-                e.stopPropagation();
-
-                // 检查API是否可用
-                const api = API.get();
-                const salt = _win.__S || window.__S;
-                if (!api || !salt) {
-                    Logger.warn('游戏正在加载中，请稍后再试');
-                    return;
-                }
-
-                this.togglePanel();
-            });
-
-            section.appendChild(title);
-            section.appendChild(btn);
-            this.insertToSidebar(section);
+            Logger.info('配方加载完成，炼造助手已就绪');
         },
 
         insertToSidebar(section) {
@@ -2277,7 +2287,7 @@
             try {
                 if (!forceRefresh && CACHE.isValid('alchemy') && CACHE.isValid('forge') && CACHE.isValid('talisman')) {
                     Logger.info('使用缓存的配方数据');
-                    UI.updateRecipeSelects();
+                    UI.refreshRecipeSelects();
                     return;
                 }
 
@@ -2315,9 +2325,14 @@
                 }
 
                 CACHE.lastUpdate = Date.now();
-                UI.updateRecipeSelects();
+                UI.refreshRecipeSelects();
+
+                // 配方加载完成，启用按钮
+                UI.enableSidebarButton();
             } catch (e) {
                 Logger.error('加载配方失败: ' + e.message);
+                // 即使失败也启用按钮，让用户可以手动重试
+                UI.enableSidebarButton();
             }
         },
 
