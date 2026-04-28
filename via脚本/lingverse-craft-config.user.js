@@ -3189,7 +3189,7 @@
         if (!location.href.includes('ling.muge.info')) return;
 
         Theme.initObserver();
-        Logger.info('炼造助手 v3.0.0 已加载');
+        Logger.info('炼造助手 已加载');
 
         // 创建侧边栏按钮
         waitForElement('.player-panel', 10000)
