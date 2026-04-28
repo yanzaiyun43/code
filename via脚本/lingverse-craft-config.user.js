@@ -1,7 +1,7 @@
 // ==UserScript==
 // @name         灵界 LingVerse 炼造配置面板
 // @namespace    lingverse-craft-config
-// @version      2.1.24
+// @version      2.1.25
 // @description  炼造自动化配置：支持炼丹/炼器/制符/化身炼造、许愿锁定、自动售卖、深色/浅色模式跟随游戏主题
 // @author       LingVerse
 // @match        https://ling.muge.info/*
@@ -2811,6 +2811,10 @@
         },
 
         async craftByName(type, name) {
+            // 每次炼制前刷新配方数据，确保材料数量最新
+            Logger.info(`${name} 刷新配方数据...`);
+            await CraftManager.loadRecipes(true);
+
             const cache = type === 'alchemy' ? CACHE.alchemy :
                          type === 'forge' ? CACHE.forge : CACHE.talisman;
 
@@ -2875,6 +2879,30 @@
                     if (buyRes.code === 200) {
                         STATE.stats.spent += totalCost;
                         Logger.success(`${name} 材料补充成功，花费${totalCost}灵石`);
+                        // 补充成功后，直接使用requestCount炼制（不再检查材料）
+                        Logger.info(`${name} 材料已补充，炼制${requestCount}次...`);
+                        let res;
+                        if (type === 'alchemy') {
+                            res = await API.batchCraftAlchemy(id, requestCount);
+                        } else if (type === 'forge') {
+                            res = await API.batchCraftForge(id, requestCount);
+                        } else {
+                            res = await API.batchCraftTalisman(id, requestCount);
+                        }
+                        if (res.code === 200) {
+                            let actualCount = res.data?.count || res.data?.crafted;
+                            if (!actualCount && res.data?.message) {
+                                const match = res.data.message.match(/(\d+)次/);
+                                if (match) actualCount = parseInt(match[1]);
+                            }
+                            actualCount = actualCount || requestCount;
+                            Logger.success(res.data?.message || `${name} x${actualCount} 炼制成功`);
+                            STATE.stats.crafted += actualCount;
+                            return { count: actualCount };
+                        } else {
+                            Logger.error(`${name} 炼制失败: ${res.message}`);
+                            return { count: 0 };
+                        }
                     } else if (buyRes.message && buyRes.message.includes('无需补充')) {
                         // 材料已经足够，直接尝试炼制
                         Logger.info(`${name} 材料已足够，直接炼制${maxCraftableCount}次`);
