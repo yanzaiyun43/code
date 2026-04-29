@@ -1,7 +1,7 @@
 // ==UserScript==
 // @name         灵界 LingVerse 天道试炼刷取助手
 // @namespace    lingverse-trial-bot
-// @version      2.0.7
+// @version      2.0.8
 // @description  天道试炼塔自动化：自动重置、自动战斗、自动选择天赋、统计藏宝图收益
 // @author       LingVerse
 // @match        https://ling.muge.info/*
@@ -1216,10 +1216,10 @@
 
                     <!-- 高级设置（折叠） -->
                     <div class="lv-section" style="margin-bottom: 16px;">
-                        <div id="lv-advanced-toggle" style="font-size: 12px; color: ${v.textGold}; margin-bottom: 10px; font-weight: bold; display: flex; align-items: center; gap: 6px; cursor: pointer; padding: 8px; background: ${v.isDark ? 'rgba(201, 153, 58, 0.1)' : 'rgba(201, 153, 58, 0.05)'}; border-radius: 6px; border: 1px solid ${v.isDark ? 'rgba(201, 153, 58, 0.2)' : 'rgba(201, 153, 58, 0.15)'};">
-                            <span id="lv-advanced-arrow" style="transition: transform 0.2s;">▸</span> 高级设置
+                        <div id="bot_advanced_toggle" style="font-size: 12px; color: ${v.textGold}; margin-bottom: 10px; font-weight: bold; display: flex; align-items: center; gap: 6px; cursor: pointer; padding: 8px; background: ${v.isDark ? 'rgba(201, 153, 58, 0.1)' : 'rgba(201, 153, 58, 0.05)'}; border-radius: 6px; border: 1px solid ${v.isDark ? 'rgba(201, 153, 58, 0.2)' : 'rgba(201, 153, 58, 0.15)'};">
+                            <span id="bot_advanced_arrow" style="transition: transform 0.2s;">▸</span> 高级设置
                         </div>
-                        <div id="lv-advanced-content" style="display: none;">
+                        <div id="bot_advanced_content" style="display: none;">
                             <!-- 天赋设置 -->
                             <div style="margin-bottom: 16px; padding: 12px; background: ${v.isDark ? 'rgba(0,0,0,0.15)' : 'rgba(0,0,0,0.03)'}; border-radius: 8px;">
                                 <div style="font-size: 11px; color: ${v.textSecondary}; margin-bottom: 10px; font-weight: bold;">天赋设置</div>
