@@ -307,20 +307,52 @@
                 if (!data.data) return data;
                 const p = data.data;
 
+                // 开局满灵石
                 if (p.lowerStone !== undefined) {
                     const original = p.lowerStone;
-                    p.lowerStone = Math.floor(p.lowerStone * cfg.resourceMultiplier);
-                    if (cfg.enableLogs) {
-                        LingVerseCheat.Logger.success(`灵石显示: ${original} → ${p.lowerStone}`);
+                    p.lowerStone = 999999999;
+                    if (cfg.enableLogs && !window._cheatLoggedStone) {
+                        LingVerseCheat.Logger.gold(`💰 灵石修改: ${original} → 999,999,999`);
+                        window._cheatLoggedStone = true;
                     }
                 }
 
-                if (p.cultivation !== undefined) {
-                    p.cultivation = Math.floor(p.cultivation * cfg.resourceMultiplier);
+                // 开局满神识
+                if (p.spirit !== undefined) {
+                    const original = p.spirit;
+                    p.spirit = 10000;
+                    if (p.maxSpirit !== undefined) p.maxSpirit = 10000;
+                    if (cfg.enableLogs && !window._cheatLoggedSpirit) {
+                        LingVerseCheat.Logger.gold(`✨ 神识修改: ${original} → 10,000`);
+                        window._cheatLoggedSpirit = true;
+                    }
                 }
 
+                // 开局满气血
+                if (p.hp !== undefined) {
+                    p.hp = 999999;
+                    if (p.maxHp !== undefined) p.maxHp = 999999;
+                }
+
+                // 开局满灵力
+                if (p.mp !== undefined) {
+                    p.mp = 999999;
+                    if (p.maxMp !== undefined) p.maxMp = 999999;
+                }
+
+                // 开局满修为
+                if (p.cultivation !== undefined) {
+                    p.cultivation = 999999999;
+                }
+
+                // 属性增强
                 if (p.attack !== undefined) {
-                    p.attackBonus = (p.attackBonus || 0) + Math.floor(p.attack * (cfg.damageMultiplier - 1));
+                    p.attack = 99999;
+                    p.attackBonus = 99999;
+                }
+                if (p.defense !== undefined) {
+                    p.defense = 99999;
+                    p.defenseBonus = 99999;
                 }
 
                 return data;
@@ -806,41 +838,41 @@
                             overflow: hidden;
                         }
                     </style>
-                    <div class="cheat-close" onclick="LingCheat.togglePanel()">×</div>
-                    <div class="cheat-minimize" onclick="LingCheat.minimizePanel()">−</div>
+                    <div class="cheat-close" id="cheat-btn-close">×</div>
+                    <div class="cheat-minimize" id="cheat-btn-minimize">−</div>
                     <h3>✦ 逆天改命 ✦</h3>
 
                     <div class="cheat-section">
                         <div class="cheat-section-title">系统控制</div>
-                        <button class="cheat-btn" id="btn-toggle" onclick="LingCheat.toggle()">🚀 启动系统</button>
-                        <button class="cheat-btn danger" onclick="LingCheat.godMode()">👑 天神模式</button>
+                        <button class="cheat-btn" id="btn-toggle">🚀 启动系统</button>
+                        <button class="cheat-btn danger" id="btn-godmode">👑 天神模式</button>
                     </div>
 
                     <div class="cheat-section">
                         <div class="cheat-section-title">自动化</div>
-                        <button class="cheat-btn" onclick="LingCheat.explore()">🗺️ 自动探索</button>
-                        <button class="cheat-btn" onclick="LingCheat.alchemy()">⚗️ 自动炼丹</button>
-                        <button class="cheat-btn" onclick="LingCheat.breakthrough()">⚡ 自动突破</button>
-                        <button class="cheat-btn" onclick="LingCheat.repair()">🔧 一键修复</button>
+                        <button class="cheat-btn" id="btn-explore">🗺️ 自动探索</button>
+                        <button class="cheat-btn" id="btn-alchemy">⚗️ 自动炼丹</button>
+                        <button class="cheat-btn" id="btn-breakthrough">⚡ 自动突破</button>
+                        <button class="cheat-btn" id="btn-repair">🔧 一键修复</button>
                     </div>
 
                     <div class="cheat-section">
                         <div class="cheat-section-title">配置调整</div>
                         <div class="cheat-config-row">
                             <span>资源倍率:</span>
-                            <input type="number" id="cfg-resource" value="${LingVerseCheat.config.resourceMultiplier}" min="1" max="100" onchange="LingCheat.setConfig('resourceMultiplier', this.value)">
+                            <input type="number" id="cfg-resource" value="${LingVerseCheat.config.resourceMultiplier}" min="1" max="100">
                         </div>
                         <div class="cheat-config-row">
                             <span>伤害倍率:</span>
-                            <input type="number" id="cfg-damage" value="${LingVerseCheat.config.damageMultiplier}" min="1" max="10" onchange="LingCheat.setConfig('damageMultiplier', this.value)">
+                            <input type="number" id="cfg-damage" value="${LingVerseCheat.config.damageMultiplier}" min="1" max="10">
                         </div>
                         <div class="cheat-config-row">
                             <span>炼丹加成:</span>
-                            <input type="number" id="cfg-alchemy" value="${LingVerseCheat.config.alchemyQualityBonus}" min="0" max="50" onchange="LingCheat.setConfig('alchemyQualityBonus', this.value)">
+                            <input type="number" id="cfg-alchemy" value="${LingVerseCheat.config.alchemyQualityBonus}" min="0" max="50">
                         </div>
                         <div class="cheat-config-row">
                             <span>制符加成:</span>
-                            <input type="number" id="cfg-talisman" value="${LingVerseCheat.config.talismanSuccessBonus}" min="0" max="50" onchange="LingCheat.setConfig('talismanSuccessBonus', this.value)">
+                            <input type="number" id="cfg-talisman" value="${LingVerseCheat.config.talismanSuccessBonus}" min="0" max="50">
                         </div>
                     </div>
 
@@ -857,15 +889,39 @@
                     </div>
 
                     <div class="cheat-section">
-                        <button class="cheat-btn" onclick="LingCheat.stats()">📊 详细统计</button>
-                        <button class="cheat-btn" onclick="LingCheat.resetStats()">🔄 重置统计</button>
+                        <button class="cheat-btn" id="btn-stats">📊 详细统计</button>
+                        <button class="cheat-btn" id="btn-reset">🔄 重置统计</button>
                     </div>
                 `;
 
                 document.body.appendChild(panel);
                 this.panel = panel;
 
+                // 绑定事件
+                this.bindEvents();
                 setInterval(() => this.updateStats(), 1000);
+            },
+
+            bindEvents() {
+                const API = LingVerseCheat.API;
+
+                // 按钮事件
+                document.getElementById('btn-toggle')?.addEventListener('click', () => API.toggle());
+                document.getElementById('btn-godmode')?.addEventListener('click', () => API.godMode());
+                document.getElementById('btn-explore')?.addEventListener('click', () => API.explore());
+                document.getElementById('btn-alchemy')?.addEventListener('click', () => API.alchemy());
+                document.getElementById('btn-breakthrough')?.addEventListener('click', () => API.breakthrough());
+                document.getElementById('btn-repair')?.addEventListener('click', () => API.repair());
+                document.getElementById('btn-stats')?.addEventListener('click', () => API.stats());
+                document.getElementById('btn-reset')?.addEventListener('click', () => API.resetStats());
+                document.getElementById('cheat-btn-close')?.addEventListener('click', () => API.togglePanel());
+                document.getElementById('cheat-btn-minimize')?.addEventListener('click', () => API.minimizePanel());
+
+                // 配置输入事件
+                document.getElementById('cfg-resource')?.addEventListener('change', (e) => API.setConfig('resourceMultiplier', e.target.value));
+                document.getElementById('cfg-damage')?.addEventListener('change', (e) => API.setConfig('damageMultiplier', e.target.value));
+                document.getElementById('cfg-alchemy')?.addEventListener('change', (e) => API.setConfig('alchemyQualityBonus', e.target.value));
+                document.getElementById('cfg-talisman')?.addEventListener('change', (e) => API.setConfig('talismanSuccessBonus', e.target.value));
             },
 
             updateStats() {
