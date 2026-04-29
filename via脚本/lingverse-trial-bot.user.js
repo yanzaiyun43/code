@@ -1,7 +1,7 @@
 // ==UserScript==
 // @name         灵界 LingVerse 天道试炼刷取助手
 // @namespace    lingverse-trial-bot
-// @version      1.1.5
+// @version      1.2.6
 // @description  天道试炼塔自动化：自动重置、自动战斗、自动选择天赋、统计藏宝图收益
 // @author       LingVerse
 // @match        https://ling.muge.info/*
@@ -46,6 +46,7 @@
         stopWhenNoFreeReset: false,  // 没有免费重置时停止
         stopOnError: true,           // 出错时停止
         maxConsecutiveErrors: 3,     // 最大连续错误次数
+        stopWhenNoBuyRequest: false, // 没有符合条件的求购单时停止
 
         // 高级设置
         useAdPoints: false,          // 使用仙缘代替灵石
@@ -58,7 +59,8 @@
         minMapPrice: 2000,           // 最低出售价格
         sellMapWhenStoneBelow: 5000, // 灵石低于此值时出售
         maxMapsToSell: 0,            // 最大出售数量 (0=全部)
-        sellMapStrategy: 'highest'   // 出售策略: highest(最高价优先)/all(全部)
+        sellMapStrategy: 'highest',  // 出售策略: highest(最高价优先)/all(全部)
+        sellMapWhenCountAbove: 0     // 藏宝图数量超过此值时出售 (0=不启用)
     };
 
     // 状态管理
@@ -404,10 +406,10 @@
                 const playerData = playerRes.data || {};
                 const currentStone = playerData.lowerStone || playerData.spiritStones || 0;
 
-                // 如果灵石不足1000，尝试出售藏宝图
+                // 如果灵石不足1000，尝试出售藏宝图（强制出售，不受autoSellMaps配置限制）
                 if (currentStone < 1000) {
                     Logger.warn(`灵石不足 (${currentStone} < 1000)，尝试出售藏宝图...`);
-                    const soldMaps = await MapTrader.checkAndSellMaps();
+                    const soldMaps = await MapTrader.forceSellMaps();
                     if (soldMaps) {
                         await wait(1000);
                         // 重新获取灵石数量确认是否足够
@@ -494,6 +496,10 @@
                         const soldMaps = await MapTrader.checkAndSellMaps();
                         if (soldMaps) {
                             await wait(1000);
+                        } else if (CONFIG.stopWhenNoBuyRequest) {
+                            Logger.error('未能出售藏宝图且无符合条件的求购单，停止运行');
+                            TrialManager.stop();
+                            return { victory: false, stopReason: 'no_buy_request' };
                         }
                     }
                 }
@@ -559,7 +565,18 @@
 
     // 藏宝图交易管理器
     const MapTrader = {
-        // 检查是否需要出售藏宝图
+        // 强制出售藏宝图（用于灵石不足时，不受配置限制）
+        async forceSellMaps() {
+            try {
+                Logger.warn('强制出售藏宝图以补充灵石...');
+                return await this._doSellMaps();
+            } catch (e) {
+                Logger.error(`强制出售藏宝图时出错: ${e.message}`);
+                return false;
+            }
+        },
+
+        // 检查是否需要出售藏宝图（根据配置）
         async checkAndSellMaps() {
             if (!CONFIG.autoSellMaps) return false;
 
@@ -570,12 +587,38 @@
                 const currentStone = playerData.lowerStone || playerData.spiritStones || 0;
 
                 // 检查灵石是否低于阈值
-                if (currentStone >= CONFIG.sellMapWhenStoneBelow) {
-                    return false;
+                if (currentStone < CONFIG.sellMapWhenStoneBelow) {
+                    Logger.warn(`灵石不足 (${currentStone} < ${CONFIG.sellMapWhenStoneBelow})，尝试出售藏宝图...`);
+                    return await this._doSellMaps();
                 }
 
-                Logger.warn(`灵石不足 (${currentStone} < ${CONFIG.sellMapWhenStoneBelow})，尝试出售藏宝图...`);
+                // 检查藏宝图数量是否超过阈值
+                if (CONFIG.sellMapWhenCountAbove > 0) {
+                    const invRes = await API.getInventory();
+                    const inventory = invRes.data || [];
+                    const mapItems = inventory.filter(item =>
+                        item.name && item.name.includes('藏宝图') &&
+                        !item.isEquipped && !item.isLocked &&
+                        !(item.tradeCooldown && item.tradeCooldown > Date.now())
+                    );
+                    const totalMaps = mapItems.reduce((sum, item) => sum + (item.quantity || 1), 0);
 
+                    if (totalMaps > CONFIG.sellMapWhenCountAbove) {
+                        Logger.warn(`藏宝图数量 (${totalMaps}) 超过阈值 (${CONFIG.sellMapWhenCountAbove})，尝试出售...`);
+                        return await this._doSellMaps();
+                    }
+                }
+
+                return false;
+            } catch (e) {
+                Logger.error(`出售藏宝图时出错: ${e.message}`);
+                return false;
+            }
+        },
+
+        // 实际执行出售逻辑
+        async _doSellMaps() {
+            try {
                 // 获取背包中的藏宝图
                 const invRes = await API.getInventory();
                 const inventory = invRes.data || [];
@@ -586,11 +629,6 @@
                     !item.isEquipped && !item.isLocked &&
                     !(item.tradeCooldown && item.tradeCooldown > Date.now())
                 );
-
-                Logger.info(`背包中藏宝图: ${mapItems.length} 种`);
-                mapItems.forEach((item, idx) => {
-                    Logger.info(`藏宝图${idx+1}: ${item.name}, 数量${item.quantity || 1}, templateId=${item.templateId}`);
-                });
 
                 if (mapItems.length === 0) {
                     Logger.warn('背包中没有可出售的藏宝图');
@@ -607,26 +645,16 @@
 
                 // 获取求购列表
                 const buyReqRes = await API.getBuyRequests();
-                const allRequests = buyReqRes.data || [];
-                Logger.info(`获取到 ${allRequests.length} 个求购单`);
-
-                const buyRequests = allRequests.filter(req =>
+                const buyRequests = (buyReqRes.data || []).filter(req =>
                     req.name && req.name.includes('藏宝图') &&
                     req.unitPrice >= CONFIG.minMapPrice &&
                     !req.isMine
                 );
 
-                Logger.info(`符合条件的藏宝图求购单: ${buyRequests.length} 个 (价格≥${CONFIG.minMapPrice})`);
-
                 if (buyRequests.length === 0) {
                     Logger.warn(`未找到价格 ≥ ${CONFIG.minMapPrice} 的藏宝图求购单`);
                     return false;
                 }
-
-                // 打印求购单详情
-                buyRequests.forEach((req, idx) => {
-                    Logger.info(`求购单${idx+1}: ${req.name} @ ${req.unitPrice}灵石, 剩余${req.remainingQty}个`);
-                });
 
                 // 按价格排序（从高到低）
                 buyRequests.sort((a, b) => b.unitPrice - a.unitPrice);
@@ -640,17 +668,13 @@
 
                     const itemQty = mapItem.quantity || 1;
                     let remainingQty = itemQty;
-                    Logger.info(`尝试出售: ${mapItem.name} (templateId=${mapItem.templateId}), 数量${itemQty}`);
 
                     for (const request of buyRequests) {
                         if (remainingQty <= 0 || soldCount >= totalMaps) break;
                         if (request.remainingQty <= 0) continue;
 
                         // 检查是否是同一种藏宝图
-                        if (request.templateId !== mapItem.templateId) {
-                            Logger.info(`  跳过求购单: templateId不匹配 (物品=${mapItem.templateId}, 求购=${request.templateId})`);
-                            continue;
-                        }
+                        if (request.templateId !== mapItem.templateId) continue;
 
                         const sellQty = Math.min(remainingQty, request.remainingQty, totalMaps - soldCount);
 
@@ -677,6 +701,7 @@
                     return true;
                 } else {
                     Logger.warn('未能成功出售任何藏宝图');
+                    Logger.info('可能原因: 1.没有符合条件的求购单 2.藏宝图类型不匹配 3.求购价格低于设置 4.藏宝图被锁定或有交易冷却');
                     return false;
                 }
 
@@ -1103,77 +1128,6 @@
                         </div>
                     </div>
 
-                    <!-- 天赋设置 -->
-                    <div class="lv-section" style="margin-bottom: 16px;">
-                        <div class="lv-section-title" style="font-size: 12px; color: ${v.textGold}; margin-bottom: 10px; font-weight: bold; display: flex; align-items: center; gap: 6px;">
-                            <span>▸</span> 天赋设置
-                        </div>
-                        <div class="lv-section-content">
-                            <label style="display: flex; align-items: center; gap: 8px; margin-bottom: 10px; cursor: pointer;">
-                                <input type="checkbox" id="lv-auto-buff" checked style="width: 16px; height: 16px;">
-                                <span style="font-size: 12px;">自动选择天赋</span>
-                            </label>
-
-                            <div style="margin-bottom: 10px;">
-                                <span class="lv-label" style="font-size: 11px; color: ${v.textSecondary};">选择策略:</span>
-                                <select id="lv-buff-strategy" class="lv-trial-select" style="
-                                    width: 100%;
-                                    margin-top: 4px;
-                                    background: ${v.bgInput};
-                                    border: 1px solid ${v.borderColor};
-                                    color: ${v.textPrimary};
-                                    padding: 8px 10px;
-                                    border-radius: 6px;
-                                    font-size: 12px;
-                                ">
-                                    <option value="attack">攻击优先 (斩杀/暴击/连击)</option>
-                                    <option value="defense">防御优先 (不死/反伤/防御)</option>
-                                    <option value="balance">平衡策略 (优先高品质)</option>
-                                    <option value="random">随机选择</option>
-                                </select>
-                            </div>
-
-                            <div style="margin-bottom: 10px;">
-                                <span class="lv-label" style="font-size: 11px; color: ${v.textSecondary};">最小天赋品质:</span>
-                                <select id="lv-min-rarity" class="lv-trial-select" style="
-                                    width: 100%;
-                                    margin-top: 4px;
-                                    background: ${v.bgInput};
-                                    border: 1px solid ${v.borderColor};
-                                    color: ${v.textPrimary};
-                                    padding: 8px 10px;
-                                    border-radius: 6px;
-                                    font-size: 12px;
-                                ">
-                                    <option value="1">普通及以上</option>
-                                    <option value="2">稀有及以上</option>
-                                    <option value="3">仅传说</option>
-                                </select>
-                            </div>
-
-                            <label style="display: flex; align-items: center; gap: 8px; margin-bottom: 8px; cursor: pointer;">
-                                <input type="checkbox" id="lv-refresh-buff" style="width: 16px; height: 16px;">
-                                <span style="font-size: 12px;">无传说时自动刷新天赋</span>
-                            </label>
-
-                            <div style="display: flex; gap: 10px;">
-                                <div style="flex: 1;">
-                                    <span class="lv-label" style="font-size: 11px; color: ${v.textSecondary};">最大刷新次数</span>
-                                    <input type="number" id="lv-max-refresh" value="3" min="1" max="10" class="lv-trial-input" style="
-                                        width: 100%;
-                                        margin-top: 4px;
-                                        background: ${v.bgInput};
-                                        border: 1px solid ${v.borderColor};
-                                        color: ${v.textPrimary};
-                                        padding: 6px 10px;
-                                        border-radius: 6px;
-                                        font-size: 12px;
-                                    ">
-                                </div>
-                            </div>
-                        </div>
-                    </div>
-
                     <!-- 藏宝图交易 -->
                     <div class="lv-section" style="margin-bottom: 16px;">
                         <div class="lv-section-title" style="font-size: 12px; color: ${v.textGold}; margin-bottom: 10px; font-weight: bold; display: flex; align-items: center; gap: 6px;">
@@ -1228,28 +1182,10 @@
                                 ">
                                 <span style="font-size: 10px; color: ${v.textMuted};">0 = 出售全部</span>
                             </div>
-                        </div>
-                    </div>
-
-                    <!-- 停止条件 -->
-                    <div class="lv-section" style="margin-bottom: 16px;">
-                        <div class="lv-section-title" style="font-size: 12px; color: ${v.textGold}; margin-bottom: 10px; font-weight: bold; display: flex; align-items: center; gap: 6px;">
-                            <span>▸</span> 停止条件
-                        </div>
-                        <div class="lv-section-content">
-                            <label style="display: flex; align-items: center; gap: 8px; margin-bottom: 8px; cursor: pointer;">
-                                <input type="checkbox" id="lv-stop-record" style="width: 16px; height: 16px;">
-                                <span style="font-size: 12px;">达到新纪录时停止</span>
-                            </label>
-
-                            <label style="display: flex; align-items: center; gap: 8px; margin-bottom: 8px; cursor: pointer;">
-                                <input type="checkbox" id="lv-stop-error" checked style="width: 16px; height: 16px;">
-                                <span style="font-size: 12px;">出错时停止</span>
-                            </label>
 
                             <div style="margin-bottom: 10px;">
-                                <span class="lv-label" style="font-size: 11px; color: ${v.textSecondary};">最大连续错误次数</span>
-                                <input type="number" id="lv-max-errors" value="3" min="1" max="10" class="lv-trial-input" style="
+                                <span class="lv-label" style="font-size: 11px; color: ${v.textSecondary};">数量超过时出售</span>
+                                <input type="number" id="lv-sell-count-above" value="0" min="0" class="lv-trial-input" style="
                                     width: 100%;
                                     margin-top: 4px;
                                     background: ${v.bgInput};
@@ -1259,12 +1195,121 @@
                                     border-radius: 6px;
                                     font-size: 12px;
                                 ">
+                                <span style="font-size: 10px; color: ${v.textMuted};">0 = 不启用（当藏宝图数量超过此值时自动出售）</span>
+                            </div>
+                        </div>
+                    </div>
+
+                    <!-- 高级设置（折叠） -->
+                    <div class="lv-section" style="margin-bottom: 16px;">
+                        <div id="lv-advanced-toggle" style="font-size: 12px; color: ${v.textGold}; margin-bottom: 10px; font-weight: bold; display: flex; align-items: center; gap: 6px; cursor: pointer; padding: 8px; background: ${v.isDark ? 'rgba(201, 153, 58, 0.1)' : 'rgba(201, 153, 58, 0.05)'}; border-radius: 6px; border: 1px solid ${v.isDark ? 'rgba(201, 153, 58, 0.2)' : 'rgba(201, 153, 58, 0.15)'};">
+                            <span id="lv-advanced-arrow" style="transition: transform 0.2s;">▸</span> 高级设置
+                        </div>
+                        <div id="lv-advanced-content" style="display: none;">
+                            <!-- 天赋设置 -->
+                            <div style="margin-bottom: 16px; padding: 12px; background: ${v.isDark ? 'rgba(0,0,0,0.15)' : 'rgba(0,0,0,0.03)'}; border-radius: 8px;">
+                                <div style="font-size: 11px; color: ${v.textSecondary}; margin-bottom: 10px; font-weight: bold;">天赋设置</div>
+                                <label style="display: flex; align-items: center; gap: 8px; margin-bottom: 10px; cursor: pointer;">
+                                    <input type="checkbox" id="lv-auto-buff" checked style="width: 16px; height: 16px;">
+                                    <span style="font-size: 12px;">自动选择天赋</span>
+                                </label>
+
+                                <div style="margin-bottom: 10px;">
+                                    <span class="lv-label" style="font-size: 11px; color: ${v.textSecondary};">选择策略:</span>
+                                    <select id="lv-buff-strategy" class="lv-trial-select" style="
+                                        width: 100%;
+                                        margin-top: 4px;
+                                        background: ${v.bgInput};
+                                        border: 1px solid ${v.borderColor};
+                                        color: ${v.textPrimary};
+                                        padding: 8px 10px;
+                                        border-radius: 6px;
+                                        font-size: 12px;
+                                    ">
+                                        <option value="attack">攻击优先 (斩杀/暴击/连击)</option>
+                                        <option value="defense">防御优先 (不死/反伤/防御)</option>
+                                        <option value="balance">平衡策略 (优先高品质)</option>
+                                        <option value="random">随机选择</option>
+                                    </select>
+                                </div>
+
+                                <div style="margin-bottom: 10px;">
+                                    <span class="lv-label" style="font-size: 11px; color: ${v.textSecondary};">最小天赋品质:</span>
+                                    <select id="lv-min-rarity" class="lv-trial-select" style="
+                                        width: 100%;
+                                        margin-top: 4px;
+                                        background: ${v.bgInput};
+                                        border: 1px solid ${v.borderColor};
+                                        color: ${v.textPrimary};
+                                        padding: 8px 10px;
+                                        border-radius: 6px;
+                                        font-size: 12px;
+                                    ">
+                                        <option value="1">普通及以上</option>
+                                        <option value="2">稀有及以上</option>
+                                        <option value="3">仅传说</option>
+                                    </select>
+                                </div>
+
+                                <label style="display: flex; align-items: center; gap: 8px; margin-bottom: 8px; cursor: pointer;">
+                                    <input type="checkbox" id="lv-refresh-buff" style="width: 16px; height: 16px;">
+                                    <span style="font-size: 12px;">无传说时自动刷新天赋</span>
+                                </label>
+
+                                <div style="display: flex; gap: 10px;">
+                                    <div style="flex: 1;">
+                                        <span class="lv-label" style="font-size: 11px; color: ${v.textSecondary};">最大刷新次数</span>
+                                        <input type="number" id="lv-max-refresh" value="3" min="1" max="10" class="lv-trial-input" style="
+                                            width: 100%;
+                                            margin-top: 4px;
+                                            background: ${v.bgInput};
+                                            border: 1px solid ${v.borderColor};
+                                            color: ${v.textPrimary};
+                                            padding: 6px 10px;
+                                            border-radius: 6px;
+                                            font-size: 12px;
+                                        ">
+                                    </div>
+                                </div>
                             </div>
 
-                            <label style="display: flex; align-items: center; gap: 8px; cursor: pointer;">
-                                <input type="checkbox" id="lv-auto-close" style="width: 16px; height: 16px;">
-                                <span style="font-size: 12px;">结束后自动关闭面板</span>
-                            </label>
+                            <!-- 停止条件 -->
+                            <div style="padding: 12px; background: ${v.isDark ? 'rgba(0,0,0,0.15)' : 'rgba(0,0,0,0.03)'}; border-radius: 8px;">
+                                <div style="font-size: 11px; color: ${v.textSecondary}; margin-bottom: 10px; font-weight: bold;">停止条件</div>
+                                <label style="display: flex; align-items: center; gap: 8px; margin-bottom: 8px; cursor: pointer;">
+                                    <input type="checkbox" id="lv-stop-record" style="width: 16px; height: 16px;">
+                                    <span style="font-size: 12px;">达到新纪录时停止</span>
+                                </label>
+
+                                <label style="display: flex; align-items: center; gap: 8px; margin-bottom: 8px; cursor: pointer;">
+                                    <input type="checkbox" id="lv-stop-error" checked style="width: 16px; height: 16px;">
+                                    <span style="font-size: 12px;">出错时停止</span>
+                                </label>
+
+                                <label style="display: flex; align-items: center; gap: 8px; margin-bottom: 8px; cursor: pointer;">
+                                    <input type="checkbox" id="lv-stop-no-buy" style="width: 16px; height: 16px;">
+                                    <span style="font-size: 12px;">无求购单时停止</span>
+                                </label>
+
+                                <div style="margin-bottom: 10px;">
+                                    <span class="lv-label" style="font-size: 11px; color: ${v.textSecondary};">最大连续错误次数</span>
+                                    <input type="number" id="lv-max-errors" value="3" min="1" max="10" class="lv-trial-input" style="
+                                        width: 100%;
+                                        margin-top: 4px;
+                                        background: ${v.bgInput};
+                                        border: 1px solid ${v.borderColor};
+                                        color: ${v.textPrimary};
+                                        padding: 6px 10px;
+                                        border-radius: 6px;
+                                        font-size: 12px;
+                                    ">
+                                </div>
+
+                                <label style="display: flex; align-items: center; gap: 8px; cursor: pointer;">
+                                    <input type="checkbox" id="lv-auto-close" style="width: 16px; height: 16px;">
+                                    <span style="font-size: 12px;">结束后自动关闭面板</span>
+                                </label>
+                            </div>
                         </div>
                     </div>
 
@@ -1339,6 +1384,17 @@
             $('#lv-clear-log')?.addEventListener('click', () => {
                 STATE.logs = [];
                 this.updateLogPanel();
+            });
+
+            // 高级设置折叠/展开
+            $('#lv-advanced-toggle')?.addEventListener('click', () => {
+                const content = $('#lv-advanced-content');
+                const arrow = $('#lv-advanced-arrow');
+                if (content && arrow) {
+                    const isHidden = content.style.display === 'none';
+                    content.style.display = isHidden ? 'block' : 'none';
+                    arrow.style.transform = isHidden ? 'rotate(90deg)' : 'rotate(0deg)';
+                }
             });
 
             // 点击面板外部关闭
@@ -1419,6 +1475,7 @@
 
             CONFIG.stopOnRecord = $('#lv-stop-record')?.checked || false;
             CONFIG.stopOnError = $('#lv-stop-error')?.checked !== false;
+            CONFIG.stopWhenNoBuyRequest = $('#lv-stop-no-buy')?.checked || false;
             CONFIG.maxConsecutiveErrors = parseInt($('#lv-max-errors')?.value || '3');
             CONFIG.autoClosePanel = $('#lv-auto-close')?.checked || false;
 
@@ -1427,6 +1484,7 @@
             CONFIG.minMapPrice = parseInt($('#lv-min-map-price')?.value || '2000');
             CONFIG.sellMapWhenStoneBelow = parseInt($('#lv-sell-stone-below')?.value || '5000');
             CONFIG.maxMapsToSell = parseInt($('#lv-max-maps-sell')?.value || '0');
+            CONFIG.sellMapWhenCountAbove = parseInt($('#lv-sell-count-above')?.value || '0');
 
             localStorage.setItem('lv_trial_config_v2', JSON.stringify(CONFIG));
             Logger.info('配置已保存');
@@ -1466,6 +1524,7 @@
             // 停止条件
             if ($('#lv-stop-record')) $('#lv-stop-record').checked = CONFIG.stopOnRecord;
             if ($('#lv-stop-error')) $('#lv-stop-error').checked = CONFIG.stopOnError;
+            if ($('#lv-stop-no-buy')) $('#lv-stop-no-buy').checked = CONFIG.stopWhenNoBuyRequest;
             if ($('#lv-max-errors')) $('#lv-max-errors').value = CONFIG.maxConsecutiveErrors;
             if ($('#lv-auto-close')) $('#lv-auto-close').checked = CONFIG.autoClosePanel;
 
@@ -1474,6 +1533,7 @@
             if ($('#lv-min-map-price')) $('#lv-min-map-price').value = CONFIG.minMapPrice;
             if ($('#lv-sell-stone-below')) $('#lv-sell-stone-below').value = CONFIG.sellMapWhenStoneBelow;
             if ($('#lv-max-maps-sell')) $('#lv-max-maps-sell').value = CONFIG.maxMapsToSell;
+            if ($('#lv-sell-count-above')) $('#lv-sell-count-above').value = CONFIG.sellMapWhenCountAbove;
         },
 
         togglePanel() {
@@ -1568,50 +1628,88 @@
         createSidebarButton() {
             if ($('#lv-trial-sidebar-btn')) return;
 
+            const v = Theme.getVars();
+
+            // 创建独立的 section 容器
+            const section = document.createElement('div');
+            section.className = 'panel-section';
+            section.id = 'lv-trial-section';
+            section.style.cssText = `
+                margin-bottom: 20px;
+                padding-bottom: 16px;
+                border-bottom: 1px solid var(--border-color);
+                width: 100%;
+                box-sizing: border-box;
+            `;
+
+            const title = document.createElement('h3');
+            title.className = 'panel-title';
+            title.textContent = '试炼助手';
+            title.style.cssText = `
+                font-size: 13px;
+                color: #c9993a;
+                letter-spacing: 2px;
+                margin-bottom: 12px;
+                padding-bottom: 6px;
+                border-bottom: 1px solid rgba(201, 153, 58, 0.15);
+            `;
+
             const btn = document.createElement('button');
             btn.id = 'lv-trial-sidebar-btn';
-            btn.textContent = '试炼助手';
+            btn.textContent = '打开试炼面板';
             btn.style.cssText = `
                 width: 100%;
                 padding: 10px 12px;
-                background: rgba(201, 153, 58, 0.2);
-                border: 1px solid rgba(201, 153, 58, 0.4);
+                background: ${v.isDark ? 'rgba(201, 153, 58, 0.2)' : 'rgba(201, 153, 58, 0.15)'};
+                border: 1px solid ${v.isDark ? 'rgba(201, 153, 58, 0.4)' : 'rgba(201, 153, 58, 0.3)'};
                 border-radius: 6px;
                 color: #c9993a;
                 font-size: 13px;
                 font-weight: bold;
                 cursor: pointer;
-                margin-top: 8px;
                 font-family: KaiTi, 楷体, STKaiti, "Noto Serif SC", serif;
                 transition: all 0.2s;
+                display: block;
+                text-align: center;
+                -webkit-tap-highlight-color: transparent;
+                box-sizing: border-box;
             `;
 
             btn.addEventListener('mouseenter', () => {
-                btn.style.background = 'rgba(201, 153, 58, 0.35)';
+                btn.style.background = v.isDark ? 'rgba(201, 153, 58, 0.35)' : 'rgba(201, 153, 58, 0.25)';
+                btn.style.borderColor = v.isDark ? 'rgba(201, 153, 58, 0.6)' : 'rgba(201, 153, 58, 0.4)';
             });
             btn.addEventListener('mouseleave', () => {
-                btn.style.background = 'rgba(201, 153, 58, 0.2)';
+                btn.style.background = v.isDark ? 'rgba(201, 153, 58, 0.2)' : 'rgba(201, 153, 58, 0.15)';
+                btn.style.borderColor = v.isDark ? 'rgba(201, 153, 58, 0.4)' : 'rgba(201, 153, 58, 0.3)';
             });
 
-            btn.addEventListener('click', () => this.togglePanel());
+            btn.addEventListener('click', (e) => {
+                e.preventDefault();
+                e.stopPropagation();
+                this.togglePanel();
+            });
 
-            // 插入到炼造按钮后面
+            section.appendChild(title);
+            section.appendChild(btn);
+
+            // 插入到炼造 section 后面（如果存在）
             const craftSection = $('#lv-craft-section');
             if (craftSection) {
-                craftSection.appendChild(btn);
+                craftSection.insertAdjacentElement('afterend', section);
                 return;
             }
 
-            // 如果没有找到炼造按钮，插入到侧边栏第一个section后面
+            // 如果没有找到炼造 section，插入到侧边栏第一个 section 后面
             const playerPanel = $('.player-panel') || $('#playerPanel');
             if (playerPanel) {
                 const firstSection = playerPanel.querySelector('.panel-section');
                 if (firstSection) {
-                    firstSection.insertAdjacentElement('afterend', btn);
+                    firstSection.insertAdjacentElement('afterend', section);
                     return;
                 }
                 // 兜底：直接append到侧边栏
-                playerPanel.appendChild(btn);
+                playerPanel.appendChild(section);
             }
         }
     };
