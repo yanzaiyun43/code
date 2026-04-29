@@ -1,7 +1,7 @@
 // ==UserScript==
 // @name         灵界 LingVerse 炼造配置面板
 // @namespace    lingverse-craft-config
-// @version      2.1.29
+// @version      2.1.30
 // @description  炼造自动化配置：支持炼丹/炼器/制符/化身炼造、许愿锁定、自动售卖、深色/浅色模式跟随游戏主题
 // @author       LingVerse
 // @match        https://ling.muge.info/*
@@ -1992,6 +1992,19 @@
                     </div>
 
                     <!-- 日志面板 -->
+                    <div style="margin-bottom: 8px; display: flex; justify-content: space-between; align-items: center;">
+                        <span style="font-size: 12px; color: ${v.textSecondary};">📋 运行日志</span>
+                        <button id="lv-btn-clear-log" style="
+                            font-size: 11px;
+                            padding: 4px 10px;
+                            background: ${v.bgCard};
+                            border: 1px solid ${v.borderColor};
+                            color: ${v.textMuted};
+                            border-radius: 6px;
+                            cursor: pointer;
+                            transition: all 0.2s;
+                        " onmouseover="this.style.color='${v.textRed}'" onmouseout="this.style.color='${v.textMuted}'">清除日志</button>
+                    </div>
                     <div id="lv-log-panel" style="
                         max-height: 150px;
                         overflow-y: auto;
@@ -2150,6 +2163,17 @@
             $('#lv-btn-save')?.addEventListener('click', () => {
                 this.saveConfigFromPanel();
                 Logger.success('配置已保存');
+            });
+
+            // 清除日志按钮
+            $('#lv-btn-clear-log')?.addEventListener('click', () => {
+                STATE.logs = [];
+                const panel = $('#lv-log-panel');
+                if (panel) {
+                    panel.innerHTML = '';
+                    panel.style.display = 'none';
+                }
+                Logger.info('日志已清除');
             });
 
             $('#lv-autosell-confirm')?.addEventListener('change', () => {
