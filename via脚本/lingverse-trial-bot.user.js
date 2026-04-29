@@ -1,7 +1,7 @@
 // ==UserScript==
 // @name         灵界 LingVerse 天道试炼刷取助手
 // @namespace    lingverse-trial-bot
-// @version      1.1.2
+// @version      1.1.4
 // @description  天道试炼塔自动化：自动重置、自动战斗、自动选择天赋、统计藏宝图收益
 // @author       LingVerse
 // @match        https://ling.muge.info/*
@@ -370,12 +370,6 @@
         async runOnce() {
             Logger.info(`开始第 ${STATE.stats.totalRuns + 1} 轮试炼`);
 
-            // 检查是否需要出售藏宝图补充灵石
-            const soldMaps = await MapTrader.checkAndSellMaps();
-            if (soldMaps) {
-                await wait(1000);
-            }
-
             // 获取试炼信息
             const infoRes = await API.getTrialInfo();
             const info = infoRes.data;
@@ -400,10 +394,40 @@
                 return;
             }
 
-            // 开始新的试炼
+            // 如果不是免费重置，检查灵石是否足够，不足则尝试出售藏宝图
             const isFree = info.freeResetAvailable;
             const useAd = CONFIG.useAdPoints;
 
+            if (!isFree && !useAd) {
+                // 获取当前灵石
+                const playerRes = await API.getPlayerInfo();
+                const playerData = playerRes.data || {};
+                const currentStone = playerData.lowerStone || playerData.spiritStones || 0;
+
+                // 如果灵石不足1000，尝试出售藏宝图
+                if (currentStone < 1000) {
+                    Logger.warn(`灵石不足 (${currentStone} < 1000)，尝试出售藏宝图...`);
+                    const soldMaps = await MapTrader.checkAndSellMaps();
+                    if (soldMaps) {
+                        await wait(1000);
+                        // 重新获取灵石数量确认是否足够
+                        const newPlayerRes = await API.getPlayerInfo();
+                        const newPlayerData = newPlayerRes.data || {};
+                        const newStone = newPlayerRes.data.lowerStone || newPlayerData.spiritStones || 0;
+                        if (newStone < 1000) {
+                            Logger.error(`出售藏宝图后灵石仍不足 (${newStone} < 1000)，停止运行`);
+                            this.stop();
+                            return;
+                        }
+                    } else {
+                        Logger.error('无法出售藏宝图，灵石不足，停止运行');
+                        this.stop();
+                        return;
+                    }
+                }
+            }
+
+            // 开始新的试炼
             if (!isFree) {
                 if (useAd) {
                     STATE.stats.totalAdPointsSpent += 1;
