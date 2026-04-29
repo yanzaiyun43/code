@@ -1,7 +1,7 @@
 // ==UserScript==
 // @name         灵界 LingVerse 炼造配置面板
 // @namespace    lingverse-craft-config
-// @version      2.1.28
+// @version      2.1.29
 // @description  炼造自动化配置：支持炼丹/炼器/制符/化身炼造、许愿锁定、自动售卖、深色/浅色模式跟随游戏主题
 // @author       LingVerse
 // @match        https://ling.muge.info/*
@@ -1036,26 +1036,46 @@
             const content = $('#lv-panel-content');
             if (!content) return;
 
-            // 获取所有子元素
-            const allChildren = Array.from(content.children);
+            // 直接通过选择器找到各个区域（避免使用parentElement/closest导致的循环引用）
+            // 炼造目标区 - 包含炼丹/炼器/制符选择的区域
+            const targetSection = content.querySelector('.lv-section');
             
-            // 识别各个区域（通过查找特定的子元素）
-            const targetSection = allChildren.find(el => el.querySelector('#lv-target-alchemy'))?.parentElement;
-            const settingsSection = allChildren.find(el => el.querySelector('#lv-interval'))?.closest('.lv-card');
-            const advancedSection = allChildren.find(el => el.querySelector('#lv-advanced-toggle'))?.closest('.lv-card');
-            const incarnationSection = allChildren.find(el => el.querySelector('#lv-incarnation-toggle'))?.closest('.lv-card');
-            const wishSection = allChildren.find(el => el.querySelector('#lv-wish-toggle'))?.closest('.lv-card');
-            const buttonSection = allChildren.find(el => el.querySelector('#lv-btn-start'));
-            const logSection = allChildren.find(el => el.id === 'lv-log-panel');
+            // 设置区 - 包含间隔设置的卡片（通过查找包含lv-interval的卡片）
+            const settingsCards = content.querySelectorAll('.lv-card');
+            let settingsSection = null;
+            let advancedSection = null;
+            let incarnationSection = null;
+            let wishSection = null;
+            
+            settingsCards.forEach(card => {
+                // 设置区：包含lv-interval但不包含折叠toggle的卡片
+                if (card.querySelector('#lv-interval') && !card.querySelector('[id$="-toggle"]')) {
+                    settingsSection = card;
+                } else if (card.querySelector('#lv-advanced-toggle')) {
+                    advancedSection = card;
+                } else if (card.querySelector('#lv-incarnation-toggle')) {
+                    incarnationSection = card;
+                } else if (card.querySelector('#lv-wish-toggle')) {
+                    wishSection = card;
+                }
+            });
+            
+            // 按钮区域 - 包含开始按钮的div
+            const buttonSection = content.querySelector('#lv-btn-start')?.closest('div[style*="margin-bottom"]') || 
+                                  content.querySelector('#lv-btn-start')?.parentElement;
+            
+            // 日志面板
+            const logSection = $('#lv-log-panel');
 
             // 按新顺序重新插入：目标 -> 设置 -> 化身 -> 许愿 -> 高级 -> 按钮 -> 日志
-            if (targetSection) content.appendChild(targetSection);
-            if (settingsSection) content.appendChild(settingsSection);
-            if (incarnationSection) content.appendChild(incarnationSection);
-            if (wishSection) content.appendChild(wishSection);
-            if (advancedSection) content.appendChild(advancedSection);
-            if (buttonSection) content.appendChild(buttonSection);
-            if (logSection) content.appendChild(logSection);
+            // 使用appendChild会将元素从原位置移动到新位置（如果已在DOM中）
+            if (targetSection && targetSection.parentElement === content) content.appendChild(targetSection);
+            if (settingsSection && settingsSection.parentElement === content) content.appendChild(settingsSection);
+            if (incarnationSection && incarnationSection.parentElement === content) content.appendChild(incarnationSection);
+            if (wishSection && wishSection.parentElement === content) content.appendChild(wishSection);
+            if (advancedSection && advancedSection.parentElement === content) content.appendChild(advancedSection);
+            if (buttonSection && buttonSection.parentElement === content) content.appendChild(buttonSection);
+            if (logSection && logSection.parentElement === content) content.appendChild(logSection);
         },
 
         generatePanelHTML() {
