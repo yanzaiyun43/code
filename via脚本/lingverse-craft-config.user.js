@@ -1,7 +1,7 @@
 // ==UserScript==
 // @name         灵界 LingVerse 炼造配置面板
 // @namespace    lingverse-craft-config
-// @version      2.1.30
+// @version      2.1.31
 // @description  炼造自动化配置：支持炼丹/炼器/制符/化身炼造、许愿锁定、自动售卖、深色/浅色模式跟随游戏主题
 // @author       LingVerse
 // @match        https://ling.muge.info/*
@@ -1036,46 +1036,53 @@
             const content = $('#lv-panel-content');
             if (!content) return;
 
-            // 直接通过选择器找到各个区域（避免使用parentElement/closest导致的循环引用）
-            // 炼造目标区 - 包含炼丹/炼器/制符选择的区域
-            const targetSection = content.querySelector('.lv-section');
+            // 获取所有直接子元素
+            const children = Array.from(content.children);
             
-            // 设置区 - 包含间隔设置的卡片（通过查找包含lv-interval的卡片）
-            const settingsCards = content.querySelectorAll('.lv-card');
-            let settingsSection = null;
-            let advancedSection = null;
-            let incarnationSection = null;
-            let wishSection = null;
-            
-            settingsCards.forEach(card => {
-                // 设置区：包含lv-interval但不包含折叠toggle的卡片
-                if (card.querySelector('#lv-interval') && !card.querySelector('[id$="-toggle"]')) {
-                    settingsSection = card;
-                } else if (card.querySelector('#lv-advanced-toggle')) {
-                    advancedSection = card;
-                } else if (card.querySelector('#lv-incarnation-toggle')) {
-                    incarnationSection = card;
-                } else if (card.querySelector('#lv-wish-toggle')) {
-                    wishSection = card;
+            // 识别各个区域
+            const sections = {
+                target: null,      // 炼造目标区 .lv-section
+                settings: null,    // 设置区 .lv-card 包含 #lv-interval
+                incarnation: null, // 化身炼造 .lv-card 包含 #lv-incarnation-toggle
+                wish: null,        // 许愿锁定 .lv-card 包含 #lv-wish-toggle
+                advanced: null,    // 高级设置 .lv-card 包含 #lv-advanced-toggle
+                buttons: null,     // 操作按钮 div 包含 #lv-btn-start
+                stats: null,       // 统计信息 #lv-stats
+                logHeader: null,   // 日志标题栏 包含 #lv-btn-clear-log
+                log: null          // 日志面板 #lv-log-panel
+            };
+
+            children.forEach(child => {
+                if (child.classList.contains('lv-section')) {
+                    sections.target = child;
+                } else if (child.id === 'lv-stats') {
+                    sections.stats = child;
+                } else if (child.id === 'lv-log-panel') {
+                    sections.log = child;
+                } else if (child.querySelector('#lv-btn-clear-log')) {
+                    sections.logHeader = child;
+                } else if (child.querySelector('#lv-btn-start')) {
+                    sections.buttons = child;
+                } else if (child.classList.contains('lv-card')) {
+                    if (child.querySelector('#lv-incarnation-toggle')) {
+                        sections.incarnation = child;
+                    } else if (child.querySelector('#lv-wish-toggle')) {
+                        sections.wish = child;
+                    } else if (child.querySelector('#lv-advanced-toggle')) {
+                        sections.advanced = child;
+                    } else if (child.querySelector('#lv-interval') && !child.querySelector('[id$="-toggle"]')) {
+                        sections.settings = child;
+                    }
                 }
             });
-            
-            // 按钮区域 - 包含开始按钮的div
-            const buttonSection = content.querySelector('#lv-btn-start')?.closest('div[style*="margin-bottom"]') || 
-                                  content.querySelector('#lv-btn-start')?.parentElement;
-            
-            // 日志面板
-            const logSection = $('#lv-log-panel');
 
-            // 按新顺序重新插入：目标 -> 设置 -> 化身 -> 许愿 -> 高级 -> 按钮 -> 日志
-            // 使用appendChild会将元素从原位置移动到新位置（如果已在DOM中）
-            if (targetSection && targetSection.parentElement === content) content.appendChild(targetSection);
-            if (settingsSection && settingsSection.parentElement === content) content.appendChild(settingsSection);
-            if (incarnationSection && incarnationSection.parentElement === content) content.appendChild(incarnationSection);
-            if (wishSection && wishSection.parentElement === content) content.appendChild(wishSection);
-            if (advancedSection && advancedSection.parentElement === content) content.appendChild(advancedSection);
-            if (buttonSection && buttonSection.parentElement === content) content.appendChild(buttonSection);
-            if (logSection && logSection.parentElement === content) content.appendChild(logSection);
+            // 按新顺序重新插入：目标 -> 设置 -> 化身 -> 许愿 -> 高级 -> 按钮 -> 统计 -> 日志标题 -> 日志
+            const order = ['target', 'settings', 'incarnation', 'wish', 'advanced', 'buttons', 'stats', 'logHeader', 'log'];
+            order.forEach(key => {
+                if (sections[key] && sections[key].parentElement === content) {
+                    content.appendChild(sections[key]);
+                }
+            });
         },
 
         generatePanelHTML() {
@@ -1163,7 +1170,7 @@
                             padding-bottom: 8px;
                             border-bottom: 1px solid ${v.borderColor};
                         ">
-                            <span>🎯</span> 炼造目标
+                            炼造目标
                         </div>
 
                         <!-- 炼丹 -->
@@ -1296,7 +1303,7 @@
                                 align-items: center;
                                 gap: 6px;
                             ">
-                                <span id="lv-incarnation-icon">▶</span> <span>👤</span> 化身炼造
+                                <span id="lv-incarnation-icon">▶</span> 化身炼造
                             </div>
                             <span id="lv-incarnation-status" style="
                                 font-size: 10px;
@@ -1507,7 +1514,7 @@
                             padding-bottom: 8px;
                             border-bottom: 1px solid ${v.borderColor};
                         ">
-                            <span>⚙️</span> 设置
+                            设置
                         </div>
 
                         <div style="display: grid; grid-template-columns: 1fr 1fr; gap: 12px; margin-bottom: 12px;">
@@ -1993,7 +2000,7 @@
 
                     <!-- 日志面板 -->
                     <div style="margin-bottom: 8px; display: flex; justify-content: space-between; align-items: center;">
-                        <span style="font-size: 12px; color: ${v.textSecondary};">📋 运行日志</span>
+                        <span style="font-size: 12px; color: ${v.textSecondary};">运行日志</span>
                         <button id="lv-btn-clear-log" style="
                             font-size: 11px;
                             padding: 4px 10px;
