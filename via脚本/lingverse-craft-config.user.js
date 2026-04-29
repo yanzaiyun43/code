@@ -1,7 +1,7 @@
 // ==UserScript==
 // @name         灵界 LingVerse 炼造配置面板
 // @namespace    lingverse-craft-config
-// @version      2.1.25
+// @version      2.1.26
 // @description  炼造自动化配置：支持炼丹/炼器/制符/化身炼造、许愿锁定、自动售卖、深色/浅色模式跟随游戏主题
 // @author       LingVerse
 // @match        https://ling.muge.info/*
@@ -2915,9 +2915,58 @@
             // 检查材料是否足够
             const needBuy = recipe.materials?.some(m => m.have < m.need * requestCount);
             if (needBuy && CONFIG.general.useQuickBuy) {
+                // 检查是否可以补充材料
+                if (!canQuickBuy) {
+                    Logger.warn(`${name} 材料不足但无法补充(canQuickBuy=false)，只能炼制${maxCraftableCount}次`);
+                    // 使用现有材料炼制
+                    const adjustedRequestCount = maxCraftableCount;
+                    let res;
+                    if (type === 'alchemy') {
+                        res = await API.batchCraftAlchemy(id, adjustedRequestCount);
+                    } else if (type === 'forge') {
+                        res = await API.batchCraftForge(id, adjustedRequestCount);
+                    } else {
+                        res = await API.batchCraftTalisman(id, adjustedRequestCount);
+                    }
+                    if (res.code === 200) {
+                        let actualCount = res.data?.count || res.data?.crafted;
+                        if (!actualCount && res.data?.message) {
+                            const match = res.data.message.match(/(\d+)次/);
+                            if (match) actualCount = parseInt(match[1]);
+                        }
+                        actualCount = actualCount || adjustedRequestCount;
+                        Logger.success(res.data?.message || `${name} x${actualCount} 炼制成功`);
+                        STATE.stats.crafted += actualCount;
+                        return { count: actualCount };
+                    } else {
+                        Logger.error(`${name} 炼制失败: ${res.message}`);
+                        return { count: 0 };
+                    }
+                }
+                
                 // 计算需要补充的份数 = 目标次数 - 现有材料可炼次数
                 const buyAmount = requestCount - maxCraftableCount;
-                const totalCost = recipe.quickBuyCost * buyAmount;
+                
+                // 使用preview模式获取准确的补充费用
+                let quickBuyCost = recipe.quickBuyCost;
+                let previewCost = 0;
+                try {
+                    const previewRes = await API.quickBuyMats(type, id, buyAmount, true);
+                    if (previewRes.code === 200 && previewRes.data) {
+                        previewCost = previewRes.data.totalCost || previewRes.data.cost || 0;
+                        quickBuyCost = Math.floor(previewCost / buyAmount);
+                        Logger.info(`${name} 预览补充费用: ${previewCost}灵石 (${buyAmount}份)`);
+                    }
+                } catch (e) {
+                    Logger.warn(`${name} 获取预览费用失败: ${e.message}`);
+                }
+                
+                // 如果preview也获取不到，使用配方中的quickBuyCost或估算
+                if (!quickBuyCost || quickBuyCost <= 0) {
+                    quickBuyCost = recipe.quickBuyCost || 20;
+                }
+                
+                const totalCost = previewCost || (quickBuyCost * buyAmount);
                 
                 Logger.info(`${name} 需要补充: ${buyAmount}份, 预计费用: ${totalCost}灵石, canQuickBuy=${canQuickBuy}`);
                 
