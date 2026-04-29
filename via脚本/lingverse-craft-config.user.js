@@ -1,7 +1,7 @@
 // ==UserScript==
 // @name         灵界 LingVerse 炼造配置面板
 // @namespace    lingverse-craft-config
-// @version      2.1.27
+// @version      2.1.28
 // @description  炼造自动化配置：支持炼丹/炼器/制符/化身炼造、许愿锁定、自动售卖、深色/浅色模式跟随游戏主题
 // @author       LingVerse
 // @match        https://ling.muge.info/*
@@ -1036,22 +1036,26 @@
             const content = $('#lv-panel-content');
             if (!content) return;
 
-            // 获取各个区域元素
-            const sections = content.querySelectorAll('.lv-section, .lv-card');
-            const targetSection = sections[0]; // 炼造目标区
-            const settingsSection = sections[3]; // 设置区
-            const incarnationSection = sections[1]; // 化身炼造
-            const wishSection = sections[2]; // 许愿锁定
-            const advancedSection = sections[4]; // 高级设置
+            // 获取所有子元素
+            const allChildren = Array.from(content.children);
+            
+            // 识别各个区域（通过查找特定的子元素）
+            const targetSection = allChildren.find(el => el.querySelector('#lv-target-alchemy'))?.parentElement;
+            const settingsSection = allChildren.find(el => el.querySelector('#lv-interval'))?.closest('.lv-card');
+            const advancedSection = allChildren.find(el => el.querySelector('#lv-advanced-toggle'))?.closest('.lv-card');
+            const incarnationSection = allChildren.find(el => el.querySelector('#lv-incarnation-toggle'))?.closest('.lv-card');
+            const wishSection = allChildren.find(el => el.querySelector('#lv-wish-toggle'))?.closest('.lv-card');
+            const buttonSection = allChildren.find(el => el.querySelector('#lv-btn-start'));
+            const logSection = allChildren.find(el => el.id === 'lv-log-panel');
 
-            // 按新顺序重新插入：目标 -> 设置 -> 化身 -> 许愿 -> 高级
+            // 按新顺序重新插入：目标 -> 设置 -> 化身 -> 许愿 -> 高级 -> 按钮 -> 日志
             if (targetSection) content.appendChild(targetSection);
             if (settingsSection) content.appendChild(settingsSection);
             if (incarnationSection) content.appendChild(incarnationSection);
             if (wishSection) content.appendChild(wishSection);
             if (advancedSection) content.appendChild(advancedSection);
-
-            // 按钮和日志区保持在最后
+            if (buttonSection) content.appendChild(buttonSection);
+            if (logSection) content.appendChild(logSection);
         },
 
         generatePanelHTML() {
@@ -1943,7 +1947,8 @@
                             font-size: 13px;
                             font-weight: bold;
                             transition: all 0.2s;
-                        ">💾</button>
+                            white-space: nowrap;
+                        ">保存配置</button>
                     </div>
 
                     <!-- 统计信息 -->
@@ -2141,6 +2146,7 @@
                 if (content.style.display === 'none') {
                     content.style.display = 'block';
                     icon.textContent = '▼';
+                    Logger.info('💡 修改高级设置后，点击「保存配置」按钮即可保存，或者直接点击「开始炼造」/「执行一次」');
                 } else {
                     content.style.display = 'none';
                     icon.textContent = '▶';
@@ -2154,6 +2160,7 @@
                 if (content.style.display === 'none') {
                     content.style.display = 'block';
                     icon.textContent = '▼';
+                    Logger.info('💡 修改化身炼造设置后，点击「保存配置」按钮即可保存，或者直接点击「开始炼造」/「执行一次」');
                 } else {
                     content.style.display = 'none';
                     icon.textContent = '▶';
@@ -2167,6 +2174,7 @@
                 if (content.style.display === 'none') {
                     content.style.display = 'block';
                     icon.textContent = '▼';
+                    Logger.info('💡 修改许愿锁定设置后，点击「保存配置」按钮即可保存，或者直接点击「开始炼造」/「执行一次」');
                 } else {
                     content.style.display = 'none';
                     icon.textContent = '▶';
@@ -3326,7 +3334,10 @@
         if (!location.href.includes('ling.muge.info')) return;
 
         Theme.initObserver();
-        Logger.info('炼造助手 v3.0.0 已加载');
+        const scriptVersion = (typeof GM_info !== 'undefined' && GM_info.script?.version) ||
+                              (typeof GM !== 'undefined' && GM.info?.script?.version) ||
+                              '2';
+        Logger.info(`炼造助手 v${scriptVersion} 已加载`);
 
         // 创建侧边栏按钮
         waitForElement('.player-panel', 10000)
