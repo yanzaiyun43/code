@@ -1,7 +1,7 @@
 // ==UserScript==
 // @name         灵界 LingVerse 炼造配置面板
 // @namespace    lingverse-craft-config
-// @version      2.1.26
+// @version      2.1.27
 // @description  炼造自动化配置：支持炼丹/炼器/制符/化身炼造、许愿锁定、自动售卖、深色/浅色模式跟随游戏主题
 // @author       LingVerse
 // @match        https://ling.muge.info/*
@@ -1027,6 +1027,31 @@
             this.loadConfigToPanel();
             this.makePanelDraggable();
             this.updateTheme();
+            
+            // 重新排列面板区域顺序：设置区 -> 高级设置 -> 化身炼造 -> 许愿锁定 -> 按钮 -> 日志
+            this.reorderPanelSections();
+        },
+
+        reorderPanelSections() {
+            const content = $('#lv-panel-content');
+            if (!content) return;
+
+            // 获取各个区域元素
+            const sections = content.querySelectorAll('.lv-section, .lv-card');
+            const targetSection = sections[0]; // 炼造目标区
+            const settingsSection = sections[3]; // 设置区
+            const incarnationSection = sections[1]; // 化身炼造
+            const wishSection = sections[2]; // 许愿锁定
+            const advancedSection = sections[4]; // 高级设置
+
+            // 按新顺序重新插入：目标 -> 设置 -> 化身 -> 许愿 -> 高级
+            if (targetSection) content.appendChild(targetSection);
+            if (settingsSection) content.appendChild(settingsSection);
+            if (incarnationSection) content.appendChild(incarnationSection);
+            if (wishSection) content.appendChild(wishSection);
+            if (advancedSection) content.appendChild(advancedSection);
+
+            // 按钮和日志区保持在最后
         },
 
         generatePanelHTML() {
@@ -2887,9 +2912,6 @@
             // 优先使用API返回的canQuickBuy，如果没有则根据quickBuyCost判断
             const canQuickBuy = recipe.canQuickBuy !== undefined ? recipe.canQuickBuy : (recipe.quickBuyCost > 0);
 
-            // 调试日志
-            Logger.info(`${name} 配方信息: canCraft=${canCraft}, canQuickBuy=${canQuickBuy}, quickBuyCost=${recipe.quickBuyCost}, id=${id}`);
-
             if (!canCraft) {
                 if (!canQuickBuy || !CONFIG.general.useQuickBuy) {
                     Logger.warn(`${name} 不可炼制(canQuickBuy=${canQuickBuy}, useQuickBuy=${CONFIG.general.useQuickBuy})`);
@@ -2917,7 +2939,7 @@
             if (needBuy && CONFIG.general.useQuickBuy) {
                 // 检查是否可以补充材料
                 if (!canQuickBuy) {
-                    Logger.warn(`${name} 材料不足但无法补充(canQuickBuy=false)，只能炼制${maxCraftableCount}次`);
+                    Logger.warn(`${name} 材料仅够炼制${maxCraftableCount}次（目标${requestCount}次），下次将尝试恢复${requestCount}次`);
                     // 使用现有材料炼制
                     const adjustedRequestCount = maxCraftableCount;
                     let res;
