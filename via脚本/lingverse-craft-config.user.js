@@ -1,7 +1,7 @@
 // ==UserScript==
 // @name         灵界 LingVerse 炼造配置面板
 // @namespace    lingverse-craft-config
-// @version      2.1.26
+// @version      2.1.25
 // @description  炼造自动化配置：支持炼丹/炼器/制符/化身炼造、许愿锁定、自动售卖、深色/浅色模式跟随游戏主题
 // @author       LingVerse
 // @match        https://ling.muge.info/*
@@ -1225,199 +1225,217 @@
                     <!-- 化身炼造区 -->
                     <div class="lv-card" style="
                         margin-bottom: 16px;
-                        padding: 14px;
                         background: ${v.bgCard};
                         border: 1px solid ${v.borderColor};
                         border-radius: 12px;
+                        overflow: hidden;
                     ">
-                        <div style="
-                            font-size: 13px;
-                            color: ${v.textGold};
-                            margin-bottom: 12px;
-                            font-weight: bold;
+                        <div id="lv-incarnation-toggle" style="
+                            padding: 14px;
+                            cursor: pointer;
                             display: flex;
                             align-items: center;
-                            gap: 6px;
-                            padding-bottom: 8px;
-                            border-bottom: 1px solid ${v.borderColor};
-                        ">
-                            <span>👤</span> 化身炼造
+                            justify-content: space-between;
+                            background: ${v.isDark ? 'rgba(201,153,58,0.08)' : 'rgba(184,70,62,0.05)'};
+                            transition: all 0.2s;
+                        " onmouseover="this.style.background='${v.isDark ? 'rgba(201,153,58,0.15)' : 'rgba(184,70,62,0.1)'}'" onmouseout="this.style.background='${v.isDark ? 'rgba(201,153,58,0.08)' : 'rgba(184,70,62,0.05)'}'">
+                            <div style="
+                                font-size: 13px;
+                                color: ${v.textGold};
+                                font-weight: bold;
+                                display: flex;
+                                align-items: center;
+                                gap: 6px;
+                            ">
+                                <span id="lv-incarnation-icon">▶</span> <span>👤</span> 化身炼造
+                            </div>
                             <span id="lv-incarnation-status" style="
                                 font-size: 10px;
                                 color: ${v.textMuted};
                                 font-weight: normal;
-                                margin-left: auto;
                             ">检测中...</span>
                         </div>
 
-                        <label style="
-                            display: flex;
-                            align-items: center;
-                            gap: 10px;
-                            margin-bottom: 12px;
-                            cursor: pointer;
-                        ">
-                            <input type="checkbox" id="lv-incarnation-enabled" style="
-                                width: 18px;
-                                height: 18px;
-                                accent-color: ${v.accentPurple};
-                            ">
-                            <span style="font-size: 12px;">启用化身自动炼造</span>
-                        </label>
-
-                        <div style="margin-bottom: 10px;">
-                            <span style="font-size: 11px; color: ${v.textSecondary};">炼造类型:</span>
-                            <select id="lv-incarnation-type" class="lv-select" style="
-                                width: 100%;
-                                margin-top: 6px;
-                                background: ${v.bgInput};
-                                border: 1px solid ${v.borderColor};
-                                color: ${v.textPrimary};
-                                padding: 8px 10px;
-                                border-radius: 6px;
-                                font-size: 12px;
-                            ">
-                                <option value="alchemy">炼丹</option>
-                                <option value="forge">炼器</option>
-                                <option value="talisman">制符</option>
-                            </select>
-                        </div>
-
-                        <div style="margin-bottom: 10px;">
-                            <span style="font-size: 11px; color: ${v.textSecondary};">炼造目标:</span>
-                            <select id="lv-incarnation-target" class="lv-select" style="
-                                width: 100%;
-                                margin-top: 6px;
-                                background: ${v.bgInput};
-                                border: 1px solid ${v.borderColor};
-                                color: ${v.textPrimary};
-                                padding: 8px 10px;
-                                border-radius: 6px;
-                                font-size: 12px;
-                            ">
-                                <option value="">-- 选择目标 --</option>
-                            </select>
-                        </div>
-
-                        <div style="display: grid; grid-template-columns: 1fr 1fr; gap: 8px; margin-top: 12px;">
-                            <button id="lv-btn-incarnation-condense" class="lv-btn-secondary" style="
-                                background: ${v.bgCard};
-                                border: 1px solid ${v.borderGold};
-                                color: ${v.textGold};
-                                padding: 8px;
-                                border-radius: 6px;
+                        <div id="lv-incarnation-content" style="display: none; padding: 14px; border-top: 1px solid ${v.borderColor};">
+                            <label style="
+                                display: flex;
+                                align-items: center;
+                                gap: 10px;
+                                margin-bottom: 12px;
                                 cursor: pointer;
-                                font-size: 11px;
-                                font-weight: bold;
-                            ">凝聚化身</button>
-                            <button id="lv-btn-incarnation-refine" class="lv-btn-secondary" style="
-                                background: ${v.bgCard};
-                                border: 1px solid ${v.borderGold};
-                                color: ${v.textGold};
-                                padding: 8px;
-                                border-radius: 6px;
-                                cursor: pointer;
-                                font-size: 11px;
-                                font-weight: bold;
-                            ">精炼化身</button>
+                            ">
+                                <input type="checkbox" id="lv-incarnation-enabled" style="
+                                    width: 18px;
+                                    height: 18px;
+                                    accent-color: ${v.accentPurple};
+                                ">
+                                <span style="font-size: 12px;">启用化身自动炼造</span>
+                            </label>
+
+                            <div style="margin-bottom: 10px;">
+                                <span style="font-size: 11px; color: ${v.textSecondary};">炼造类型:</span>
+                                <select id="lv-incarnation-type" class="lv-select" style="
+                                    width: 100%;
+                                    margin-top: 6px;
+                                    background: ${v.bgInput};
+                                    border: 1px solid ${v.borderColor};
+                                    color: ${v.textPrimary};
+                                    padding: 8px 10px;
+                                    border-radius: 6px;
+                                    font-size: 12px;
+                                ">
+                                    <option value="alchemy">炼丹</option>
+                                    <option value="forge">炼器</option>
+                                    <option value="talisman">制符</option>
+                                </select>
+                            </div>
+
+                            <div style="margin-bottom: 10px;">
+                                <span style="font-size: 11px; color: ${v.textSecondary};">炼造目标:</span>
+                                <select id="lv-incarnation-target" class="lv-select" style="
+                                    width: 100%;
+                                    margin-top: 6px;
+                                    background: ${v.bgInput};
+                                    border: 1px solid ${v.borderColor};
+                                    color: ${v.textPrimary};
+                                    padding: 8px 10px;
+                                    border-radius: 6px;
+                                    font-size: 12px;
+                                ">
+                                    <option value="">-- 选择目标 --</option>
+                                </select>
+                            </div>
+
+                            <div style="display: grid; grid-template-columns: 1fr 1fr; gap: 8px; margin-top: 12px;">
+                                <button id="lv-btn-incarnation-condense" class="lv-btn-secondary" style="
+                                    background: ${v.bgCard};
+                                    border: 1px solid ${v.borderGold};
+                                    color: ${v.textGold};
+                                    padding: 8px;
+                                    border-radius: 6px;
+                                    cursor: pointer;
+                                    font-size: 11px;
+                                    font-weight: bold;
+                                ">凝聚化身</button>
+                                <button id="lv-btn-incarnation-refine" class="lv-btn-secondary" style="
+                                    background: ${v.bgCard};
+                                    border: 1px solid ${v.borderGold};
+                                    color: ${v.textGold};
+                                    padding: 8px;
+                                    border-radius: 6px;
+                                    cursor: pointer;
+                                    font-size: 11px;
+                                    font-weight: bold;
+                                ">精炼化身</button>
+                            </div>
                         </div>
                     </div>
 
                     <!-- 许愿锁定区 -->
                     <div class="lv-card" style="
                         margin-bottom: 16px;
-                        padding: 14px;
                         background: ${v.bgCard};
                         border: 1px solid ${v.borderColor};
                         border-radius: 12px;
+                        overflow: hidden;
                     ">
-                        <div style="
-                            font-size: 13px;
-                            color: ${v.textJade};
-                            margin-bottom: 12px;
-                            font-weight: bold;
-                            display: flex;
-                            align-items: center;
-                            gap: 6px;
-                            padding-bottom: 8px;
-                            border-bottom: 1px solid ${v.borderColor};
-                        ">
-                            <span>⭐</span> 许愿锁定
-                        </div>
-
-                        <label style="
-                            display: flex;
-                            align-items: center;
-                            gap: 10px;
-                            margin-bottom: 12px;
-                            padding: 8px;
-                            background: ${v.isDark ? 'rgba(76,175,80,0.1)' : 'rgba(76,175,80,0.08)'};
-                            border-radius: 8px;
+                        <div id="lv-wish-toggle" style="
+                            padding: 14px;
                             cursor: pointer;
-                        ">
-                            <input type="checkbox" id="lv-wish-enabled" style="
-                                width: 18px;
-                                height: 18px;
-                                accent-color: ${v.accentJade};
+                            display: flex;
+                            align-items: center;
+                            justify-content: space-between;
+                            background: ${v.isDark ? 'rgba(76,175,80,0.08)' : 'rgba(76,175,80,0.05)'};
+                            transition: all 0.2s;
+                        " onmouseover="this.style.background='${v.isDark ? 'rgba(76,175,80,0.15)' : 'rgba(76,175,80,0.1)'}'" onmouseout="this.style.background='${v.isDark ? 'rgba(76,175,80,0.08)' : 'rgba(76,175,80,0.05)'}'">
+                            <div style="
+                                font-size: 13px;
+                                color: ${v.textJade};
+                                font-weight: bold;
+                                display: flex;
+                                align-items: center;
+                                gap: 6px;
                             ">
-                            <div style="flex: 1;">
-                                <div style="color: ${v.textJade}; font-weight: bold; font-size: 12px;">启用许愿锁定</div>
-                                <div style="color: ${v.textMuted}; font-size: 11px;">自动设置许愿目标提高成功率</div>
+                                <span id="lv-wish-icon">▶</span> <span>⭐</span> 许愿锁定
                             </div>
-                        </label>
-
-                        <div style="margin-bottom: 10px;">
-                            <span style="font-size: 11px; color: ${v.textSecondary};">许愿类型:</span>
-                            <select id="lv-wish-type" class="lv-select" style="
-                                width: 100%;
-                                margin-top: 6px;
-                                background: ${v.bgInput};
-                                border: 1px solid ${v.borderColor};
-                                color: ${v.textPrimary};
-                                padding: 8px 10px;
-                                border-radius: 6px;
-                                font-size: 12px;
-                            ">
-                                <option value="alchemy">炼丹</option>
-                                <option value="forge">炼器</option>
-                                <option value="talisman">制符</option>
-                            </select>
+                            <span style="font-size: 11px; color: ${v.textMuted};">自动设置许愿目标</span>
                         </div>
 
-                        <div style="margin-bottom: 10px;">
-                            <span style="font-size: 11px; color: ${v.textSecondary};">许愿目标:</span>
-                            <select id="lv-wish-target" class="lv-select" style="
-                                width: 100%;
-                                margin-top: 6px;
-                                background: ${v.bgInput};
-                                border: 1px solid ${v.borderColor};
-                                color: ${v.textPrimary};
-                                padding: 8px 10px;
-                                border-radius: 6px;
-                                font-size: 12px;
+                        <div id="lv-wish-content" style="display: none; padding: 14px; border-top: 1px solid ${v.borderColor};">
+                            <label style="
+                                display: flex;
+                                align-items: center;
+                                gap: 10px;
+                                margin-bottom: 12px;
+                                padding: 8px;
+                                background: ${v.isDark ? 'rgba(76,175,80,0.1)' : 'rgba(76,175,80,0.08)'};
+                                border-radius: 8px;
+                                cursor: pointer;
                             ">
-                                <option value="">-- 选择许愿目标 --</option>
-                            </select>
-                        </div>
+                                <input type="checkbox" id="lv-wish-enabled" style="
+                                    width: 18px;
+                                    height: 18px;
+                                    accent-color: ${v.accentJade};
+                                ">
+                                <div style="flex: 1;">
+                                    <div style="color: ${v.textJade}; font-weight: bold; font-size: 12px;">启用许愿锁定</div>
+                                    <div style="color: ${v.textMuted}; font-size: 11px;">自动设置许愿目标提高成功率</div>
+                                </div>
+                            </label>
 
-                        <div style="margin-bottom: 10px;">
-                            <span style="font-size: 11px; color: ${v.textSecondary};">目标品质:</span>
-                            <select id="lv-wish-rarity" class="lv-select" style="
-                                width: 100%;
-                                margin-top: 6px;
-                                background: ${v.bgInput};
-                                border: 1px solid ${v.borderColor};
-                                color: ${v.textPrimary};
-                                padding: 8px 10px;
-                                border-radius: 6px;
-                                font-size: 12px;
-                            ">
-                                <option value="1">普通</option>
-                                <option value="2">优秀</option>
-                                <option value="3">稀有</option>
-                                <option value="4" selected>史诗</option>
-                                <option value="5">传说</option>
-                            </select>
+                            <div style="margin-bottom: 10px;">
+                                <span style="font-size: 11px; color: ${v.textSecondary};">许愿类型:</span>
+                                <select id="lv-wish-type" class="lv-select" style="
+                                    width: 100%;
+                                    margin-top: 6px;
+                                    background: ${v.bgInput};
+                                    border: 1px solid ${v.borderColor};
+                                    color: ${v.textPrimary};
+                                    padding: 8px 10px;
+                                    border-radius: 6px;
+                                    font-size: 12px;
+                                ">
+                                    <option value="alchemy">炼丹</option>
+                                    <option value="forge">炼器</option>
+                                    <option value="talisman">制符</option>
+                                </select>
+                            </div>
+
+                            <div style="margin-bottom: 10px;">
+                                <span style="font-size: 11px; color: ${v.textSecondary};">许愿目标:</span>
+                                <select id="lv-wish-target" class="lv-select" style="
+                                    width: 100%;
+                                    margin-top: 6px;
+                                    background: ${v.bgInput};
+                                    border: 1px solid ${v.borderColor};
+                                    color: ${v.textPrimary};
+                                    padding: 8px 10px;
+                                    border-radius: 6px;
+                                    font-size: 12px;
+                                ">
+                                    <option value="">-- 选择许愿目标 --</option>
+                                </select>
+                            </div>
+
+                            <div style="margin-bottom: 10px;">
+                                <span style="font-size: 11px; color: ${v.textSecondary};">目标品质:</span>
+                                <select id="lv-wish-rarity" class="lv-select" style="
+                                    width: 100%;
+                                    margin-top: 6px;
+                                    background: ${v.bgInput};
+                                    border: 1px solid ${v.borderColor};
+                                    color: ${v.textPrimary};
+                                    padding: 8px 10px;
+                                    border-radius: 6px;
+                                    font-size: 12px;
+                                ">
+                                    <option value="1">普通</option>
+                                    <option value="2">优秀</option>
+                                    <option value="3">稀有</option>
+                                    <option value="4" selected>史诗</option>
+                                    <option value="5">传说</option>
+                                </select>
+                            </div>
                         </div>
                     </div>
 
@@ -2104,6 +2122,32 @@
                 }
             });
 
+            // 化身炼造折叠
+            $('#lv-incarnation-toggle')?.addEventListener('click', () => {
+                const content = $('#lv-incarnation-content');
+                const icon = $('#lv-incarnation-icon');
+                if (content.style.display === 'none') {
+                    content.style.display = 'block';
+                    icon.textContent = '▼';
+                } else {
+                    content.style.display = 'none';
+                    icon.textContent = '▶';
+                }
+            });
+
+            // 许愿锁定折叠
+            $('#lv-wish-toggle')?.addEventListener('click', () => {
+                const content = $('#lv-wish-content');
+                const icon = $('#lv-wish-icon');
+                if (content.style.display === 'none') {
+                    content.style.display = 'block';
+                    icon.textContent = '▼';
+                } else {
+                    content.style.display = 'none';
+                    icon.textContent = '▶';
+                }
+            });
+
             document.addEventListener('keydown', (e) => {
                 if (e.key === 'Escape' && STATE.panelOpen) {
                     this.closePanel();
@@ -2625,6 +2669,13 @@
         },
 
         async executeOnce() {
+            // 检查是否有设置炼造目标
+            const hasTarget = CONFIG.targets.alchemy || CONFIG.targets.forge || CONFIG.targets.talisman || CONFIG.targets.incarnation.enabled;
+            if (!hasTarget) {
+                Logger.warn('未设置炼造目标，请在面板中选择要炼制的物品');
+                return;
+            }
+
             // 检测冥想状态 - 冥想中跳过本次但不停止，下次继续检测
             const isMeditating = await this.isMeditating();
             STATE.monitor.isMeditating = isMeditating;
@@ -2636,12 +2687,14 @@
 
             const statusCheck = await this.checkPlayerStatus();
             if (!statusCheck.canCraft) {
+                Logger.warn(`无法炼造: ${statusCheck.reason}`);
                 this.stop(statusCheck.reason);
                 return;
             }
 
             const stopCheck = STATE.shouldStop();
             if (stopCheck.shouldStop) {
+                Logger.warn(`自动停止: ${stopCheck.reason}`);
                 this.stop(stopCheck.reason);
                 return;
             }
@@ -2877,8 +2930,10 @@
                 try {
                     const buyRes = await API.quickBuyMats(type, id, buyAmount);
                     if (buyRes.code === 200) {
-                        STATE.stats.spent += totalCost;
-                        Logger.success(`${name} 材料补充成功，花费${totalCost}灵石`);
+                        // 使用API返回的实际费用
+                        const actualCost = buyRes.data?.totalCost || buyRes.data?.cost || totalCost;
+                        STATE.stats.spent += actualCost;
+                        Logger.success(`${name} 材料补充成功，花费${actualCost}灵石`);
                         // 补充成功后，直接使用requestCount炼制（不再检查材料）
                         Logger.info(`${name} 材料已补充，炼制${requestCount}次...`);
                         let res;
@@ -3099,12 +3154,23 @@
                         const { count, totalGold, items } = previewRes.data;
                         Logger.info(`批量出售预览: ${count}件，预计获得${totalGold}灵石`);
 
-                        let pillCount = 0, equipCount = 0;
+                        let pillCount = 0, equipCount = 0, talismanCount = 0;
                         (items || []).forEach(item => {
-                            if (item.type === 'pill') pillCount += item.count;
-                            else if (item.type === 'equipment') equipCount += item.count;
+                            // 根据物品名称或类型判断
+                            const name = item.name || '';
+                            const itemType = item.type || item.itemType || '';
+                            if (itemType === 'pill' || name.includes('丹') || name.includes('丸') || name.includes('散')) {
+                                pillCount += item.count || 1;
+                            } else if (itemType === 'equipment' || name.includes('剑') || name.includes('甲') || name.includes('盔') || name.includes('靴') || name.includes('盾') || name.includes('戒') || name.includes('链')) {
+                                equipCount += item.count || 1;
+                            } else if (itemType === 'talisman' || name.includes('符')) {
+                                talismanCount += item.count || 1;
+                            } else {
+                                // 无法识别的默认计入装备
+                                equipCount += item.count || 1;
+                            }
                         });
-                        Logger.info(`包含 - 丹药:${pillCount} 装备:${equipCount}`);
+                        Logger.info(`包含 - 丹药:${pillCount} 装备:${equipCount} 符箓:${talismanCount}`);
 
                         const sellRes = await API.batchSell(maxRarity, 'all');
                         if (sellRes.code === 200 && sellRes.data) {
@@ -3189,7 +3255,7 @@
         if (!location.href.includes('ling.muge.info')) return;
 
         Theme.initObserver();
-        Logger.info('炼造助手 已加载');
+        Logger.info('炼造助手 v3.0.0 已加载');
 
         // 创建侧边栏按钮
         waitForElement('.player-panel', 10000)
