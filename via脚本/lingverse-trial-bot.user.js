@@ -464,6 +464,14 @@
                 if (data.rewardMaps > 0) {
                     STATE.stats.totalMaps += data.rewardMaps;
                     Logger.gold(`获得藏宝图 x${data.rewardMaps} (累计${STATE.stats.totalMaps})`);
+
+                    // 获得藏宝图后检查是否需要出售
+                    if (CONFIG.autoSellMaps) {
+                        const soldMaps = await MapTrader.checkAndSellMaps();
+                        if (soldMaps) {
+                            await wait(1000);
+                        }
+                    }
                 }
 
                 // 选择天赋
@@ -934,6 +942,7 @@
                                         border-radius: 6px;
                                         font-size: 12px;
                                     ">
+                                    <span style="font-size: 10px; color: ${v.textMuted};">0 = 无限制</span>
                                 </div>
                             </div>
 
@@ -950,6 +959,7 @@
                                         border-radius: 6px;
                                         font-size: 12px;
                                     ">
+                                    <span style="font-size: 10px; color: ${v.textMuted};">0 = 无限制</span>
                                 </div>
                                 <div style="flex: 1;">
                                     <span class="lv-label" style="font-size: 11px; color: ${v.textSecondary};">目标层数(停止)</span>
@@ -963,6 +973,7 @@
                                         border-radius: 6px;
                                         font-size: 12px;
                                     ">
+                                    <span style="font-size: 10px; color: ${v.textMuted};">0 = 不启用</span>
                                 </div>
                             </div>
 
@@ -1161,7 +1172,7 @@
                             </div>
 
                             <div style="margin-bottom: 10px;">
-                                <span class="lv-label" style="font-size: 11px; color: ${v.textSecondary};">最大出售数量 (0=全部)</span>
+                                <span class="lv-label" style="font-size: 11px; color: ${v.textSecondary};">最大出售数量</span>
                                 <input type="number" id="lv-max-maps-sell" value="0" min="0" class="lv-trial-input" style="
                                     width: 100%;
                                     margin-top: 4px;
@@ -1172,6 +1183,7 @@
                                     border-radius: 6px;
                                     font-size: 12px;
                                 ">
+                                <span style="font-size: 10px; color: ${v.textMuted};">0 = 出售全部</span>
                             </div>
                         </div>
                     </div>
@@ -1487,7 +1499,7 @@
         },
 
         updateLogPanel() {
-            const panel = $('#lv-trial-log');
+            const panel = $('#lv-trial-logs');
             if (!panel) return;
 
             const html = STATE.logs.map(log => {
