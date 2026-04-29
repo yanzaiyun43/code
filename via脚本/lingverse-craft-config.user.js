@@ -1,7 +1,7 @@
 // ==UserScript==
 // @name         灵界 LingVerse 炼造配置面板
 // @namespace    lingverse-craft-config
-// @version      2.1.31
+// @version      2.1.32
 // @description  炼造自动化配置：支持炼丹/炼器/制符/化身炼造、许愿锁定、自动售卖、深色/浅色模式跟随游戏主题
 // @author       LingVerse
 // @match        https://ling.muge.info/*
@@ -628,16 +628,17 @@
             return this.request('GET', '/api/game/incarnation/cultivation-pills');
         },
 
-        async consumeIncarnationPill(pillId, quantity = 1) {
-            return this.request('POST', '/api/game/incarnation/consume-pill', { pillId, quantity });
+        async consumeIncarnationPill(itemId) {
+            return this.request('POST', '/api/game/incarnation/consume-pill', { itemId });
         },
 
-        async consumeAllIncarnationPills(pillId) {
-            return this.request('POST', '/api/game/incarnation/consume-pill-all', { pillId });
+        async consumeAllIncarnationPills() {
+            return this.request('POST', '/api/game/incarnation/consume-pill-all', {});
         },
 
-        async getIncarnationAvailableEquip() {
-            return this.request('GET', '/api/game/incarnation/available-equip');
+        async getIncarnationAvailableEquip(slot) {
+            const query = slot ? `?slot=${slot}` : '';
+            return this.request('GET', `/api/game/incarnation/available-equip${query}`);
         },
 
         async equipIncarnation(itemId) {
@@ -3315,13 +3316,13 @@
 
                 if (CONFIG.autoSell.equipment.enabled) {
                     const maxRarity = CONFIG.autoSell.equipment.maxRarity;
-                    const previewRes = await API.previewBatchSell(maxRarity, 'equip');
+                    const previewRes = await API.previewBatchSell(maxRarity, 'equipment');
                     if (previewRes.code === 200 && previewRes.data && previewRes.data.count > 0) {
 
                         const equipCount = previewRes.data.count || 0;
 
                         if (equipCount > 0) {
-                            const sellRes = await API.batchSell(maxRarity, 'equip');
+                            const sellRes = await API.batchSell(maxRarity, 'equipment');
                             if (sellRes.code === 200 && sellRes.data) {
                                 STATE.stats.soldEquip += equipCount;
                                 Logger.success(`自动售出 ${equipCount} 件装备`);
