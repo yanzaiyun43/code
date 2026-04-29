@@ -1,7 +1,7 @@
 // ==UserScript==
 // @name         灵界 LingVerse 天道试炼刷取助手
 // @namespace    lingverse-trial-bot
-// @version      2.0.6
+// @version      2.0.7
 // @description  天道试炼塔自动化：自动重置、自动战斗、自动选择天赋、统计藏宝图收益
 // @author       LingVerse
 // @match        https://ling.muge.info/*
@@ -817,7 +817,7 @@
 
             const v = bot_Theme.getVars();
             const panel = document.createElement('div');
-            panel.id = 'lv-trial-panel';
+            panel.id = 'bot_trial_panel';
             panel.style.cssText = `
                 position: fixed;
                 top: 50%;
@@ -1401,9 +1401,9 @@
             });
 
             // 高级设置折叠/展开
-            $('#lv-advanced-toggle')?.addEventListener('click', () => {
-                const content = $('#lv-advanced-content');
-                const arrow = $('#lv-advanced-arrow');
+            $('#bot_advanced_toggle')?.addEventListener('click', () => {
+                const content = $('#bot_advanced_content');
+                const arrow = $('#bot_advanced_arrow');
                 if (content && arrow) {
                     const isHidden = content.style.display === 'none';
                     content.style.display = isHidden ? 'block' : 'none';
@@ -1413,7 +1413,7 @@
 
             // 点击面板外部关闭
             $('#bot_trial_panel')?.addEventListener('click', (e) => {
-                if (e.target.id === 'lv-trial-panel') this.closePanel();
+                if (e.target.id === 'bot_trial_panel') this.closePanel();
             });
 
             // ESC键关闭
@@ -1647,7 +1647,7 @@
             // 创建独立的 section 容器
             const section = document.createElement('div');
             section.className = 'panel-section';
-            section.id = 'lv-trial-section';
+            section.id = 'bot_trial_section';
             section.style.cssText = `
                 margin-bottom: 20px;
                 padding-bottom: 16px;
@@ -1669,7 +1669,7 @@
             `;
 
             const btn = document.createElement('button');
-            btn.id = 'lv-trial-sidebar-btn';
+            btn.id = 'bot_trial_sidebar_btn';
             btn.textContent = '打开试炼面板';
             btn.style.cssText = `
                 width: 100%;
