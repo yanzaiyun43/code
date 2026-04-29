@@ -1,7 +1,7 @@
 // ==UserScript==
 // @name         灵界 LingVerse 炼造配置面板
 // @namespace    lingverse-craft-config
-// @version      2.1.32
+// @version      2.1.33
 // @description  炼造自动化配置：支持炼丹/炼器/制符/化身炼造、许愿锁定、自动售卖、深色/浅色模式跟随游戏主题
 // @author       LingVerse
 // @match        https://ling.muge.info/*
@@ -3320,12 +3320,14 @@
                     if (previewRes.code === 200 && previewRes.data && previewRes.data.count > 0) {
 
                         const equipCount = previewRes.data.count || 0;
+                        const previewGold = previewRes.data.totalGold || 0;
 
                         if (equipCount > 0) {
                             const sellRes = await API.batchSell(maxRarity, 'equipment');
                             if (sellRes.code === 200 && sellRes.data) {
+                                const gotGold = sellRes.data.totalGold || previewGold;
                                 STATE.stats.soldEquip += equipCount;
-                                Logger.success(`自动售出 ${equipCount} 件装备`);
+                                Logger.success(`自动售出 ${equipCount} 件装备，获得 ${gotGold} 灵石`);
                             }
                         }
                     }
@@ -3336,12 +3338,14 @@
                     const previewRes = await API.previewBatchSell(maxRarity, 'pill');
                     if (previewRes.code === 200 && previewRes.data && previewRes.data.count > 0) {
                         const pillCount = previewRes.data.count || 0;
+                        const previewGold = previewRes.data.totalGold || 0;
 
                         if (pillCount > 0) {
                             const sellRes = await API.batchSell(maxRarity, 'pill');
                             if (sellRes.code === 200 && sellRes.data) {
+                                const gotGold = sellRes.data.totalGold || previewGold;
                                 STATE.stats.soldPills += pillCount;
-                                Logger.success(`自动售出 ${pillCount} 个丹药`);
+                                Logger.success(`自动售出 ${pillCount} 个丹药，获得 ${gotGold} 灵石`);
                             }
                         }
                     }
@@ -3384,6 +3388,30 @@
     // 初始化入口
     async function init() {
         if (!location.href.includes('ling.muge.info')) return;
+
+        // 添加全局样式移除按钮焦点轮廓
+        const style = document.createElement('style');
+        style.textContent = `
+            #lv-craft-panel button,
+            #lv-craft-panel input,
+            #lv-craft-panel select,
+            #lv-craft-sidebar-btn {
+                outline: none !important;
+                -webkit-tap-highlight-color: transparent !important;
+            }
+            #lv-craft-panel button:focus,
+            #lv-craft-panel input:focus,
+            #lv-craft-panel select:focus,
+            #lv-craft-sidebar-btn:focus {
+                outline: none !important;
+                box-shadow: none !important;
+            }
+            #lv-craft-panel button:active,
+            #lv-craft-sidebar-btn:active {
+                outline: none !important;
+            }
+        `;
+        document.head.appendChild(style);
 
         Theme.initObserver();
         const scriptVersion = (typeof GM_info !== 'undefined' && GM_info.script?.version) ||

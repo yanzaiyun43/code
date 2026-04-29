@@ -1,7 +1,7 @@
 // ==UserScript==
 // @name         灵界 LingVerse 天道试炼刷取助手
 // @namespace    lingverse-trial-bot
-// @version      1.1.0
+// @version      1.1.2
 // @description  天道试炼塔自动化：自动重置、自动战斗、自动选择天赋、统计藏宝图收益
 // @author       LingVerse
 // @match        https://ling.muge.info/*
@@ -636,11 +636,96 @@
         }
     };
 
+    // 主题管理 - 自动适配游戏深色/浅色模式
+    const Theme = {
+        getCurrent() {
+            const html = document.documentElement;
+            if (html.classList.contains('theme-dark')) return 'dark';
+            if (html.classList.contains('theme-light')) return 'light';
+            return window.matchMedia('(prefers-color-scheme: dark)').matches ? 'dark' : 'light';
+        },
+
+        isDark() {
+            return this.getCurrent() === 'dark';
+        },
+
+        initObserver() {
+            const observer = new MutationObserver(() => {
+                UI.updateTheme();
+            });
+            observer.observe(document.documentElement, {
+                attributes: true,
+                attributeFilter: ['class']
+            });
+
+            window.matchMedia('(prefers-color-scheme: dark)').addEventListener('change', () => {
+                UI.updateTheme();
+            });
+        },
+
+        getVars() {
+            const isDark = this.isDark();
+            return {
+                isDark,
+
+                bgPrimary: isDark ? '#0a0f1c' : '#f3f2f0',
+                bgSecondary: isDark ? '#111827' : '#eae9e7',
+                bgCard: isDark ? '#151d2e' : '#f9f9f8',
+                bgCardHover: isDark ? '#1a2540' : '#eeedeb',
+                bgPanel: isDark ? '#0e1525' : '#f0efed',
+                bgInput: isDark ? '#0d1420' : '#ffffff',
+
+                borderColor: isDark ? 'rgba(201, 153, 58, 0.15)' : 'rgba(60, 60, 60, 0.12)',
+                borderGold: isDark ? 'rgba(201, 153, 58, 0.3)' : 'rgba(140, 60, 50, 0.25)',
+                borderActive: isDark ? 'rgba(201, 153, 58, 0.5)' : 'rgba(140, 60, 50, 0.4)',
+
+                textPrimary: isDark ? '#e8e0d0' : '#1a1a1a',
+                textSecondary: isDark ? '#a8a090' : '#4a5a5a',
+                textMuted: isDark ? '#6a6560' : '#8a9090',
+                textGold: isDark ? '#c9993a' : '#b8463e',
+                textJade: isDark ? '#3dab97' : '#3a6a7a',
+                textPurple: isDark ? '#9a6ae0' : '#6a5a8a',
+                textRed: isDark ? '#e06060' : '#c04040',
+                textBlue: isDark ? '#60a0e0' : '#3a5a8a',
+                textGreen: isDark ? '#4ade80' : '#16a34a',
+
+                accentGold: isDark ? '#c9993a' : '#b8463e',
+                accentJade: isDark ? '#3dab97' : '#3a6a7a',
+                accentPurple: isDark ? '#9a6ae0' : '#6a5a8a',
+                accentRed: isDark ? '#e06060' : '#c04040',
+
+                gradientGold: isDark
+                    ? 'linear-gradient(135deg, #8a6a20 0%, #c9993a 50%, #8a6a20 100%)'
+                    : 'linear-gradient(135deg, #b84a40 0%, #d06858 50%, #b84a40 100%)',
+                gradientJade: isDark
+                    ? 'linear-gradient(135deg, #1a6b5a 0%, #3dab97 100%)'
+                    : 'linear-gradient(135deg, #3a6a7a 0%, #5a8a9a 100%)',
+                gradientPurple: isDark
+                    ? 'linear-gradient(135deg, #6a3a9a 0%, #9a6ae0 100%)'
+                    : 'linear-gradient(135deg, #5a4a7a 0%, #7a6a9a 100%)',
+
+                shadowSm: isDark ? '0 2px 8px rgba(0, 0, 0, 0.3)' : '0 2px 12px rgba(40, 40, 40, 0.06)',
+                shadowMd: isDark ? '0 4px 16px rgba(0, 0, 0, 0.4)' : '0 4px 20px rgba(40, 40, 40, 0.08)',
+                shadowLg: isDark ? '0 8px 32px rgba(0, 0, 0, 0.5)' : '0 8px 40px rgba(40, 40, 40, 0.12)',
+                shadowGlow: isDark ? '0 0 20px rgba(201, 153, 58, 0.15)' : '0 0 20px rgba(184, 70, 62, 0.1)',
+
+                rarity: {
+                    1: isDark ? '#9ca3af' : '#6b7280',
+                    2: isDark ? '#60a5fa' : '#3b82f6',
+                    3: isDark ? '#fbbf24' : '#d97706',
+                    4: isDark ? '#c084fc' : '#9333ea',
+                    5: isDark ? '#f87171' : '#dc2626'
+                }
+            };
+        }
+    };
+
     // UI管理
     const UI = {
         createPanel() {
             if ($('#lv-trial-panel')) return;
 
+            const v = Theme.getVars();
             const panel = document.createElement('div');
             panel.id = 'lv-trial-panel';
             panel.style.cssText = `
@@ -652,16 +737,17 @@
                 max-width: 520px;
                 max-height: 90vh;
                 z-index: 100000;
-                background: #0e1525;
-                border: 2px solid rgba(201, 153, 58, 0.3);
+                background: ${v.bgPanel};
+                border: 2px solid ${v.borderGold};
                 border-radius: 16px;
                 font-size: 13px;
-                color: #e8e0d0;
-                box-shadow: 0 8px 32px rgba(0, 0, 0, 0.5);
+                color: ${v.textPrimary};
+                box-shadow: ${v.shadowLg};
                 display: none;
                 flex-direction: column;
                 overflow: hidden;
                 font-family: KaiTi, 楷体, STKaiti, "Noto Serif SC", serif;
+                transition: background 0.3s, color 0.3s;
             `;
 
             panel.innerHTML = this.generatePanelHTML();
@@ -670,14 +756,71 @@
             this.bindEvents();
             this.loadConfig();
             this.makeDraggable();
+            this.updateTheme();
+        },
+
+        updateTheme() {
+            const panel = $('#lv-trial-panel');
+            if (!panel) return;
+
+            const v = Theme.getVars();
+
+            panel.style.background = v.bgPanel;
+            panel.style.borderColor = v.borderGold;
+            panel.style.color = v.textPrimary;
+            panel.style.boxShadow = v.shadowLg;
+
+            const header = $('#lv-trial-header');
+            if (header) {
+                header.style.background = v.gradientGold;
+            }
+
+            const status = $('#lv-trial-status');
+            if (status) {
+                status.style.color = v.textPrimary;
+                status.style.background = v.bgCard;
+            }
+
+            const content = $('#lv-trial-content');
+            if (content) {
+                content.style.color = v.textPrimary;
+            }
+
+            // 更新所有卡片背景
+            $$('.lv-trial-card').forEach(card => {
+                card.style.background = v.bgCard;
+                card.style.borderColor = v.borderColor;
+            });
+
+            // 更新所有输入框
+            $$('.lv-trial-input').forEach(input => {
+                input.style.background = v.bgInput;
+                input.style.borderColor = v.borderColor;
+                input.style.color = v.textPrimary;
+            });
+
+            // 更新所有选择框
+            $$('.lv-trial-select').forEach(select => {
+                select.style.background = v.bgInput;
+                select.style.borderColor = v.borderColor;
+                select.style.color = v.textPrimary;
+            });
+
+            // 更新日志区域
+            const logPanel = $('#lv-trial-logs');
+            if (logPanel) {
+                logPanel.style.background = v.bgCard;
+                logPanel.style.borderColor = v.borderColor;
+            }
         },
 
         generatePanelHTML() {
+            const v = Theme.getVars();
             return `
                 <div id="lv-trial-header" style="
-                    background: linear-gradient(135deg, #8a6a20 0%, #c9993a 50%, #8a6a20 100%);
+                    background: ${v.gradientGold};
                     padding: 14px 18px;
-                    border-bottom: 2px solid #c9993a;
+                    border-bottom: 2px solid ${v.accentGold};
                     display: flex;
                     justify-content: space-between;
                     align-items: center;
@@ -690,8 +833,8 @@
                         <span id="lv-trial-status" style="
                             margin-left: 8px;
                             font-size: 11px;
-                            color: #e8e0d0;
-                            background: #151d2e;
+                            color: ${v.textPrimary};
+                            background: ${v.bgCard};
                             padding: 3px 10px;
                             border-radius: 12px;
                             font-weight: bold;
@@ -723,70 +866,70 @@
 
                 <div id="lv-trial-content" style="padding: 16px; overflow-y: auto; flex: 1;">
                     <!-- 统计信息 -->
-                    <div style="
-                        background: #151d2e;
-                        border: 1px solid rgba(201, 153, 58, 0.15);
+                    <div class="lv-trial-card" style="
+                        background: ${v.bgCard};
+                        border: 1px solid ${v.borderColor};
                         border-radius: 10px;
                         padding: 12px;
                         margin-bottom: 16px;
                     ">
-                        <div style="font-size: 12px; color: #c9993a; margin-bottom: 10px; font-weight: bold;">运行统计</div>
+                        <div style="font-size: 12px; color: ${v.textGold}; margin-bottom: 10px; font-weight: bold;">运行统计</div>
                         <div style="display: grid; grid-template-columns: 1fr 1fr 1fr; gap: 8px; font-size: 11px;">
-                            <div style="text-align: center; padding: 6px; background: rgba(0,0,0,0.2); border-radius: 6px;">
-                                <div style="color: #6a6560; font-size: 10px;">刷取次数</div>
-                                <div id="lv-stat-runs" style="color: #3dab97; font-size: 16px; font-weight: bold;">0</div>
+                            <div style="text-align: center; padding: 6px; background: ${v.isDark ? 'rgba(0,0,0,0.2)' : 'rgba(0,0,0,0.05)'}; border-radius: 6px;">
+                                <div style="color: ${v.textMuted}; font-size: 10px;">刷取次数</div>
+                                <div id="lv-stat-runs" style="color: ${v.textJade}; font-size: 16px; font-weight: bold;">0</div>
                             </div>
-                            <div style="text-align: center; padding: 6px; background: rgba(0,0,0,0.2); border-radius: 6px;">
-                                <div style="color: #6a6560; font-size: 10px;">总层数</div>
-                                <div id="lv-stat-floors" style="color: #3dab97; font-size: 16px; font-weight: bold;">0</div>
+                            <div style="text-align: center; padding: 6px; background: ${v.isDark ? 'rgba(0,0,0,0.2)' : 'rgba(0,0,0,0.05)'}; border-radius: 6px;">
+                                <div style="color: ${v.textMuted}; font-size: 10px;">总层数</div>
+                                <div id="lv-stat-floors" style="color: ${v.textJade}; font-size: 16px; font-weight: bold;">0</div>
                             </div>
-                            <div style="text-align: center; padding: 6px; background: rgba(0,0,0,0.2); border-radius: 6px;">
-                                <div style="color: #6a6560; font-size: 10px;">藏宝图</div>
-                                <div id="lv-stat-maps" style="color: #c9993a; font-size: 16px; font-weight: bold;">0</div>
+                            <div style="text-align: center; padding: 6px; background: ${v.isDark ? 'rgba(0,0,0,0.2)' : 'rgba(0,0,0,0.05)'}; border-radius: 6px;">
+                                <div style="color: ${v.textMuted}; font-size: 10px;">藏宝图</div>
+                                <div id="lv-stat-maps" style="color: ${v.textGold}; font-size: 16px; font-weight: bold;">0</div>
                             </div>
-                            <div style="text-align: center; padding: 6px; background: rgba(0,0,0,0.2); border-radius: 6px;">
-                                <div style="color: #6a6560; font-size: 10px;">花费灵石</div>
-                                <div id="lv-stat-stone" style="color: #e06060; font-size: 16px; font-weight: bold;">0</div>
+                            <div style="text-align: center; padding: 6px; background: ${v.isDark ? 'rgba(0,0,0,0.2)' : 'rgba(0,0,0,0.05)'}; border-radius: 6px;">
+                                <div style="color: ${v.textMuted}; font-size: 10px;">花费灵石</div>
+                                <div id="lv-stat-stone" style="color: ${v.textRed}; font-size: 16px; font-weight: bold;">0</div>
                             </div>
-                            <div style="text-align: center; padding: 6px; background: rgba(0,0,0,0.2); border-radius: 6px;">
-                                <div style="color: #6a6560; font-size: 10px;">最高纪录</div>
-                                <div id="lv-stat-best" style="color: #9a6ae0; font-size: 16px; font-weight: bold;">0</div>
+                            <div style="text-align: center; padding: 6px; background: ${v.isDark ? 'rgba(0,0,0,0.2)' : 'rgba(0,0,0,0.05)'}; border-radius: 6px;">
+                                <div style="color: ${v.textMuted}; font-size: 10px;">最高纪录</div>
+                                <div id="lv-stat-best" style="color: ${v.textPurple}; font-size: 16px; font-weight: bold;">0</div>
                             </div>
-                            <div style="text-align: center; padding: 6px; background: rgba(0,0,0,0.2); border-radius: 6px;">
-                                <div style="color: #6a6560; font-size: 10px;">运行时间</div>
-                                <div id="lv-stat-time" style="color: #60a0e0; font-size: 14px; font-weight: bold;">0:00</div>
+                            <div style="text-align: center; padding: 6px; background: ${v.isDark ? 'rgba(0,0,0,0.2)' : 'rgba(0,0,0,0.05)'}; border-radius: 6px;">
+                                <div style="color: ${v.textMuted}; font-size: 10px;">运行时间</div>
+                                <div id="lv-stat-time" style="color: ${v.textBlue}; font-size: 14px; font-weight: bold;">0:00</div>
                             </div>
                         </div>
                     </div>
 
                     <!-- 基本设置 -->
                     <div class="lv-section" style="margin-bottom: 16px;">
-                        <div class="lv-section-title" style="font-size: 12px; color: #c9993a; margin-bottom: 10px; font-weight: bold; display: flex; align-items: center; gap: 6px;">
+                        <div class="lv-section-title" style="font-size: 12px; color: ${v.textGold}; margin-bottom: 10px; font-weight: bold; display: flex; align-items: center; gap: 6px;">
                             <span>▸</span> 基本设置
                         </div>
                         <div class="lv-section-content">
                             <div class="lv-row" style="display: flex; gap: 10px; margin-bottom: 10px;">
                                 <div style="flex: 1;">
-                                    <span class="lv-label" style="font-size: 11px; color: #a8a090;">最大灵石花费</span>
-                                    <input type="number" id="lv-max-stone" value="50000" step="1000" style="
+                                    <span class="lv-label" style="font-size: 11px; color: ${v.textSecondary};">最大灵石花费</span>
+                                    <input type="number" id="lv-max-stone" value="50000" step="1000" class="lv-trial-input" style="
                                         width: 100%;
                                         margin-top: 4px;
-                                        background: #0d1420;
-                                        border: 1px solid rgba(201, 153, 58, 0.15);
-                                        color: #e8e0d0;
+                                        background: ${v.bgInput};
+                                        border: 1px solid ${v.borderColor};
+                                        color: ${v.textPrimary};
                                         padding: 6px 10px;
                                         border-radius: 6px;
                                         font-size: 12px;
                                     ">
                                 </div>
                                 <div style="flex: 1;">
-                                    <span class="lv-label" style="font-size: 11px; color: #a8a090;">最大刷取次数</span>
-                                    <input type="number" id="lv-max-runs" value="0" min="0" style="
+                                    <span class="lv-label" style="font-size: 11px; color: ${v.textSecondary};">最大刷取次数</span>
+                                    <input type="number" id="lv-max-runs" value="0" min="0" class="lv-trial-input" style="
                                         width: 100%;
                                         margin-top: 4px;
-                                        background: #0d1420;
-                                        border: 1px solid rgba(201, 153, 58, 0.15);
-                                        color: #e8e0d0;
+                                        background: ${v.bgInput};
+                                        border: 1px solid ${v.borderColor};
+                                        color: ${v.textPrimary};
                                         padding: 6px 10px;
                                         border-radius: 6px;
                                         font-size: 12px;
@@ -796,26 +939,26 @@
 
                             <div class="lv-row" style="display: flex; gap: 10px; margin-bottom: 10px;">
                                 <div style="flex: 1;">
-                                    <span class="lv-label" style="font-size: 11px; color: #a8a090;">目标藏宝图数</span>
-                                    <input type="number" id="lv-target-maps" value="0" min="0" style="
+                                    <span class="lv-label" style="font-size: 11px; color: ${v.textSecondary};">目标藏宝图数</span>
+                                    <input type="number" id="lv-target-maps" value="0" min="0" class="lv-trial-input" style="
                                         width: 100%;
                                         margin-top: 4px;
-                                        background: #0d1420;
-                                        border: 1px solid rgba(201, 153, 58, 0.15);
-                                        color: #e8e0d0;
+                                        background: ${v.bgInput};
+                                        border: 1px solid ${v.borderColor};
+                                        color: ${v.textPrimary};
                                         padding: 6px 10px;
                                         border-radius: 6px;
                                         font-size: 12px;
                                     ">
                                 </div>
                                 <div style="flex: 1;">
-                                    <span class="lv-label" style="font-size: 11px; color: #a8a090;">目标层数(停止)</span>
-                                    <input type="number" id="lv-stop-floor" value="0" min="0" style="
+                                    <span class="lv-label" style="font-size: 11px; color: ${v.textSecondary};">目标层数(停止)</span>
+                                    <input type="number" id="lv-stop-floor" value="0" min="0" class="lv-trial-input" style="
                                         width: 100%;
                                         margin-top: 4px;
-                                        background: #0d1420;
-                                        border: 1px solid rgba(201, 153, 58, 0.15);
-                                        color: #e8e0d0;
+                                        background: ${v.bgInput};
+                                        border: 1px solid ${v.borderColor};
+                                        color: ${v.textPrimary};
                                         padding: 6px 10px;
                                         border-radius: 6px;
                                         font-size: 12px;
@@ -837,32 +980,32 @@
 
                     <!-- 战斗设置 -->
                     <div class="lv-section" style="margin-bottom: 16px;">
-                        <div class="lv-section-title" style="font-size: 12px; color: #c9993a; margin-bottom: 10px; font-weight: bold; display: flex; align-items: center; gap: 6px;">
+                        <div class="lv-section-title" style="font-size: 12px; color: ${v.textGold}; margin-bottom: 10px; font-weight: bold; display: flex; align-items: center; gap: 6px;">
                             <span>▸</span> 战斗设置
                         </div>
                         <div class="lv-section-content">
                             <div class="lv-row" style="display: flex; gap: 10px; margin-bottom: 10px;">
                                 <div style="flex: 1;">
-                                    <span class="lv-label" style="font-size: 11px; color: #a8a090;">战斗间隔(ms)</span>
-                                    <input type="number" id="lv-delay-fight" value="1000" min="500" step="100" style="
+                                    <span class="lv-label" style="font-size: 11px; color: ${v.textSecondary};">战斗间隔(ms)</span>
+                                    <input type="number" id="lv-delay-fight" value="1000" min="500" step="100" class="lv-trial-input" style="
                                         width: 100%;
                                         margin-top: 4px;
-                                        background: #0d1420;
-                                        border: 1px solid rgba(201, 153, 58, 0.15);
-                                        color: #e8e0d0;
+                                        background: ${v.bgInput};
+                                        border: 1px solid ${v.borderColor};
+                                        color: ${v.textPrimary};
                                         padding: 6px 10px;
                                         border-radius: 6px;
                                         font-size: 12px;
                                     ">
                                 </div>
                                 <div style="flex: 1;">
-                                    <span class="lv-label" style="font-size: 11px; color: #a8a090;">重置等待(ms)</span>
-                                    <input type="number" id="lv-delay-reset" value="2000" min="500" step="100" style="
+                                    <span class="lv-label" style="font-size: 11px; color: ${v.textSecondary};">重置等待(ms)</span>
+                                    <input type="number" id="lv-delay-reset" value="2000" min="500" step="100" class="lv-trial-input" style="
                                         width: 100%;
                                         margin-top: 4px;
-                                        background: #0d1420;
-                                        border: 1px solid rgba(201, 153, 58, 0.15);
-                                        color: #e8e0d0;
+                                        background: ${v.bgInput};
+                                        border: 1px solid ${v.borderColor};
+                                        color: ${v.textPrimary};
                                         padding: 6px 10px;
                                         border-radius: 6px;
                                         font-size: 12px;
@@ -872,26 +1015,26 @@
 
                             <div class="lv-row" style="display: flex; gap: 10px; margin-bottom: 10px;">
                                 <div style="flex: 1;">
-                                    <span class="lv-label" style="font-size: 11px; color: #a8a090;">天赋等待(ms)</span>
-                                    <input type="number" id="lv-delay-buff" value="500" min="100" step="100" style="
+                                    <span class="lv-label" style="font-size: 11px; color: ${v.textSecondary};">天赋等待(ms)</span>
+                                    <input type="number" id="lv-delay-buff" value="500" min="100" step="100" class="lv-trial-input" style="
                                         width: 100%;
                                         margin-top: 4px;
-                                        background: #0d1420;
-                                        border: 1px solid rgba(201, 153, 58, 0.15);
-                                        color: #e8e0d0;
+                                        background: ${v.bgInput};
+                                        border: 1px solid ${v.borderColor};
+                                        color: ${v.textPrimary};
                                         padding: 6px 10px;
                                         border-radius: 6px;
                                         font-size: 12px;
                                     ">
                                 </div>
                                 <div style="flex: 1;">
-                                    <span class="lv-label" style="font-size: 11px; color: #a8a090;">战斗超时(ms)</span>
-                                    <input type="number" id="lv-fight-timeout" value="30000" min="5000" step="1000" style="
+                                    <span class="lv-label" style="font-size: 11px; color: ${v.textSecondary};">战斗超时(ms)</span>
+                                    <input type="number" id="lv-fight-timeout" value="30000" min="5000" step="1000" class="lv-trial-input" style="
                                         width: 100%;
                                         margin-top: 4px;
-                                        background: #0d1420;
-                                        border: 1px solid rgba(201, 153, 58, 0.15);
-                                        color: #e8e0d0;
+                                        background: ${v.bgInput};
+                                        border: 1px solid ${v.borderColor};
+                                        color: ${v.textPrimary};
                                         padding: 6px 10px;
                                         border-radius: 6px;
                                         font-size: 12px;
@@ -908,7 +1051,7 @@
 
                     <!-- 天赋设置 -->
                     <div class="lv-section" style="margin-bottom: 16px;">
-                        <div class="lv-section-title" style="font-size: 12px; color: #c9993a; margin-bottom: 10px; font-weight: bold; display: flex; align-items: center; gap: 6px;">
+                        <div class="lv-section-title" style="font-size: 12px; color: ${v.textGold}; margin-bottom: 10px; font-weight: bold; display: flex; align-items: center; gap: 6px;">
                             <span>▸</span> 天赋设置
                         </div>
                         <div class="lv-section-content">
@@ -918,13 +1061,13 @@
                             </label>
 
                             <div style="margin-bottom: 10px;">
-                                <span class="lv-label" style="font-size: 11px; color: #a8a090;">选择策略:</span>
-                                <select id="lv-buff-strategy" style="
+                                <span class="lv-label" style="font-size: 11px; color: ${v.textSecondary};">选择策略:</span>
+                                <select id="lv-buff-strategy" class="lv-trial-select" style="
                                     width: 100%;
                                     margin-top: 4px;
-                                    background: #0d1420;
-                                    border: 1px solid rgba(201, 153, 58, 0.15);
-                                    color: #e8e0d0;
+                                    background: ${v.bgInput};
+                                    border: 1px solid ${v.borderColor};
+                                    color: ${v.textPrimary};
                                     padding: 8px 10px;
                                     border-radius: 6px;
                                     font-size: 12px;
@@ -937,13 +1080,13 @@
                             </div>
 
                             <div style="margin-bottom: 10px;">
-                                <span class="lv-label" style="font-size: 11px; color: #a8a090;">最小天赋品质:</span>
-                                <select id="lv-min-rarity" style="
+                                <span class="lv-label" style="font-size: 11px; color: ${v.textSecondary};">最小天赋品质:</span>
+                                <select id="lv-min-rarity" class="lv-trial-select" style="
                                     width: 100%;
                                     margin-top: 4px;
-                                    background: #0d1420;
-                                    border: 1px solid rgba(201, 153, 58, 0.15);
-                                    color: #e8e0d0;
+                                    background: ${v.bgInput};
+                                    border: 1px solid ${v.borderColor};
+                                    color: ${v.textPrimary};
                                     padding: 8px 10px;
                                     border-radius: 6px;
                                     font-size: 12px;
@@ -961,13 +1104,13 @@
 
                             <div style="display: flex; gap: 10px;">
                                 <div style="flex: 1;">
-                                    <span class="lv-label" style="font-size: 11px; color: #a8a090;">最大刷新次数</span>
-                                    <input type="number" id="lv-max-refresh" value="3" min="1" max="10" style="
+                                    <span class="lv-label" style="font-size: 11px; color: ${v.textSecondary};">最大刷新次数</span>
+                                    <input type="number" id="lv-max-refresh" value="3" min="1" max="10" class="lv-trial-input" style="
                                         width: 100%;
                                         margin-top: 4px;
-                                        background: #0d1420;
-                                        border: 1px solid rgba(201, 153, 58, 0.15);
-                                        color: #e8e0d0;
+                                        background: ${v.bgInput};
+                                        border: 1px solid ${v.borderColor};
+                                        color: ${v.textPrimary};
                                         padding: 6px 10px;
                                         border-radius: 6px;
                                         font-size: 12px;
@@ -979,7 +1122,7 @@
 
                     <!-- 藏宝图交易 -->
                     <div class="lv-section" style="margin-bottom: 16px;">
-                        <div class="lv-section-title" style="font-size: 12px; color: #c9993a; margin-bottom: 10px; font-weight: bold; display: flex; align-items: center; gap: 6px;">
+                        <div class="lv-section-title" style="font-size: 12px; color: ${v.textGold}; margin-bottom: 10px; font-weight: bold; display: flex; align-items: center; gap: 6px;">
                             <span>▸</span> 藏宝图交易
                         </div>
                         <div class="lv-section-content">
@@ -990,26 +1133,26 @@
 
                             <div class="lv-row" style="display: flex; gap: 10px; margin-bottom: 10px;">
                                 <div style="flex: 1;">
-                                    <span class="lv-label" style="font-size: 11px; color: #a8a090;">最低出售价格</span>
-                                    <input type="number" id="lv-min-map-price" value="2000" min="100" step="100" style="
+                                    <span class="lv-label" style="font-size: 11px; color: ${v.textSecondary};">最低出售价格</span>
+                                    <input type="number" id="lv-min-map-price" value="2000" min="100" step="100" class="lv-trial-input" style="
                                         width: 100%;
                                         margin-top: 4px;
-                                        background: #0d1420;
-                                        border: 1px solid rgba(201, 153, 58, 0.15);
-                                        color: #e8e0d0;
+                                        background: ${v.bgInput};
+                                        border: 1px solid ${v.borderColor};
+                                        color: ${v.textPrimary};
                                         padding: 6px 10px;
                                         border-radius: 6px;
                                         font-size: 12px;
                                     ">
                                 </div>
                                 <div style="flex: 1;">
-                                    <span class="lv-label" style="font-size: 11px; color: #a8a090;">灵石低于时出售</span>
-                                    <input type="number" id="lv-sell-stone-below" value="5000" min="1000" step="500" style="
+                                    <span class="lv-label" style="font-size: 11px; color: ${v.textSecondary};">灵石低于时出售</span>
+                                    <input type="number" id="lv-sell-stone-below" value="5000" min="1000" step="500" class="lv-trial-input" style="
                                         width: 100%;
                                         margin-top: 4px;
-                                        background: #0d1420;
-                                        border: 1px solid rgba(201, 153, 58, 0.15);
-                                        color: #e8e0d0;
+                                        background: ${v.bgInput};
+                                        border: 1px solid ${v.borderColor};
+                                        color: ${v.textPrimary};
                                         padding: 6px 10px;
                                         border-radius: 6px;
                                         font-size: 12px;
@@ -1018,13 +1161,13 @@
                             </div>
 
                             <div style="margin-bottom: 10px;">
-                                <span class="lv-label" style="font-size: 11px; color: #a8a090;">最大出售数量 (0=全部)</span>
-                                <input type="number" id="lv-max-maps-sell" value="0" min="0" style="
+                                <span class="lv-label" style="font-size: 11px; color: ${v.textSecondary};">最大出售数量 (0=全部)</span>
+                                <input type="number" id="lv-max-maps-sell" value="0" min="0" class="lv-trial-input" style="
                                     width: 100%;
                                     margin-top: 4px;
-                                    background: #0d1420;
-                                    border: 1px solid rgba(201, 153, 58, 0.15);
-                                    color: #e8e0d0;
+                                    background: ${v.bgInput};
+                                    border: 1px solid ${v.borderColor};
+                                    color: ${v.textPrimary};
                                     padding: 6px 10px;
                                     border-radius: 6px;
                                     font-size: 12px;
@@ -1035,7 +1178,7 @@
 
                     <!-- 停止条件 -->
                     <div class="lv-section" style="margin-bottom: 16px;">
-                        <div class="lv-section-title" style="font-size: 12px; color: #c9993a; margin-bottom: 10px; font-weight: bold; display: flex; align-items: center; gap: 6px;">
+                        <div class="lv-section-title" style="font-size: 12px; color: ${v.textGold}; margin-bottom: 10px; font-weight: bold; display: flex; align-items: center; gap: 6px;">
                             <span>▸</span> 停止条件
                         </div>
                         <div class="lv-section-content">
@@ -1050,13 +1193,13 @@
                             </label>
 
                             <div style="margin-bottom: 10px;">
-                                <span class="lv-label" style="font-size: 11px; color: #a8a090;">最大连续错误次数</span>
-                                <input type="number" id="lv-max-errors" value="3" min="1" max="10" style="
+                                <span class="lv-label" style="font-size: 11px; color: ${v.textSecondary};">最大连续错误次数</span>
+                                <input type="number" id="lv-max-errors" value="3" min="1" max="10" class="lv-trial-input" style="
                                     width: 100%;
                                     margin-top: 4px;
-                                    background: #0d1420;
-                                    border: 1px solid rgba(201, 153, 58, 0.15);
-                                    color: #e8e0d0;
+                                    background: ${v.bgInput};
+                                    border: 1px solid ${v.borderColor};
+                                    color: ${v.textPrimary};
                                     padding: 6px 10px;
                                     border-radius: 6px;
                                     font-size: 12px;
@@ -1074,7 +1217,7 @@
                     <div style="display: flex; gap: 10px; margin-bottom: 16px;">
                         <button id="lv-trial-start" style="
                             flex: 1;
-                            background: linear-gradient(135deg, #8a6a20 0%, #c9993a 50%, #8a6a20 100%);
+                            background: ${v.gradientGold};
                             border: none;
                             color: #fff;
                             padding: 12px;
@@ -1085,9 +1228,9 @@
                         ">开始刷取</button>
                         <button id="lv-trial-stop" style="
                             flex: 1;
-                            background: #151d2e;
-                            border: 1px solid rgba(224, 96, 96, 0.5);
-                            color: #e06060;
+                            background: ${v.bgCard};
+                            border: 1px solid ${v.textRed}80;
+                            color: ${v.textRed};
                             padding: 12px;
                             border-radius: 8px;
                             cursor: pointer;
@@ -1099,22 +1242,22 @@
 
                     <!-- 日志面板 -->
                     <div style="margin-bottom: 8px; display: flex; justify-content: space-between; align-items: center;">
-                        <span style="font-size: 12px; color: #a8a090;">运行日志</span>
+                        <span style="font-size: 12px; color: ${v.textSecondary};">运行日志</span>
                         <button id="lv-clear-log" style="
                             font-size: 11px;
                             padding: 4px 10px;
-                            background: #151d2e;
-                            border: 1px solid rgba(201, 153, 58, 0.15);
-                            color: #6a6560;
+                            background: ${v.bgCard};
+                            border: 1px solid ${v.borderColor};
+                            color: ${v.textMuted};
                             border-radius: 6px;
                             cursor: pointer;
                         ">清除</button>
                     </div>
-                    <div id="lv-trial-log" style="
+                    <div id="lv-trial-logs" class="lv-trial-card" style="
                         max-height: 180px;
                         overflow-y: auto;
-                        background: #151d2e;
-                        border: 1px solid rgba(201, 153, 58, 0.15);
+                        background: ${v.bgCard};
+                        border: 1px solid ${v.borderColor};
                         border-radius: 10px;
                         padding: 12px;
                         font-size: 11px;
@@ -1383,7 +1526,7 @@
                 font-size: 13px;
                 font-weight: bold;
                 cursor: pointer;
-                margin-top: 10px;
+                margin-top: 8px;
                 font-family: KaiTi, 楷体, STKaiti, "Noto Serif SC", serif;
                 transition: all 0.2s;
             `;
@@ -1397,10 +1540,23 @@
 
             btn.addEventListener('click', () => this.togglePanel());
 
-            // 插入到侧边栏
-            const sidebar = $('.player-panel') || $('#playerPanel');
-            if (sidebar) {
-                sidebar.appendChild(btn);
+            // 插入到炼造按钮后面
+            const craftSection = $('#lv-craft-section');
+            if (craftSection) {
+                craftSection.appendChild(btn);
+                return;
+            }
+
+            // 如果没有找到炼造按钮，插入到侧边栏第一个section后面
+            const playerPanel = $('.player-panel') || $('#playerPanel');
+            if (playerPanel) {
+                const firstSection = playerPanel.querySelector('.panel-section');
+                if (firstSection) {
+                    firstSection.insertAdjacentElement('afterend', btn);
+                    return;
+                }
+                // 兜底：直接append到侧边栏
+                playerPanel.appendChild(btn);
             }
         }
     };
@@ -1410,6 +1566,33 @@
         if (!location.href.includes('ling.muge.info')) return;
 
         Logger.info('天道试炼助手 v1.1.0 已加载');
+
+        // 添加全局样式移除按钮焦点轮廓
+        const style = document.createElement('style');
+        style.textContent = `
+            #lv-trial-panel button,
+            #lv-trial-panel input,
+            #lv-trial-panel select,
+            #lv-trial-sidebar-btn {
+                outline: none !important;
+                -webkit-tap-highlight-color: transparent !important;
+            }
+            #lv-trial-panel button:focus,
+            #lv-trial-panel input:focus,
+            #lv-trial-panel select:focus,
+            #lv-trial-sidebar-btn:focus {
+                outline: none !important;
+                box-shadow: none !important;
+            }
+            #lv-trial-panel button:active,
+            #lv-trial-sidebar-btn:active {
+                outline: none !important;
+            }
+        `;
+        document.head.appendChild(style);
+
+        // 初始化主题观察者
+        Theme.initObserver();
 
         // 等待侧边栏加载
         const checkSidebar = setInterval(() => {
