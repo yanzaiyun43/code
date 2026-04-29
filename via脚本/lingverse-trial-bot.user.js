@@ -1,7 +1,7 @@
 // ==UserScript==
 // @name         灵界 LingVerse 天道试炼刷取助手
 // @namespace    lingverse-trial-bot
-// @version      1.1.4
+// @version      1.1.5
 // @description  天道试炼塔自动化：自动重置、自动战斗、自动选择天赋、统计藏宝图收益
 // @author       LingVerse
 // @match        https://ling.muge.info/*
@@ -587,6 +587,11 @@
                     !(item.tradeCooldown && item.tradeCooldown > Date.now())
                 );
 
+                Logger.info(`背包中藏宝图: ${mapItems.length} 种`);
+                mapItems.forEach((item, idx) => {
+                    Logger.info(`藏宝图${idx+1}: ${item.name}, 数量${item.quantity || 1}, templateId=${item.templateId}`);
+                });
+
                 if (mapItems.length === 0) {
                     Logger.warn('背包中没有可出售的藏宝图');
                     return false;
@@ -602,16 +607,26 @@
 
                 // 获取求购列表
                 const buyReqRes = await API.getBuyRequests();
-                const buyRequests = (buyReqRes.data || []).filter(req =>
+                const allRequests = buyReqRes.data || [];
+                Logger.info(`获取到 ${allRequests.length} 个求购单`);
+
+                const buyRequests = allRequests.filter(req =>
                     req.name && req.name.includes('藏宝图') &&
                     req.unitPrice >= CONFIG.minMapPrice &&
                     !req.isMine
                 );
 
+                Logger.info(`符合条件的藏宝图求购单: ${buyRequests.length} 个 (价格≥${CONFIG.minMapPrice})`);
+
                 if (buyRequests.length === 0) {
                     Logger.warn(`未找到价格 ≥ ${CONFIG.minMapPrice} 的藏宝图求购单`);
                     return false;
                 }
+
+                // 打印求购单详情
+                buyRequests.forEach((req, idx) => {
+                    Logger.info(`求购单${idx+1}: ${req.name} @ ${req.unitPrice}灵石, 剩余${req.remainingQty}个`);
+                });
 
                 // 按价格排序（从高到低）
                 buyRequests.sort((a, b) => b.unitPrice - a.unitPrice);
@@ -625,13 +640,17 @@
 
                     const itemQty = mapItem.quantity || 1;
                     let remainingQty = itemQty;
+                    Logger.info(`尝试出售: ${mapItem.name} (templateId=${mapItem.templateId}), 数量${itemQty}`);
 
                     for (const request of buyRequests) {
                         if (remainingQty <= 0 || soldCount >= totalMaps) break;
                         if (request.remainingQty <= 0) continue;
 
                         // 检查是否是同一种藏宝图
-                        if (request.templateId !== mapItem.templateId) continue;
+                        if (request.templateId !== mapItem.templateId) {
+                            Logger.info(`  跳过求购单: templateId不匹配 (物品=${mapItem.templateId}, 求购=${request.templateId})`);
+                            continue;
+                        }
 
                         const sellQty = Math.min(remainingQty, request.remainingQty, totalMaps - soldCount);
 
