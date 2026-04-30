@@ -1,7 +1,7 @@
 // ==UserScript==
 // @name         灵界 LingVerse 炼造配置面板
 // @namespace    lingverse-craft-config
-// @version      2.1.33
+// @version      2.1.36
 // @description  炼造自动化配置：支持炼丹/炼器/制符/化身炼造、许愿锁定、自动售卖、深色/浅色模式跟随游戏主题
 // @author       LingVerse
 // @match        https://ling.muge.info/*
@@ -578,10 +578,6 @@
 
         // ==================== 出售物品 ====================
 
-        async sellItems(items) {
-            return this.request('POST', '/api/game/inventory/sell', { items });
-        },
-
         async previewBatchSell(maxRarity, scope = null) {
             const payload = { maxRarity };
             if (scope && scope !== 'all') payload.scope = scope;
@@ -1004,13 +1000,13 @@
                 top: 50%;
                 left: 50%;
                 transform: translate(-50%, -50%);
-                width: 95%;
-                max-width: 480px;
-                max-height: 90vh;
+                width: 92%;
+                max-width: 460px;
+                max-height: 85vh;
                 z-index: 100000;
                 background: ${v.bgPanel};
                 border: 2px solid ${v.borderGold};
-                border-radius: 16px;
+                border-radius: 12px;
                 font-size: 13px;
                 color: ${v.textPrimary};
                 box-shadow: ${v.shadowLg};
@@ -1153,7 +1149,7 @@
 
                 <!-- 内容区 -->
                 <div id="lv-panel-content" style="
-                    padding: 16px;
+                    padding: 14px;
                     overflow-y: auto;
                     flex: 1;
                     -webkit-overflow-scrolling: touch;
@@ -1200,6 +1196,18 @@
                                 <option value="">-- 不自动炼丹 --</option>
                                 ${this.generateRecipeOptions(CACHE.alchemy, 'pillName', 'alchemy')}
                             </select>
+                            <div id="lv-alchemy-desc" style="
+                                margin-top: 6px;
+                                padding: 8px 10px;
+                                background: ${v.bgCard};
+                                border: 1px solid ${v.borderColor};
+                                border-radius: 6px;
+                                font-size: 11px;
+                                color: ${v.textSecondary};
+                                line-height: 1.4;
+                                min-height: 20px;
+                                display: none;
+                            "></div>
                         </div>
 
                         <!-- 炼器 -->
@@ -1228,6 +1236,18 @@
                                 <option value="">-- 不自动炼器 --</option>
                                 ${this.generateRecipeOptions(CACHE.forge, 'name', 'forge')}
                             </select>
+                            <div id="lv-forge-desc" style="
+                                margin-top: 6px;
+                                padding: 8px 10px;
+                                background: ${v.bgCard};
+                                border: 1px solid ${v.borderColor};
+                                border-radius: 6px;
+                                font-size: 11px;
+                                color: ${v.textSecondary};
+                                line-height: 1.4;
+                                min-height: 20px;
+                                display: none;
+                            "></div>
                         </div>
 
                         <!-- 制符 -->
@@ -1256,6 +1276,18 @@
                                 <option value="">-- 不自动制符 --</option>
                                 ${this.generateRecipeOptions(CACHE.talisman, 'name', 'talisman')}
                             </select>
+                            <div id="lv-talisman-desc" style="
+                                margin-top: 6px;
+                                padding: 8px 10px;
+                                background: ${v.bgCard};
+                                border: 1px solid ${v.borderColor};
+                                border-radius: 6px;
+                                font-size: 11px;
+                                color: ${v.textSecondary};
+                                line-height: 1.4;
+                                min-height: 20px;
+                                display: none;
+                            "></div>
                         </div>
 
                         <!-- 刷新按钮 -->
@@ -1542,7 +1574,7 @@
                                 font-size: 13px;
                                 text-align: center;
                             ">
-                            <span style="font-size: 12px; color: ${v.textSecondary};">最大补充:</span>
+                            <span style="font-size: 12px; color: ${v.textSecondary};">最多补充灵石:</span>
                             <input type="number" id="lv-max-cost" value="5000" min="0" step="100" style="
                                 width: 90px;
                                 background: ${v.bgInput};
@@ -2043,6 +2075,7 @@
 
             let html = '';
             const categoryNames = {
+                // 丹药分类
                 'HEAL_HP': '回血丹药', 'HEAL_MP': '回灵丹药', 'HEAL_SPIRIT': '回神识丹药',
                 'BREAKTHROUGH': '突破丹药', 'COMBAT_ATK': '战斗丹(攻)', 'COMBAT_DEF': '战斗丹(防)',
                 'SPECIAL_ANTIDOTE': '解毒丹', 'SPECIAL_PERMANENT_HP': '永久HP丹',
@@ -2050,9 +2083,14 @@
                 'SPECIAL_FIVE_ROOT': '五行通灵丹', 'ENCOUNTER_BOOST': '招妖丹药',
                 'ENCOUNTER_REPEL': '避妖丹药', 'INCARNATION_CULTIVATION': '化身修为丹药',
                 'PET_HEAL_HP': '灵兽回血丹', 'PET_HEAL_MP': '灵兽回灵丹', 'PET_HEAL_BOTH': '灵兽双补丹',
+                // 装备分类
                 'WEAPON': '武器', 'ARMOR': '防具', 'ACCESSORY': '饰品', 'RING': '储物戒',
+                'weapon': '武器', 'armor': '防具', 'accessory': '饰品', 'ring': '储物戒',
+                // 符箓分类
                 'ATTACK': '攻伐符箓', 'DEFENSE': '防御符箓', 'UTILITY': '功能符箓',
-                '秘传图纸': '秘传图纸'
+                'attack': '攻伐符箓', 'defense': '防御符箓', 'utility': '功能符箓',
+                // 其他
+                '秘传图纸': '秘传图纸', '其他': '其他'
             };
 
             for (const [category, items] of Object.entries(groups)) {
@@ -2192,6 +2230,17 @@
                 this.updateBatchSellMode();
             });
 
+            // 炼造目标选择时显示介绍
+            $('#lv-target-alchemy')?.addEventListener('change', (e) => {
+                this.updateRecipeDescription('alchemy', e.target.value);
+            });
+            $('#lv-target-forge')?.addEventListener('change', (e) => {
+                this.updateRecipeDescription('forge', e.target.value);
+            });
+            $('#lv-target-talisman')?.addEventListener('change', (e) => {
+                this.updateRecipeDescription('talisman', e.target.value);
+            });
+
             $('#lv-advanced-toggle')?.addEventListener('click', () => {
                 const content = $('#lv-advanced-content');
                 const icon = $('#lv-advanced-icon');
@@ -2276,6 +2325,30 @@
                 if (separator) separator.style.display = 'block';
                 if (pillsRow) pillsRow.style.display = 'flex';
                 if (equipRow) equipRow.style.display = 'flex';
+            }
+        },
+
+        updateRecipeDescription(type, selectedName) {
+            const descEl = $(`#lv-${type}-desc`);
+            if (!descEl) return;
+
+            if (!selectedName) {
+                descEl.style.display = 'none';
+                descEl.textContent = '';
+                return;
+            }
+
+            const cache = type === 'alchemy' ? CACHE.alchemy :
+                         type === 'forge' ? CACHE.forge : CACHE.talisman;
+            const nameField = type === 'alchemy' ? 'pillName' : 'name';
+
+            const recipe = cache.find(r => r[nameField] === selectedName);
+            if (recipe && recipe.description) {
+                descEl.textContent = recipe.description;
+                descEl.style.display = 'block';
+            } else {
+                descEl.style.display = 'none';
+                descEl.textContent = '';
             }
         },
 
@@ -2373,13 +2446,21 @@
         },
 
         toggleMinimize() {
+            const panel = $('#lv-craft-panel');
             const content = $('#lv-panel-content');
             const btn = $('#lv-btn-minimize');
-            if (!content || !btn) return;
+            if (!panel || !content || !btn) return;
 
             STATE.panelMinimized = !STATE.panelMinimized;
             content.style.display = STATE.panelMinimized ? 'none' : 'block';
             btn.textContent = STATE.panelMinimized ? '+' : '−';
+            
+            // 添加/移除收起状态类，用于移动端适配
+            if (STATE.panelMinimized) {
+                panel.classList.add('lv-minimized');
+            } else {
+                panel.classList.remove('lv-minimized');
+            }
         },
 
         saveConfigFromPanel() {
@@ -2478,6 +2559,11 @@
             setValue('#lv-target-forge', getVal(CONFIG.targets, 'forge', ''));
             setValue('#lv-target-talisman', getVal(CONFIG.targets, 'talisman', ''));
 
+            // 初始化选中物品的介绍显示
+            this.updateRecipeDescription('alchemy', getVal(CONFIG.targets, 'alchemy', ''));
+            this.updateRecipeDescription('forge', getVal(CONFIG.targets, 'forge', ''));
+            this.updateRecipeDescription('talisman', getVal(CONFIG.targets, 'talisman', ''));
+
             setChecked('#lv-incarnation-enabled', getVal(CONFIG.targets.incarnation, 'enabled', false));
             setValue('#lv-incarnation-type', getVal(CONFIG.targets.incarnation, 'type', 'alchemy'));
             setValue('#lv-incarnation-target', getVal(CONFIG.targets.incarnation, 'target', ''));
@@ -2557,6 +2643,11 @@
                     this.generateRecipeOptions(CACHE.talisman, 'name', 'talisman');
                 talismanSelect.value = current;
             }
+
+            // 刷新后更新介绍显示
+            this.updateRecipeDescription('alchemy', alchemySelect?.value || '');
+            this.updateRecipeDescription('forge', forgeSelect?.value || '');
+            this.updateRecipeDescription('talisman', talismanSelect?.value || '');
         },
 
         updateIncarnationStatus() {
@@ -3389,7 +3480,7 @@
     async function init() {
         if (!location.href.includes('ling.muge.info')) return;
 
-        // 添加全局样式移除按钮焦点轮廓
+        // 添加全局样式移除按钮焦点轮廓和移动端适配
         const style = document.createElement('style');
         style.textContent = `
             #lv-craft-panel button,
@@ -3409,6 +3500,62 @@
             #lv-craft-panel button:active,
             #lv-craft-sidebar-btn:active {
                 outline: none !important;
+            }
+            /* 移动端适配 */
+            @media (max-width: 480px) {
+                #lv-craft-panel {
+                    width: 95% !important;
+                    max-width: none !important;
+                    max-height: 80vh !important;
+                    border-radius: 10px !important;
+                }
+                #lv-panel-content {
+                    padding: 12px !important;
+                }
+                #lv-craft-panel .lv-select,
+                #lv-craft-panel input[type="number"],
+                #lv-craft-panel input[type="text"] {
+                    font-size: 14px !important;
+                    padding: 8px 10px !important;
+                    min-height: 36px !important;
+                }
+                #lv-craft-panel button {
+                    min-height: 36px !important;
+                    font-size: 13px !important;
+                }
+                #lv-panel-header {
+                    padding: 10px 14px !important;
+                }
+                #lv-craft-panel .lv-section,
+                #lv-craft-panel .lv-card {
+                    margin-bottom: 12px !important;
+                }
+                #lv-log-panel {
+                    max-height: 120px !important;
+                    padding: 8px !important;
+                }
+                #lv-craft-sidebar-btn {
+                    padding: 8px 10px !important;
+                    font-size: 12px !important;
+                }
+            }
+            /* 收起状态更小 */
+            #lv-craft-panel.lv-minimized {
+                max-height: 50px !important;
+                overflow: hidden !important;
+            }
+            #lv-craft-panel.lv-minimized #lv-panel-content {
+                display: none !important;
+            }
+            /* 超小屏幕适配 */
+            @media (max-width: 360px) {
+                #lv-craft-panel {
+                    width: 98% !important;
+                    border-radius: 8px !important;
+                }
+                #lv-panel-content {
+                    padding: 10px !important;
+                }
             }
         `;
         document.head.appendChild(style);

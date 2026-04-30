@@ -1,7 +1,7 @@
 // ==UserScript==
 // @name         灵界 LingVerse 天道试炼刷取助手
 // @namespace    lingverse-trial-bot
-// @version      2.0.8
+// @version      2.0.10
 // @description  天道试炼塔自动化：自动重置、自动战斗、自动选择天赋、统计藏宝图收益
 // @author       LingVerse
 // @match        https://ling.muge.info/*
@@ -60,7 +60,11 @@
         bot_sellMapWhenStoneBelow: 5000, // 灵石低于此值时出售
         bot_maxMapsToSell: 0,            // 最大出售数量 (0=全部)
         bot_sellMapStrategy: 'highest',  // 出售策略: highest(最高价优先)/all(全部)
-        bot_sellMapWhenCountAbove: 0     // 藏宝图数量超过此值时出售 (0=不启用)
+        bot_sellMapWhenCountAbove: 0,    // 藏宝图数量超过此值时出售 (0=不启用)
+
+        // 自动放弃设置
+        bot_autoGiveUp: false,           // 是否启用达到指定层数后自动放弃
+        bot_giveUpAtFloor: 0             // 达到此层数后自动放弃 (0=不启用, 5/10/15...)
     };
 
     // 状态管理
@@ -185,6 +189,21 @@
         }
     };
 
+    // 工具函数
+    const bot_Utils = {
+        // 计算坊市交易手续费（与游戏保持一致）
+        calcTradeFee(unitPrice, quantity) {
+            const p = Number(unitPrice) || 0;
+            const q = Number(quantity) || 0;
+            if (p <= 0 || q <= 0) return 0;
+            let rate = 0.05;
+            if (p >= 10000000) rate = 0.15;
+            else if (p >= 1000000) rate = 0.12;
+            else if (p >= 100000) rate = 0.08;
+            return Math.max(1, Math.floor(p * q * rate));
+        }
+    };
+
     // 日志系统
     const bot_Logger = {
         log(msg, type = 'info') {
@@ -277,10 +296,24 @@
             }
 
             bot_STATE.bot_running = true;
-            bot_STATE.stats.bot_startTime = Date.now();
+
+            // 重置本次运行统计
+            bot_STATE.stats = {
+                bot_totalRuns: 0,
+                bot_totalFloors: 0,
+                bot_totalMaps: 0,
+                bot_totalStoneSpent: 0,
+                bot_totalAdPointsSpent: 0,
+                bot_bestFloor: 0,
+                bot_currentRunFloors: 0,
+                bot_startTime: Date.now(),
+                bot_totalFightTime: 0
+            };
+
             bot_STATE.bot_buffRefreshCount = 0;
             bot_UI.updateStatus('运行中');
             bot_UI.updateButtonStates();
+            bot_UI.updateStats();
             bot_Logger.success('试炼助手已启动');
 
             try {
@@ -463,6 +496,15 @@
                 // 检查层数停止条件
                 if (bot_CONFIG.bot_stopOnFloor > 0 && bot_STATE.stats.bot_currentRunFloors >= bot_CONFIG.bot_stopOnFloor) {
                     bot_Logger.info(`已达到目标层数 ${bot_CONFIG.bot_stopOnFloor}，放弃当前试炼`);
+                    await bot_API.giveUp();
+                    break;
+                }
+
+                // 检查自动放弃条件（达到指定层数后主动放弃以获取藏宝图）
+                if (bot_CONFIG.bot_autoGiveUp && bot_CONFIG.bot_giveUpAtFloor > 0 &&
+                    bot_STATE.stats.bot_currentRunFloors >= bot_CONFIG.bot_giveUpAtFloor) {
+                    const mapsGot = Math.floor(bot_STATE.stats.bot_currentRunFloors / 5);
+                    bot_Logger.info(`已达到设定层数 ${bot_CONFIG.bot_giveUpAtFloor}，主动放弃，现获取 ${mapsGot} 张藏宝图`);
                     await bot_API.giveUp();
                     break;
                 }
@@ -695,12 +737,14 @@
                         try {
                             const sellRes = await bot_API.sellToRequest(request.id, sellQty);
                             if (sellRes.code === 200) {
-                                const earning = sellQty * request.unitPrice;
-                                earnedStone += earning;
+                                const grossEarning = sellQty * request.unitPrice;
+                                const fee = bot_Utils.calcTradeFee(request.unitPrice, sellQty);
+                                const netEarning = grossEarning - fee;
+                                earnedStone += netEarning;
                                 soldCount += sellQty;
                                 remainingQty -= sellQty;
                                 request.remainingQty -= sellQty;
-                                bot_Logger.success(`出售 ${sellQty} 个藏宝图 @ ${request.unitPrice}灵石，获得 ${earning} 灵石`);
+                                bot_Logger.success(`出售 ${sellQty} 个藏宝图 @ ${request.unitPrice}灵石，获得 ${netEarning} 灵石(手续费${fee})`);
                             }
                         } catch (e) {
                             bot_Logger.error(`出售失败: ${e.message}`);
@@ -823,13 +867,13 @@
                 top: 50%;
                 left: 50%;
                 transform: translate(-50%, -50%);
-                width: 95%;
-                max-width: 520px;
-                max-height: 90vh;
+                width: 92%;
+                max-width: 480px;
+                max-height: 85vh;
                 z-index: 100000;
                 background: ${v.bgPanel};
                 border: 2px solid ${v.borderGold};
-                border-radius: 16px;
+                border-radius: 12px;
                 font-size: 13px;
                 color: ${v.textPrimary};
                 box-shadow: ${v.shadowLg};
@@ -1064,10 +1108,30 @@
                                 <span style="font-size: 12px;">使用仙缘代替灵石</span>
                             </label>
 
-                            <label style="display: flex; align-items: center; gap: 8px; cursor: pointer;">
+                            <label style="display: flex; align-items: center; gap: 8px; margin-bottom: 8px; cursor: pointer;">
                                 <input type="checkbox" id="bot_stop_no_free" style="width: 16px; height: 16px;">
                                 <span style="font-size: 12px;">没有免费重置时停止</span>
                             </label>
+
+                            <label style="display: flex; align-items: center; gap: 8px; margin-bottom: 8px; cursor: pointer;">
+                                <input type="checkbox" id="bot_auto_giveup" style="width: 16px; height: 16px;">
+                                <span style="font-size: 12px;">达到层数后自动放弃</span>
+                            </label>
+
+                            <div style="margin-bottom: 10px;">
+                                <span class="lv-label" style="font-size: 11px; color: ${v.textSecondary};">达到此层数后放弃(每5层给藏宝图)</span>
+                                <input type="number" id="bot_giveup_floor" value="0" min="0" step="5" class="lv-trial-input" style="
+                                    width: 100%;
+                                    margin-top: 4px;
+                                    background: ${v.bgInput};
+                                    border: 1px solid ${v.borderColor};
+                                    color: ${v.textPrimary};
+                                    padding: 6px 10px;
+                                    border-radius: 6px;
+                                    font-size: 12px;
+                                ">
+                                <span style="font-size: 10px; color: ${v.textMuted};">0 = 不启用，建议设为5/10/15...</span>
+                            </div>
                         </div>
                     </div>
 
@@ -1474,6 +1538,8 @@
             bot_CONFIG.bot_stopOnFloor = parseInt($('#bot_stop_floor')?.value || '0');
             bot_CONFIG.bot_useAdPoints = $('#bot_use_ad')?.checked || false;
             bot_CONFIG.bot_stopWhenNoFreeReset = $('#bot_stop_no_free')?.checked || false;
+            bot_CONFIG.bot_autoGiveUp = $('#bot_auto_giveup')?.checked || false;
+            bot_CONFIG.bot_giveUpAtFloor = parseInt($('#bot_giveup_floor')?.value || '0');
 
             bot_CONFIG.bot_delayBetweenFights = parseInt($('#bot_delay_fight')?.value || '1000');
             bot_CONFIG.bot_delayAfterReset = parseInt($('#bot_delay_reset')?.value || '2000');
@@ -1520,6 +1586,8 @@
             if ($('#bot_stop_floor')) $('#bot_stop_floor').value = bot_CONFIG.bot_stopOnFloor;
             if ($('#bot_use_ad')) $('#bot_use_ad').checked = bot_CONFIG.bot_useAdPoints;
             if ($('#bot_stop_no_free')) $('#bot_stop_no_free').checked = bot_CONFIG.bot_stopWhenNoFreeReset;
+            if ($('#bot_auto_giveup')) $('#bot_auto_giveup').checked = bot_CONFIG.bot_autoGiveUp;
+            if ($('#bot_giveup_floor')) $('#bot_giveup_floor').value = bot_CONFIG.bot_giveUpAtFloor;
 
             // 战斗设置
             if ($('#bot_delay_fight')) $('#bot_delay_fight').value = bot_CONFIG.bot_delayBetweenFights;
@@ -1754,6 +1822,27 @@
             #bot_trial_panel button:active,
             #bot_trial_sidebar_btn:active {
                 outline: none !important;
+            }
+            /* 移动端适配 */
+            @media (max-width: 480px) {
+                #bot_trial_panel {
+                    width: 95% !important;
+                    max-width: none !important;
+                    max-height: 80vh !important;
+                    border-radius: 10px !important;
+                }
+                #bot_trial_content {
+                    padding: 12px !important;
+                }
+                .lv-trial-input, .lv-trial-select {
+                    font-size: 14px !important;
+                    padding: 8px !important;
+                }
+            }
+            /* 收起状态更小 */
+            #bot_trial_panel.bot-minimized {
+                max-height: 60px !important;
+                overflow: hidden !important;
             }
         `;
         document.head.appendChild(style);
