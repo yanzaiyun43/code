@@ -1,7 +1,7 @@
 // ==UserScript==
 // @name         灵界 LingVerse 炼造配置面板
 // @namespace    lingverse-craft-config
-// @version      2.1.36
+// @version      2.1.39
 // @description  炼造自动化配置：支持炼丹/炼器/制符/化身炼造、许愿锁定、自动售卖、深色/浅色模式跟随游戏主题
 // @author       LingVerse
 // @match        https://ling.muge.info/*
@@ -2343,8 +2343,41 @@
             const nameField = type === 'alchemy' ? 'pillName' : 'name';
 
             const recipe = cache.find(r => r[nameField] === selectedName);
-            if (recipe && recipe.description) {
-                descEl.textContent = recipe.description;
+            if (!recipe) {
+                descEl.style.display = 'none';
+                descEl.textContent = '';
+                return;
+            }
+
+            let descText = '';
+
+            // 炼器配方显示属性
+            if (type === 'forge') {
+                const stats = [];
+                if (recipe.baseAttack > 0) stats.push(`攻击+${recipe.baseAttack}`);
+                if (recipe.baseDefense > 0) stats.push(`防御+${recipe.baseDefense}`);
+                if (recipe.baseHp > 0) stats.push(`生命+${recipe.baseHp}`);
+                if (recipe.baseSpirit > 0) stats.push(`神识+${recipe.baseSpirit}`);
+                if (recipe.baseCapacity > 0) stats.push(`容量+${recipe.baseCapacity}`);
+
+                if (stats.length > 0) {
+                    descText = stats.join(' | ');
+                }
+            }
+
+            // 添加描述
+            if (recipe.description) {
+                descText = descText ? `${descText}\n${recipe.description}` : recipe.description;
+            }
+
+            // 制符显示成功率
+            if (type === 'talisman' && recipe.successRate) {
+                const rateText = `成功率: ${Math.round(recipe.successRate * 100)}%`;
+                descText = descText ? `${descText}\n${rateText}` : rateText;
+            }
+
+            if (descText) {
+                descEl.textContent = descText;
                 descEl.style.display = 'block';
             } else {
                 descEl.style.display = 'none';
@@ -2386,6 +2419,7 @@
             let isDragging = false;
             let startX, startY, startLeft, startTop;
 
+            // 鼠标事件
             header.addEventListener('mousedown', (e) => {
                 isDragging = true;
                 startX = e.clientX;
@@ -2407,6 +2441,34 @@
             });
 
             document.addEventListener('mouseup', () => {
+                isDragging = false;
+            });
+
+            // 触摸事件（移动端支持）
+            header.addEventListener('touchstart', (e) => {
+                isDragging = true;
+                const touch = e.touches[0];
+                startX = touch.clientX;
+                startY = touch.clientY;
+                const rect = panel.getBoundingClientRect();
+                startLeft = rect.left;
+                startTop = rect.top;
+                panel.style.transform = 'none';
+                panel.style.left = startLeft + 'px';
+                panel.style.top = startTop + 'px';
+            }, { passive: false });
+
+            document.addEventListener('touchmove', (e) => {
+                if (!isDragging) return;
+                e.preventDefault();
+                const touch = e.touches[0];
+                const dx = touch.clientX - startX;
+                const dy = touch.clientY - startY;
+                panel.style.left = (startLeft + dx) + 'px';
+                panel.style.top = (startTop + dy) + 'px';
+            }, { passive: false });
+
+            document.addEventListener('touchend', () => {
                 isDragging = false;
             });
         },
@@ -3539,13 +3601,31 @@
                     font-size: 12px !important;
                 }
             }
-            /* 收起状态更小 */
+            /* 收起状态更小 - 调整宽度和位置 */
             #lv-craft-panel.lv-minimized {
-                max-height: 50px !important;
+                max-height: 48px !important;
                 overflow: hidden !important;
+                width: auto !important;
+                min-width: 100px !important;
+                max-width: 140px !important;
             }
             #lv-craft-panel.lv-minimized #lv-panel-content {
                 display: none !important;
+            }
+            #lv-craft-panel.lv-minimized #lv-run-status {
+                display: none !important;
+            }
+            /* 收起时隐藏标题文字，只保留图标 */
+            #lv-craft-panel.lv-minimized #lv-panel-header span:nth-child(2) {
+                display: none !important;
+            }
+            /* 移动端收起状态 */
+            @media (max-width: 480px) {
+                #lv-craft-panel.lv-minimized {
+                    max-height: 44px !important;
+                    min-width: 90px !important;
+                    max-width: 120px !important;
+                }
             }
             /* 超小屏幕适配 */
             @media (max-width: 360px) {
@@ -3555,6 +3635,10 @@
                 }
                 #lv-panel-content {
                     padding: 10px !important;
+                }
+                #lv-craft-panel.lv-minimized {
+                    min-width: 90px !important;
+                    max-width: 120px !important;
                 }
             }
         `;

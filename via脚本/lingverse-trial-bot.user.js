@@ -1,7 +1,7 @@
 // ==UserScript==
 // @name         灵界 LingVerse 天道试炼刷取助手
 // @namespace    lingverse-trial-bot
-// @version      2.0.10
+// @version      2.0.12
 // @description  天道试炼塔自动化：自动重置、自动战斗、自动选择天赋、统计藏宝图收益
 // @author       LingVerse
 // @match        https://ling.muge.info/*
@@ -1496,6 +1496,7 @@
             let isDragging = false;
             let startX, startY, startLeft, startTop;
 
+            // 鼠标事件
             header.addEventListener('mousedown', (e) => {
                 isDragging = true;
                 startX = e.clientX;
@@ -1517,6 +1518,34 @@
             });
 
             document.addEventListener('mouseup', () => {
+                isDragging = false;
+            });
+
+            // 触摸事件（移动端支持）
+            header.addEventListener('touchstart', (e) => {
+                isDragging = true;
+                const touch = e.touches[0];
+                startX = touch.clientX;
+                startY = touch.clientY;
+                const rect = panel.getBoundingClientRect();
+                startLeft = rect.left;
+                startTop = rect.top;
+                panel.style.transform = 'none';
+                panel.style.left = startLeft + 'px';
+                panel.style.top = startTop + 'px';
+            }, { passive: false });
+
+            document.addEventListener('touchmove', (e) => {
+                if (!isDragging) return;
+                e.preventDefault();
+                const touch = e.touches[0];
+                const dx = touch.clientX - startX;
+                const dy = touch.clientY - startY;
+                panel.style.left = (startLeft + dx) + 'px';
+                panel.style.top = (startTop + dy) + 'px';
+            }, { passive: false });
+
+            document.addEventListener('touchend', () => {
                 isDragging = false;
             });
         },
@@ -1839,10 +1868,31 @@
                     padding: 8px !important;
                 }
             }
-            /* 收起状态更小 */
+            /* 收起状态更小 - 调整宽度和位置 */
             #bot_trial_panel.bot-minimized {
-                max-height: 60px !important;
+                max-height: 48px !important;
                 overflow: hidden !important;
+                width: auto !important;
+                min-width: 100px !important;
+                max-width: 140px !important;
+            }
+            #bot_trial_panel.bot-minimized #bot_trial_content {
+                display: none !important;
+            }
+            #bot_trial_panel.bot-minimized #bot_run_status {
+                display: none !important;
+            }
+            /* 收起时隐藏标题文字，只保留图标 */
+            #bot_trial_panel.bot-minimized #bot_trial_header span:nth-child(2) {
+                display: none !important;
+            }
+            /* 移动端收起状态 */
+            @media (max-width: 480px) {
+                #bot_trial_panel.bot-minimized {
+                    max-height: 44px !important;
+                    min-width: 90px !important;
+                    max-width: 120px !important;
+                }
             }
         `;
         document.head.appendChild(style);
