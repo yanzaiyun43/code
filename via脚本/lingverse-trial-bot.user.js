@@ -554,6 +554,9 @@
                     bot_Logger.success(`通关第 ${data.floor} 层 (耗时${fightDuration}ms)`);
                 }
 
+                // 调试：查看rewardMaps值
+                bot_Logger.info(`[调试] 第${data.floor}层 rewardMaps=${data.rewardMaps}, 类型=${typeof data.rewardMaps}`);
+
                 // 检查是否获得藏宝图
                 if (data.rewardMaps > 0) {
                     bot_STATE.stats.bot_totalMaps += data.rewardMaps;
