@@ -1,7 +1,7 @@
 // ==UserScript==
 // @name         灵界 LingVerse 天道试炼刷取助手
 // @namespace    lingverse-trial-bot
-// @version      2.0.17
+// @version      2.1.17
 // @description  天道试炼塔自动化：自动重置、自动战斗、自动选择天赋、统计藏宝图收益
 // @author       LingVerse
 // @match        https://ling.muge.info/*
@@ -341,11 +341,17 @@
                 bot_Logger.info(`运行结束，耗时 ${mins}分${secs}秒`);
             }
 
-            // 输出运行统计摘要（带颜色区分）
+            // 显示本次运行统计
             const stats = bot_STATE.stats;
-            bot_Logger.success(`本次运行统计: 刷取${stats.bot_totalRuns}次 | 通关${stats.bot_totalFloors}层 | 最高${stats.bot_bestFloor}层`);
-            bot_Logger.gold(`藏宝图总计: ${stats.bot_totalMaps}张`);
-            bot_Logger.info(`花费: ${stats.bot_totalStoneSpent}灵石${stats.bot_totalAdPointsSpent > 0 ? ` | ${stats.bot_totalAdPointsSpent}仙缘` : ''}`);
+            if (stats.bot_totalRuns > 0) {
+                bot_Logger.info(`本次运行统计: 刷取${stats.bot_totalRuns}次, 通关${stats.bot_totalFloors}层`);
+                // 使用金色高亮显示藏宝图数量
+                bot_Logger.gold(`藏宝图获取: ${stats.bot_totalMaps}张`);
+                bot_Logger.info(`灵石花费: ${stats.bot_totalStoneSpent.toLocaleString()}`);
+                if (stats.bot_bestFloor > 0) {
+                    bot_Logger.success(`🏆 最高纪录: 第${stats.bot_bestFloor}层`);
+                }
+            }
 
             bot_Logger.warn('试炼助手已停止');
 
@@ -493,8 +499,6 @@
             bot_STATE.stats.bot_totalRuns++;
             bot_STATE.stats.bot_currentRunFloors = 0;
             bot_STATE.bot_buffRefreshCount = 0;
-            // 记录本轮开始时的藏宝图数量，用于计算本轮实际获得
-            bot_STATE.bot_mapsAtStart = bot_STATE.stats.bot_totalMaps;
             bot_Logger.success('试炼已开始');
 
             await wait(bot_CONFIG.bot_delayAfterReset);
@@ -511,9 +515,14 @@
                 // 检查自动放弃条件（达到指定层数后主动放弃以获取藏宝图）
                 if (bot_CONFIG.bot_autoGiveUp && bot_CONFIG.bot_giveUpAtFloor > 0 &&
                     bot_STATE.stats.bot_currentRunFloors >= bot_CONFIG.bot_giveUpAtFloor) {
-                    // 计算本轮实际获得的藏宝图数量（基于API返回的统计）
-                    const mapsGotThisRun = bot_STATE.stats.bot_totalMaps - (bot_STATE.bot_mapsAtStart || 0);
-                    bot_Logger.gold(`已达到设定层数 ${bot_CONFIG.bot_giveUpAtFloor}，主动放弃，本次试炼获取 ${mapsGotThisRun} 张藏宝图`);
+                    const currentFloors = bot_STATE.stats.bot_currentRunFloors;
+                    const mapsGot = Math.floor(currentFloors / 5);
+                    bot_Logger.info(`[调试] 当前通关层数: ${currentFloors}, 计算藏宝图: ${mapsGot}`);
+                    if (mapsGot > 0) {
+                        bot_Logger.gold(`已达到设定层数 ${bot_CONFIG.bot_giveUpAtFloor}，主动放弃，可获取 ${mapsGot} 张藏宝图`);
+                    } else {
+                        bot_Logger.warn(`已达到设定层数 ${bot_CONFIG.bot_giveUpAtFloor}，但层数不足5层，无法获取藏宝图`);
+                    }
                     await bot_API.giveUp();
                     break;
                 }
