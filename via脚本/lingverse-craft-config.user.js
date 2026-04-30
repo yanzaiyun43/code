@@ -1,7 +1,7 @@
 // ==UserScript==
 // @name         灵界 LingVerse 炼造配置面板
 // @namespace    lingverse-craft-config
-// @version      2.1.40
+// @version      2.1.41
 // @description  炼造自动化配置：支持炼丹/炼器/制符/化身炼造、许愿锁定、自动售卖、深色/浅色模式跟随游戏主题
 // @author       LingVerse
 // @match        https://ling.muge.info/*
@@ -2351,6 +2351,14 @@
 
             let descText = '';
 
+            // 显示消耗信息（灵力、神识）
+            const costs = [];
+            if (recipe.mpCost > 0) costs.push(`灵 ${recipe.mpCost}`);
+            if (recipe.spiritCost > 0) costs.push(`神 ${recipe.spiritCost}`);
+            if (costs.length > 0) {
+                descText = costs.join(' | ');
+            }
+
             // 炼器配方显示属性
             if (type === 'forge') {
                 const stats = [];
@@ -2361,7 +2369,7 @@
                 if (recipe.baseCapacity > 0) stats.push(`容量+${recipe.baseCapacity}`);
 
                 if (stats.length > 0) {
-                    descText = stats.join(' | ');
+                    descText = descText ? `${descText}\n${stats.join(' | ')}` : stats.join(' | ');
                 }
             }
 
