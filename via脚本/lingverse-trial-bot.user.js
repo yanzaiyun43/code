@@ -1,7 +1,7 @@
 // ==UserScript==
 // @name         灵界 LingVerse 天道试炼刷取助手
 // @namespace    lingverse-trial-bot
-// @version      2.0.12
+// @version      2.0.13
 // @description  天道试炼塔自动化：自动重置、自动战斗、自动选择天赋、统计藏宝图收益
 // @author       LingVerse
 // @match        https://ling.muge.info/*
@@ -1879,12 +1879,17 @@
             #bot_trial_panel.bot-minimized #bot_trial_content {
                 display: none !important;
             }
-            #bot_trial_panel.bot-minimized #bot_run_status {
+            #bot_trial_panel.bot-minimized #bot_trial_status {
                 display: none !important;
             }
             /* 收起时隐藏标题文字，只保留图标 */
             #bot_trial_panel.bot-minimized #bot_trial_header span:nth-child(2) {
                 display: none !important;
+            }
+            /* 收起时让图标居中 */
+            #bot_trial_panel.bot-minimized #bot_trial_header > div:first-child {
+                justify-content: center !important;
+                width: 100%;
             }
             /* 移动端收起状态 */
             @media (max-width: 480px) {

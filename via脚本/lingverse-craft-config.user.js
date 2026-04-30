@@ -1,7 +1,7 @@
 // ==UserScript==
 // @name         灵界 LingVerse 炼造配置面板
 // @namespace    lingverse-craft-config
-// @version      2.1.39
+// @version      2.1.40
 // @description  炼造自动化配置：支持炼丹/炼器/制符/化身炼造、许愿锁定、自动售卖、深色/浅色模式跟随游戏主题
 // @author       LingVerse
 // @match        https://ling.muge.info/*
@@ -3618,6 +3618,11 @@
             /* 收起时隐藏标题文字，只保留图标 */
             #lv-craft-panel.lv-minimized #lv-panel-header span:nth-child(2) {
                 display: none !important;
+            }
+            /* 收起时让图标居中 */
+            #lv-craft-panel.lv-minimized #lv-panel-header > div:first-child {
+                justify-content: center !important;
+                width: 100%;
             }
             /* 移动端收起状态 */
             @media (max-width: 480px) {
