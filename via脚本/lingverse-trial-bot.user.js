@@ -1,7 +1,7 @@
 // ==UserScript==
 // @name         灵界 LingVerse 天道试炼刷取助手
 // @namespace    lingverse-trial-bot
-// @version      2.1.18
+// @version      2.1.20
 // @description  天道试炼塔自动化：自动重置、自动战斗、自动选择天赋、统计藏宝图收益
 // @author       LingVerse
 // @match        https://ling.muge.info/*
@@ -508,7 +508,13 @@
                 // 检查层数停止条件
                 if (bot_CONFIG.bot_stopOnFloor > 0 && bot_STATE.stats.bot_currentRunFloors >= bot_CONFIG.bot_stopOnFloor) {
                     bot_Logger.info(`已达到目标层数 ${bot_CONFIG.bot_stopOnFloor}，放弃当前试炼`);
-                    await bot_API.giveUp();
+                    const giveUpRes = await bot_API.giveUp();
+                    const giveUpData = giveUpRes.data || {};
+                    const actualMaps = giveUpData.rewardMaps || 0;
+                    if (actualMaps > 0) {
+                        bot_STATE.stats.bot_totalMaps += actualMaps;
+                        bot_Logger.gold(`放弃成功，获得藏宝图 x${actualMaps} (累计${bot_STATE.stats.bot_totalMaps})`);
+                    }
                     break;
                 }
 
@@ -516,14 +522,21 @@
                 if (bot_CONFIG.bot_autoGiveUp && bot_CONFIG.bot_giveUpAtFloor > 0 &&
                     bot_STATE.stats.bot_currentRunFloors >= bot_CONFIG.bot_giveUpAtFloor) {
                     const currentFloors = bot_STATE.stats.bot_currentRunFloors;
-                    const mapsGot = Math.floor(currentFloors / 5);
-                    bot_Logger.info(`[调试] 当前通关层数: ${currentFloors}, 计算藏宝图: ${mapsGot}`);
-                    if (mapsGot > 0) {
-                        bot_Logger.gold(`已达到设定层数 ${bot_CONFIG.bot_giveUpAtFloor}，主动放弃，可获取 ${mapsGot} 张藏宝图`);
+                    const estimatedMaps = Math.floor(currentFloors / 5);
+                    bot_Logger.info(`[调试] 当前通关层数: ${currentFloors}, 预计藏宝图: ${estimatedMaps}`);
+                    bot_Logger.info(`已达到设定层数 ${bot_CONFIG.bot_giveUpAtFloor}，正在放弃试炼...`);
+
+                    // 调用放弃API并获取返回数据中的藏宝图数量
+                    const giveUpRes = await bot_API.giveUp();
+                    const giveUpData = giveUpRes.data || {};
+                    const actualMaps = giveUpData.rewardMaps || 0;
+
+                    if (actualMaps > 0) {
+                        bot_STATE.stats.bot_totalMaps += actualMaps;
+                        bot_Logger.gold(`放弃成功，获得藏宝图 x${actualMaps} (累计${bot_STATE.stats.bot_totalMaps})`);
                     } else {
-                        bot_Logger.warn(`已达到设定层数 ${bot_CONFIG.bot_giveUpAtFloor}，但层数不足5层，无法获取藏宝图`);
+                        bot_Logger.warn(`放弃成功，但未获得藏宝图`);
                     }
-                    await bot_API.giveUp();
                     break;
                 }
 
@@ -553,9 +566,6 @@
                 if (bot_CONFIG.bot_showFightDetails) {
                     bot_Logger.success(`通关第 ${data.floor} 层 (耗时${fightDuration}ms)`);
                 }
-
-                // 调试：查看rewardMaps值
-                bot_Logger.info(`[调试] 第${data.floor}层 rewardMaps=${data.rewardMaps}, 类型=${typeof data.rewardMaps}`);
 
                 // 检查是否获得藏宝图
                 if (data.rewardMaps > 0) {
