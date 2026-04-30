@@ -1,7 +1,7 @@
 // ==UserScript==
 // @name         灵界 LingVerse 天道试炼刷取助手
 // @namespace    lingverse-trial-bot
-// @version      2.1.17
+// @version      2.1.18
 // @description  天道试炼塔自动化：自动重置、自动战斗、自动选择天赋、统计藏宝图收益
 // @author       LingVerse
 // @match        https://ling.muge.info/*
