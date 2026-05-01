@@ -1,7 +1,7 @@
 // ==UserScript==
 // @name         灵界 LingVerse 天道试炼刷取助手
 // @namespace    lingverse-trial-bot
-// @version      3.1.27
+// @version      3.1.3
 // @description  天道试炼塔自动化：自动重置、自动战斗、自动选择天赋、统计藏宝图收益
 // @author       LingVerse
 // @match        https://ling.muge.info/*
@@ -815,15 +815,13 @@
         },
 
         initObserver() {
-            // 使用轮询代替 MutationObserver 避免与其他脚本冲突
-            let lastTheme = this.getCurrent();
-            setInterval(() => {
-                const currentTheme = this.getCurrent();
-                if (currentTheme !== lastTheme) {
-                    lastTheme = currentTheme;
-                    bot_UI.updateTheme();
-                }
-            }, 1000);
+            const observer = new MutationObserver(() => {
+                bot_UI.updateTheme();
+            });
+            observer.observe(document.documentElement, {
+                attributes: true,
+                attributeFilter: ['class']
+            });
 
             window.matchMedia('(prefers-color-scheme: dark)').addEventListener('change', () => {
                 bot_UI.updateTheme();
