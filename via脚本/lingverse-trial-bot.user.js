@@ -1,7 +1,7 @@
 // ==UserScript==
 // @name         灵界 LingVerse 天道试炼刷取助手
 // @namespace    lingverse-trial-bot
-// @version      3.1.3
+// @version      3.1.4
 // @description  天道试炼塔自动化：自动重置、自动战斗、自动选择天赋、统计藏宝图收益
 // @author       LingVerse
 // @match        https://ling.muge.info/*
@@ -1850,23 +1850,36 @@
             section.appendChild(title);
             section.appendChild(btn);
 
+            // 检查section是否已经被插入
+            if (section.parentNode) {
+                return;
+            }
+
             // 插入到炼造 section 后面（如果存在）
             const craftSection = $('#lv-craft-section');
-            if (craftSection) {
-                craftSection.insertAdjacentElement('afterend', section);
+            if (craftSection && document.contains(craftSection)) {
+                try {
+                    craftSection.insertAdjacentElement('afterend', section);
+                } catch (e) {
+                    bot_Logger.warn('插入到炼造section后面失败: ' + e.message);
+                }
                 return;
             }
 
             // 如果没有找到炼造 section，插入到侧边栏第一个 section 后面
-            const playerPanel = $('.player-panel') || $('#playerPanel');
-            if (playerPanel) {
-                const firstSection = playerPanel.querySelector('.panel-section');
-                if (firstSection) {
-                    firstSection.insertAdjacentElement('afterend', section);
-                    return;
+            try {
+                const playerPanel = $('.player-panel') || $('#playerPanel');
+                if (playerPanel && document.contains(playerPanel)) {
+                    const firstSection = playerPanel.querySelector('.panel-section');
+                    if (firstSection && document.contains(firstSection)) {
+                        firstSection.insertAdjacentElement('afterend', section);
+                        return;
+                    }
+                    // 兜底：直接append到侧边栏
+                    playerPanel.appendChild(section);
                 }
-                // 兜底：直接append到侧边栏
-                playerPanel.appendChild(section);
+            } catch (e) {
+                bot_Logger.warn('插入侧边栏失败: ' + e.message);
             }
         }
     };
@@ -1988,18 +2001,20 @@
         // 初始化主题观察者
         bot_Theme.initObserver();
 
-        // 等待侧边栏加载
-        const checkSidebar = setInterval(() => {
-            const sidebar = $('.player-panel') || $('#playerPanel');
-            if (sidebar) {
-                clearInterval(checkSidebar);
-                bot_UI.createSidebarButton();
-                bot_Logger.info('点击侧边栏「试炼助手」按钮打开面板');
-            }
-        }, 1000);
+        // 等待侧边栏加载（延迟500ms，避免与炼造脚本同时操作DOM）
+        setTimeout(() => {
+            const checkSidebar = setInterval(() => {
+                const sidebar = $('.player-panel') || $('#playerPanel');
+                if (sidebar) {
+                    clearInterval(checkSidebar);
+                    bot_UI.createSidebarButton();
+                    bot_Logger.info('点击侧边栏「试炼助手」按钮打开面板');
+                }
+            }, 1000);
 
-        // 5秒后停止检查
-        setTimeout(() => clearInterval(checkSidebar), 10000);
+            // 5秒后停止检查
+            setTimeout(() => clearInterval(checkSidebar), 10000);
+        }, 500);
     }
 
     // 页面加载完成后初始化

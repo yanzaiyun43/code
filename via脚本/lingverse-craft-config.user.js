@@ -1,7 +1,7 @@
 // ==UserScript==
 // @name         灵界 LingVerse 炼造配置面板
 // @namespace    lingverse-craft-config
-// @version      3.1.6
+// @version      3.1.7
 // @description  炼造自动化配置：支持炼丹/炼器/制符/化身炼造、许愿锁定、自动售卖、深色/浅色模式跟随游戏主题
 // @author       LingVerse
 // @match        https://ling.muge.info/*
@@ -953,28 +953,35 @@
         },
 
         insertToSidebar(section) {
+            try {
+                // 检查section是否已经被插入
+                if (section.parentNode) {
+                    return;
+                }
 
-            const playerPanel = $('.player-panel') || $('#playerPanel');
-            if (playerPanel) {
-                const firstSection = playerPanel.querySelector('.panel-section');
-                if (firstSection) {
+                const playerPanel = $('.player-panel') || $('#playerPanel');
+                if (playerPanel && document.contains(playerPanel)) {
+                    const firstSection = playerPanel.querySelector('.panel-section');
+                    if (firstSection && document.contains(firstSection)) {
+                        if (!playerPanel.querySelector('#lv-craft-section')) {
+                            firstSection.insertAdjacentElement('afterend', section);
+                        }
+                        return;
+                    }
+                }
 
-                    if (!playerPanel.querySelector('#lv-craft-section')) {
-                        firstSection.insertAdjacentElement('afterend', section);
+                const sidebar = $('.player-panel') || $('#playerPanel') || $('.sidebar') || $('#sidebar');
+                if (sidebar && document.contains(sidebar)) {
+                    if (!sidebar.querySelector('#lv-craft-section')) {
+                        sidebar.appendChild(section);
                     }
                     return;
                 }
-            }
 
-            const sidebar = $('.player-panel') || $('#playerPanel') || $('.sidebar') || $('#sidebar');
-            if (sidebar) {
-                if (!sidebar.querySelector('#lv-craft-section')) {
-                    sidebar.appendChild(section);
-                }
-                return;
+                setTimeout(() => this.insertToSidebar(section), 1000);
+            } catch (e) {
+                Logger.warn('插入侧边栏失败: ' + e.message);
             }
-
-            setTimeout(() => this.insertToSidebar(section), 1000);
         },
 
         async createPanel() {
