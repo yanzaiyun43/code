@@ -1,7 +1,7 @@
 // ==UserScript==
 // @name         灵界 LingVerse 炼造配置面板
 // @namespace    lingverse-craft-config
-// @version      3.1.42
+// @version      3.1.43
 // @description  炼造自动化配置：支持炼丹/炼器/制符/化身炼造、许愿锁定、自动售卖、深色/浅色模式跟随游戏主题
 // @author       LingVerse
 // @match        https://ling.muge.info/*
@@ -3579,11 +3579,11 @@
                 border-radius: 0 !important;
             }
             #lv-craft-panel.lv-minimized #lv-panel-header {
-                background: ${v.bgCard} !important;
-                border: 1px solid ${v.borderLight} !important;
+                background: var(--bg-card, #ffffff) !important;
+                border: 1px solid var(--border-light, rgba(148, 163, 184, 0.12)) !important;
                 border-radius: 50px !important;
                 padding: 10px 16px !important;
-                box-shadow: ${v.shadowMd} !important;
+                box-shadow: 0 4px 12px rgba(0, 0, 0, 0.08) !important;
                 backdrop-filter: blur(10px) !important;
                 -webkit-backdrop-filter: blur(10px) !important;
                 transition: all 0.3s cubic-bezier(0.4, 0, 0.2, 1) !important;
@@ -3591,8 +3591,8 @@
             }
             #lv-craft-panel.lv-minimized #lv-panel-header:hover {
                 transform: translateY(-2px) !important;
-                box-shadow: ${v.shadowHover} !important;
-                border-color: ${v.borderActive} !important;
+                box-shadow: 0 8px 25px rgba(0, 0, 0, 0.12) !important;
+                border-color: rgba(96, 165, 250, 0.4) !important;
             }
             #lv-craft-panel.lv-minimized #lv-panel-content {
                 display: none !important;
@@ -3603,7 +3603,7 @@
             #lv-craft-panel.lv-minimized #lv-panel-header span:nth-child(2) {
                 font-size: 13px !important;
                 font-weight: 500 !important;
-                color: ${v.textPrimary} !important;
+                color: var(--text-primary, #1e293b) !important;
                 display: block !important;
             }
             #lv-craft-panel.lv-minimized #lv-run-status {
@@ -3619,8 +3619,8 @@
                 width: 24px !important;
                 height: 24px !important;
                 border: none !important;
-                background: ${v.bgSecondary} !important;
-                color: ${v.textSecondary} !important;
+                background: var(--bg-secondary, #f0f1f2) !important;
+                color: var(--text-secondary, #64748b) !important;
                 font-size: 12px !important;
                 margin-left: 6px !important;
             }

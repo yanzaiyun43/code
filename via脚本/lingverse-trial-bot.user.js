@@ -1,7 +1,7 @@
 // ==UserScript==
 // @name         灵界 LingVerse 天道试炼刷取助手
 // @namespace    lingverse-trial-bot
-// @version      3.1.21
+// @version      3.1.22
 // @description  天道试炼塔自动化：自动重置、自动战斗、自动选择天赋、统计藏宝图收益
 // @author       LingVerse
 // @match        https://ling.muge.info/*
@@ -1923,11 +1923,11 @@
                 border-radius: 0 !important;
             }
             #bot_trial_panel.bot-minimized #bot_trial_header {
-                background: ${v.bgCard} !important;
-                border: 1px solid ${v.borderLight} !important;
+                background: var(--bg-card, #ffffff) !important;
+                border: 1px solid var(--border-light, rgba(148, 163, 184, 0.12)) !important;
                 border-radius: 50px !important;
                 padding: 10px 16px !important;
-                box-shadow: ${v.shadowMd} !important;
+                box-shadow: 0 4px 12px rgba(0, 0, 0, 0.08) !important;
                 backdrop-filter: blur(10px) !important;
                 -webkit-backdrop-filter: blur(10px) !important;
                 transition: all 0.3s cubic-bezier(0.4, 0, 0.2, 1) !important;
@@ -1935,8 +1935,8 @@
             }
             #bot_trial_panel.bot-minimized #bot_trial_header:hover {
                 transform: translateY(-2px) !important;
-                box-shadow: ${v.shadowHover} !important;
-                border-color: ${v.borderActive} !important;
+                box-shadow: 0 8px 25px rgba(0, 0, 0, 0.12) !important;
+                border-color: rgba(96, 165, 250, 0.4) !important;
             }
             #bot_trial_panel.bot-minimized #bot_trial_content {
                 display: none !important;
@@ -1947,7 +1947,7 @@
             #bot_trial_panel.bot-minimized #bot_trial_header span:nth-child(2) {
                 font-size: 13px !important;
                 font-weight: 500 !important;
-                color: ${v.textPrimary} !important;
+                color: var(--text-primary, #1e293b) !important;
                 display: block !important;
             }
             #bot_trial_panel.bot-minimized #bot_trial_status {
@@ -1963,8 +1963,8 @@
                 width: 24px !important;
                 height: 24px !important;
                 border: none !important;
-                background: ${v.bgSecondary} !important;
-                color: ${v.textSecondary} !important;
+                background: var(--bg-secondary, #f0f1f2) !important;
+                color: var(--text-secondary, #64748b) !important;
                 font-size: 12px !important;
                 margin-left: 6px !important;
             }
