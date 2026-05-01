@@ -1,7 +1,7 @@
 // ==UserScript==
 // @name         灵界 LingVerse 天道试炼刷取助手
 // @namespace    lingverse-trial-bot
-// @version      3.1.25
+// @version      3.1.26
 // @description  天道试炼塔自动化：自动重置、自动战斗、自动选择天赋、统计藏宝图收益
 // @author       LingVerse
 // @match        https://ling.muge.info/*
@@ -1435,10 +1435,10 @@
                             font-size: 14px;
                             font-weight: 500;
                             transition: all 0.2s ease;
-                        " onmouseover="this.style.transform='translateY(-2px)'; this.style.boxShadow='0 6px 16px rgba(59, 130, 246, 0.35)'" onmouseout="this.style.transform=''; this.style.boxShadow=''" onmousedown="this.style.transform='scale(0.96)'" onmouseup="this.style.transform='translateY(-2px)'">开始刷取</button>
+                        " onmouseover="this.style.transform='translateY(-2px)'; this.style.boxShadow='0 6px 16px rgba(59, 130, 246, 0.35)'; this.style.filter='brightness(1.1)'" onmouseout="this.style.transform=''; this.style.boxShadow=''; this.style.filter=''" onmousedown="this.style.transform='scale(0.96)'; this.style.filter='brightness(0.9)'" onmouseup="this.style.transform='translateY(-2px)'; this.style.filter='brightness(1.1)'">开始刷取</button>
                         <button id="bot_trial_stop" style="
                             flex: 1;
-                            background: transparent;
+                            background: ${v.bgSecondary};
                             border: 1px solid ${v.accentRed};
                             color: ${v.accentRed};
                             padding: 14px;
@@ -1446,9 +1446,8 @@
                             cursor: pointer;
                             font-size: 14px;
                             font-weight: 500;
-                            opacity: 0.5;
                             transition: all 0.2s ease;
-                        " onmouseover="this.style.transform='translateY(-2px)'; this.style.opacity='1'" onmouseout="this.style.transform=''; this.style.opacity='0.5'" onmousedown="this.style.transform='scale(0.96)'" onmouseup="this.style.transform='translateY(-2px)'">停止</button>
+                        " onmouseover="this.style.transform='translateY(-2px)'; this.style.background='${v.bgCard}'; this.style.boxShadow='0 4px 12px rgba(239, 68, 68, 0.2)'" onmouseout="this.style.transform=''; this.style.background='${v.bgSecondary}'; this.style.boxShadow=''" onmousedown="this.style.transform='scale(0.96)'" onmouseup="this.style.transform='translateY(-2px)'">停止</button>
                     </div>
 
                     <!-- 日志面板 -->

@@ -1,7 +1,7 @@
 // ==UserScript==
 // @name         灵界 LingVerse 炼造配置面板
 // @namespace    lingverse-craft-config
-// @version      3.1.53
+// @version      3.1.54
 // @description  炼造自动化配置：支持炼丹/炼器/制符/化身炼造、许愿锁定、自动售卖、深色/浅色模式跟随游戏主题
 // @author       LingVerse
 // @match        https://ling.muge.info/*
@@ -1867,7 +1867,7 @@
                             font-weight: 500;
                             box-shadow: ${v.shadowSm};
                             transition: all 0.2s ease;
-                        " onmouseover="this.style.transform='translateY(-2px)'; this.style.boxShadow='0 6px 16px rgba(59, 130, 246, 0.35)'" onmouseout="this.style.transform=''; this.style.boxShadow=''" onmousedown="this.style.transform='scale(0.96)'" onmouseup="this.style.transform='translateY(-2px)'">开始炼造</button>
+                        " onmouseover="this.style.transform='translateY(-2px)'; this.style.boxShadow='0 6px 16px rgba(59, 130, 246, 0.35)'; this.style.filter='brightness(1.1)'" onmouseout="this.style.transform=''; this.style.boxShadow=''; this.style.filter=''" onmousedown="this.style.transform='scale(0.96)'; this.style.filter='brightness(0.9)'" onmouseup="this.style.transform='translateY(-2px)'; this.style.filter='brightness(1.1)'">开始炼造</button>
 
                         <button id="lv-btn-once" class="lv-btn-jade" style="
                             background: ${v.accentGreen};
@@ -1880,10 +1880,10 @@
                             font-weight: 500;
                             box-shadow: ${v.shadowSm};
                             transition: all 0.2s ease;
-                        " onmouseover="this.style.transform='translateY(-2px)'; this.style.boxShadow='0 6px 16px rgba(16, 185, 129, 0.35)'" onmouseout="this.style.transform=''; this.style.boxShadow=''" onmousedown="this.style.transform='scale(0.96)'" onmouseup="this.style.transform='translateY(-2px)'">执行一次</button>
+                        " onmouseover="this.style.transform='translateY(-2px)'; this.style.boxShadow='0 6px 16px rgba(16, 185, 129, 0.35)'; this.style.filter='brightness(1.1)'" onmouseout="this.style.transform=''; this.style.boxShadow=''; this.style.filter=''" onmousedown="this.style.transform='scale(0.96)'; this.style.filter='brightness(0.9)'" onmouseup="this.style.transform='translateY(-2px)'; this.style.filter='brightness(1.1)'">执行一次</button>
 
                         <button id="lv-btn-save" class="lv-btn-secondary" style="
-                            background: transparent;
+                            background: ${v.bgSecondary};
                             border: 1px solid ${v.borderColor};
                             color: ${v.textSecondary};
                             padding: 14px 18px;
@@ -1893,7 +1893,7 @@
                             font-weight: 500;
                             transition: all 0.2s ease;
                             white-space: nowrap;
-                        " onmouseover="this.style.transform='translateY(-2px)'; this.style.borderColor='${v.accentBlue}'; this.style.color='${v.accentBlue}'" onmouseout="this.style.transform=''; this.style.borderColor='${v.borderColor}'; this.style.color='${v.textSecondary}'" onmousedown="this.style.transform='scale(0.96)'" onmouseup="this.style.transform='translateY(-2px)'">保存配置</button>
+                        " onmouseover="this.style.transform='translateY(-2px)'; this.style.borderColor='${v.accentBlue}'; this.style.color='${v.accentBlue}'; this.style.background='${v.bgCard}'" onmouseout="this.style.transform=''; this.style.borderColor='${v.borderColor}'; this.style.color='${v.textSecondary}'; this.style.background='${v.bgSecondary}'" onmousedown="this.style.transform='scale(0.96)'" onmouseup="this.style.transform='translateY(-2px)'">保存配置</button>
                     </div>
 
                     <!-- 统计信息 -->
