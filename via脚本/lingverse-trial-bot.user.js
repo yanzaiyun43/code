@@ -832,54 +832,44 @@
             const isDark = this.isDark();
             return {
                 isDark,
+                // 极简轻奢配色
+                bgPrimary: isDark ? '#1a1f2e' : '#f8f9fa',
+                bgSecondary: isDark ? '#232836' : '#f0f1f2',
+                bgCard: isDark ? '#2a3040' : '#ffffff',
+                bgCardHover: isDark ? '#323a4d' : '#f5f6f7',
+                bgPanel: isDark ? '#252b3a' : '#fafbfc',
+                bgInput: isDark ? '#1e2330' : '#ffffff',
 
-                bgPrimary: isDark ? '#0a0f1c' : '#f3f2f0',
-                bgSecondary: isDark ? '#111827' : '#eae9e7',
-                bgCard: isDark ? '#151d2e' : '#f9f9f8',
-                bgCardHover: isDark ? '#1a2540' : '#eeedeb',
-                bgPanel: isDark ? '#0e1525' : '#f0efed',
-                bgInput: isDark ? '#0d1420' : '#ffffff',
+                // 细线条边框
+                borderColor: isDark ? 'rgba(148, 163, 184, 0.12)' : 'rgba(148, 163, 184, 0.2)',
+                borderLight: isDark ? 'rgba(148, 163, 184, 0.08)' : 'rgba(148, 163, 184, 0.12)',
+                borderActive: isDark ? 'rgba(96, 165, 250, 0.4)' : 'rgba(96, 165, 250, 0.5)',
 
-                borderColor: isDark ? 'rgba(201, 153, 58, 0.15)' : 'rgba(60, 60, 60, 0.12)',
-                borderGold: isDark ? 'rgba(201, 153, 58, 0.3)' : 'rgba(140, 60, 50, 0.25)',
-                borderActive: isDark ? 'rgba(201, 153, 58, 0.5)' : 'rgba(140, 60, 50, 0.4)',
+                // 柔和文字色
+                textPrimary: isDark ? '#e2e8f0' : '#1e293b',
+                textSecondary: isDark ? '#94a3b8' : '#64748b',
+                textMuted: isDark ? '#64748b' : '#94a3b8',
+                textAccent: isDark ? '#60a5fa' : '#3b82f6',
 
-                textPrimary: isDark ? '#e8e0d0' : '#1a1a1a',
-                textSecondary: isDark ? '#a8a090' : '#4a5a5a',
-                textMuted: isDark ? '#6a6560' : '#8a9090',
-                textGold: isDark ? '#c9993a' : '#b8463e',
-                textJade: isDark ? '#3dab97' : '#3a6a7a',
-                textPurple: isDark ? '#9a6ae0' : '#6a5a8a',
-                textRed: isDark ? '#e06060' : '#c04040',
-                textBlue: isDark ? '#60a0e0' : '#3a5a8a',
-                textGreen: isDark ? '#4ade80' : '#16a34a',
+                // 强调色
+                accentBlue: isDark ? '#60a5fa' : '#3b82f6',
+                accentGreen: isDark ? '#34d399' : '#10b981',
+                accentAmber: isDark ? '#fbbf24' : '#f59e0b',
+                accentRed: isDark ? '#f87171' : '#ef4444',
+                accentPurple: isDark ? '#a78bfa' : '#8b5cf6',
 
-                accentGold: isDark ? '#c9993a' : '#b8463e',
-                accentJade: isDark ? '#3dab97' : '#3a6a7a',
-                accentPurple: isDark ? '#9a6ae0' : '#6a5a8a',
-                accentRed: isDark ? '#e06060' : '#c04040',
-
-                gradientGold: isDark
-                    ? 'linear-gradient(135deg, #8a6a20 0%, #c9993a 50%, #8a6a20 100%)'
-                    : 'linear-gradient(135deg, #b84a40 0%, #d06858 50%, #b84a40 100%)',
-                gradientJade: isDark
-                    ? 'linear-gradient(135deg, #1a6b5a 0%, #3dab97 100%)'
-                    : 'linear-gradient(135deg, #3a6a7a 0%, #5a8a9a 100%)',
-                gradientPurple: isDark
-                    ? 'linear-gradient(135deg, #6a3a9a 0%, #9a6ae0 100%)'
-                    : 'linear-gradient(135deg, #5a4a7a 0%, #7a6a9a 100%)',
-
-                shadowSm: isDark ? '0 2px 8px rgba(0, 0, 0, 0.3)' : '0 2px 12px rgba(40, 40, 40, 0.06)',
-                shadowMd: isDark ? '0 4px 16px rgba(0, 0, 0, 0.4)' : '0 4px 20px rgba(40, 40, 40, 0.08)',
-                shadowLg: isDark ? '0 8px 32px rgba(0, 0, 0, 0.5)' : '0 8px 40px rgba(40, 40, 40, 0.12)',
-                shadowGlow: isDark ? '0 0 20px rgba(201, 153, 58, 0.15)' : '0 0 20px rgba(184, 70, 62, 0.1)',
+                // 轻质感阴影
+                shadowSm: isDark ? '0 1px 2px rgba(0, 0, 0, 0.1)' : '0 1px 3px rgba(0, 0, 0, 0.04)',
+                shadowMd: isDark ? '0 4px 6px rgba(0, 0, 0, 0.15)' : '0 4px 12px rgba(0, 0, 0, 0.05)',
+                shadowLg: isDark ? '0 10px 25px rgba(0, 0, 0, 0.25)' : '0 10px 40px rgba(0, 0, 0, 0.08)',
+                shadowHover: isDark ? '0 8px 20px rgba(0, 0, 0, 0.2)' : '0 8px 25px rgba(0, 0, 0, 0.06)',
 
                 rarity: {
-                    1: isDark ? '#9ca3af' : '#6b7280',
+                    1: isDark ? '#94a3b8' : '#64748b',
                     2: isDark ? '#60a5fa' : '#3b82f6',
-                    3: isDark ? '#fbbf24' : '#d97706',
-                    4: isDark ? '#c084fc' : '#9333ea',
-                    5: isDark ? '#f87171' : '#dc2626'
+                    3: isDark ? '#fbbf24' : '#f59e0b',
+                    4: isDark ? '#a78bfa' : '#8b5cf6',
+                    5: isDark ? '#f87171' : '#ef4444'
                 }
             };
         }
@@ -931,19 +921,20 @@
             const v = bot_Theme.getVars();
 
             panel.style.background = v.bgPanel;
-            panel.style.borderColor = v.borderGold;
+            panel.style.borderColor = v.borderColor;
             panel.style.color = v.textPrimary;
             panel.style.boxShadow = v.shadowLg;
 
             const header = $('#bot_trial_header');
             if (header) {
-                header.style.background = v.gradientGold;
+                header.style.background = v.bgCard;
+                header.style.borderBottomColor = v.borderColor;
             }
 
             const status = $('#bot_trial_status');
             if (status) {
                 status.style.color = v.textPrimary;
-                status.style.background = v.bgCard;
+                status.style.background = v.bgSecondary;
             }
 
             const content = $('#bot_trial_content');
@@ -954,7 +945,7 @@
             // 更新所有卡片背景
             $$('.lv-trial-card').forEach(card => {
                 card.style.background = v.bgCard;
-                card.style.borderColor = v.borderColor;
+                card.style.borderColor = v.borderLight;
             });
 
             // 更新所有输入框
@@ -975,7 +966,7 @@
             const logPanel = $('#bot_trial_logs');
             if (logPanel) {
                 logPanel.style.background = v.bgCard;
-                logPanel.style.borderColor = v.borderColor;
+                logPanel.style.borderColor = v.borderLight;
             }
         },
 
@@ -983,137 +974,142 @@
             const v = bot_Theme.getVars();
             return `
                 <div id="bot_trial_header" style="
-                    background: ${v.gradientGold};
-                    padding: 14px 18px;
-                    border-bottom: 2px solid ${v.accentGold};
+                    background: ${v.bgCard};
+                    padding: 16px 20px;
+                    border-bottom: 1px solid ${v.borderColor};
                     display: flex;
                     justify-content: space-between;
                     align-items: center;
                     cursor: move;
                     user-select: none;
                 ">
-                    <div style="display: flex; align-items: center; gap: 10px;">
-                        <span style="font-size: 20px;">塔</span>
-                        <span style="font-weight: bold; color: #fff; font-size: 16px;">试炼助手</span>
+                    <div style="display: flex; align-items: center; gap: 12px;">
+                        <span style="font-size: 18px; color: ${v.accentBlue};">◆</span>
+                        <span style="font-weight: 500; color: ${v.textPrimary}; font-size: 15px; letter-spacing: 0.5px;">试炼助手</span>
                         <span id="bot_trial_status" style="
                             margin-left: 8px;
                             font-size: 11px;
-                            color: ${v.textPrimary};
-                            background: ${v.bgCard};
-                            padding: 3px 10px;
-                            border-radius: 12px;
-                            font-weight: bold;
+                            color: ${v.textSecondary};
+                            background: ${v.bgSecondary};
+                            padding: 4px 12px;
+                            border-radius: 20px;
+                            font-weight: 500;
                         ">未运行</span>
                     </div>
                     <div style="display: flex; gap: 8px;">
                         <button id="bot_trial_minimize" style="
-                            background: rgba(255,255,255,0.2);
-                            border: 1px solid rgba(255,255,255,0.4);
-                            color: #fff;
-                            width: 32px;
-                            height: 32px;
-                            border-radius: 50%;
+                            background: transparent;
+                            border: 1px solid ${v.borderColor};
+                            color: ${v.textSecondary};
+                            width: 28px;
+                            height: 28px;
+                            border-radius: 6px;
                             cursor: pointer;
-                            font-size: 16px;
+                            font-size: 14px;
+                            transition: all 0.2s ease;
                         ">−</button>
                         <button id="bot_trial_close" style="
-                            background: rgba(255,255,255,0.2);
-                            border: 1px solid rgba(255,255,255,0.4);
-                            color: #fff;
-                            width: 32px;
-                            height: 32px;
-                            border-radius: 50%;
+                            background: transparent;
+                            border: 1px solid ${v.borderColor};
+                            color: ${v.textSecondary};
+                            width: 28px;
+                            height: 28px;
+                            border-radius: 6px;
                             cursor: pointer;
-                            font-size: 18px;
+                            font-size: 14px;
+                            transition: all 0.2s ease;
                         ">×</button>
                     </div>
                 </div>
 
-                <div id="bot_trial_content" style="padding: 16px; overflow-y: auto; flex: 1;">
+                <div id="bot_trial_content" style="padding: 20px; overflow-y: auto; flex: 1;">
                     <!-- 统计信息 -->
                     <div class="lv-trial-card" style="
                         background: ${v.bgCard};
-                        border: 1px solid ${v.borderColor};
-                        border-radius: 10px;
-                        padding: 12px;
-                        margin-bottom: 16px;
+                        border: 1px solid ${v.borderLight};
+                        border-radius: 12px;
+                        padding: 16px;
+                        margin-bottom: 20px;
+                        transition: all 0.3s ease;
                     ">
-                        <div style="font-size: 12px; color: ${v.textGold}; margin-bottom: 10px; font-weight: bold;">运行统计</div>
-                        <div style="display: grid; grid-template-columns: 1fr 1fr 1fr; gap: 8px; font-size: 11px;">
-                            <div style="text-align: center; padding: 6px; background: ${v.isDark ? 'rgba(0,0,0,0.2)' : 'rgba(0,0,0,0.05)'}; border-radius: 6px;">
-                                <div style="color: ${v.textMuted}; font-size: 10px;">刷取次数</div>
-                                <div id="bot_stat_runs" style="color: ${v.textJade}; font-size: 16px; font-weight: bold;">0</div>
+                        <div style="font-size: 12px; color: ${v.textMuted}; margin-bottom: 14px; font-weight: 500; letter-spacing: 0.5px;">运行统计</div>
+                        <div style="display: grid; grid-template-columns: 1fr 1fr 1fr; gap: 10px; font-size: 12px;">
+                            <div style="text-align: center; padding: 10px; background: ${v.bgSecondary}; border-radius: 8px;">
+                                <div style="color: ${v.textMuted}; font-size: 11px; margin-bottom: 4px;">刷取次数</div>
+                                <div id="bot_stat_runs" style="color: ${v.accentGreen}; font-size: 18px; font-weight: 600;">0</div>
                             </div>
-                            <div style="text-align: center; padding: 6px; background: ${v.isDark ? 'rgba(0,0,0,0.2)' : 'rgba(0,0,0,0.05)'}; border-radius: 6px;">
-                                <div style="color: ${v.textMuted}; font-size: 10px;">总层数</div>
-                                <div id="bot_stat_floors" style="color: ${v.textJade}; font-size: 16px; font-weight: bold;">0</div>
+                            <div style="text-align: center; padding: 10px; background: ${v.bgSecondary}; border-radius: 8px;">
+                                <div style="color: ${v.textMuted}; font-size: 11px; margin-bottom: 4px;">总层数</div>
+                                <div id="bot_stat_floors" style="color: ${v.accentGreen}; font-size: 18px; font-weight: 600;">0</div>
                             </div>
-                            <div style="text-align: center; padding: 6px; background: ${v.isDark ? 'rgba(0,0,0,0.2)' : 'rgba(0,0,0,0.05)'}; border-radius: 6px;">
-                                <div style="color: ${v.textMuted}; font-size: 10px;">藏宝图</div>
-                                <div id="bot_stat_maps" style="color: ${v.textGold}; font-size: 16px; font-weight: bold;">0</div>
+                            <div style="text-align: center; padding: 10px; background: ${v.bgSecondary}; border-radius: 8px;">
+                                <div style="color: ${v.textMuted}; font-size: 11px; margin-bottom: 4px;">藏宝图</div>
+                                <div id="bot_stat_maps" style="color: ${v.accentAmber}; font-size: 18px; font-weight: 600;">0</div>
                             </div>
-                            <div style="text-align: center; padding: 6px; background: ${v.isDark ? 'rgba(0,0,0,0.2)' : 'rgba(0,0,0,0.05)'}; border-radius: 6px;">
-                                <div style="color: ${v.textMuted}; font-size: 10px;">花费灵石</div>
-                                <div id="bot_stat_stone" style="color: ${v.textRed}; font-size: 16px; font-weight: bold;">0</div>
+                            <div style="text-align: center; padding: 10px; background: ${v.bgSecondary}; border-radius: 8px;">
+                                <div style="color: ${v.textMuted}; font-size: 11px; margin-bottom: 4px;">花费灵石</div>
+                                <div id="bot_stat_stone" style="color: ${v.accentRed}; font-size: 18px; font-weight: 600;">0</div>
                             </div>
-                            <div style="text-align: center; padding: 6px; background: ${v.isDark ? 'rgba(0,0,0,0.2)' : 'rgba(0,0,0,0.05)'}; border-radius: 6px;">
-                                <div style="color: ${v.textMuted}; font-size: 10px;">最高纪录</div>
-                                <div id="bot_stat_best" style="color: ${v.textPurple}; font-size: 16px; font-weight: bold;">0</div>
+                            <div style="text-align: center; padding: 10px; background: ${v.bgSecondary}; border-radius: 8px;">
+                                <div style="color: ${v.textMuted}; font-size: 11px; margin-bottom: 4px;">最高纪录</div>
+                                <div id="bot_stat_best" style="color: ${v.accentPurple}; font-size: 18px; font-weight: 600;">0</div>
                             </div>
-                            <div style="text-align: center; padding: 6px; background: ${v.isDark ? 'rgba(0,0,0,0.2)' : 'rgba(0,0,0,0.05)'}; border-radius: 6px;">
-                                <div style="color: ${v.textMuted}; font-size: 10px;">运行时间</div>
-                                <div id="bot_stat_time" style="color: ${v.textBlue}; font-size: 14px; font-weight: bold;">0:00</div>
+                            <div style="text-align: center; padding: 10px; background: ${v.bgSecondary}; border-radius: 8px;">
+                                <div style="color: ${v.textMuted}; font-size: 11px; margin-bottom: 4px;">运行时间</div>
+                                <div id="bot_stat_time" style="color: ${v.accentBlue}; font-size: 16px; font-weight: 600;">0:00</div>
                             </div>
                         </div>
                     </div>
 
                     <!-- 基本设置 -->
-                    <div class="lv-section" style="margin-bottom: 16px;">
-                        <div class="lv-section-title" style="font-size: 12px; color: ${v.textGold}; margin-bottom: 10px; font-weight: bold; display: flex; align-items: center; gap: 6px;">
-                            <span>▸</span> 基本设置
+                    <div class="lv-section" style="margin-bottom: 20px;">
+                        <div class="lv-section-title" style="font-size: 12px; color: ${v.textMuted}; margin-bottom: 14px; font-weight: 500; letter-spacing: 0.5px;">
+                            基本设置
                         </div>
                         <div class="lv-section-content">
-                            <div class="lv-row" style="display: flex; gap: 10px; margin-bottom: 10px;">
+                            <div class="lv-row" style="display: flex; gap: 12px; margin-bottom: 12px;">
                                 <div style="flex: 1;">
                                     <span class="lv-label" style="font-size: 11px; color: ${v.textSecondary};">最大灵石花费</span>
                                     <input type="number" id="bot_max_stone" value="50000" step="1000" class="lv-trial-input" style="
                                         width: 100%;
-                                        margin-top: 4px;
+                                        margin-top: 6px;
                                         background: ${v.bgInput};
-                                        border: 1px solid ${v.borderColor};
+                                        border: 1px solid ${v.borderLight};
                                         color: ${v.textPrimary};
-                                        padding: 6px 10px;
-                                        border-radius: 6px;
-                                        font-size: 12px;
+                                        padding: 10px 12px;
+                                        border-radius: 8px;
+                                        font-size: 13px;
+                                        transition: all 0.2s ease;
                                     ">
                                 </div>
                                 <div style="flex: 1;">
                                     <span class="lv-label" style="font-size: 11px; color: ${v.textSecondary};">最大刷取次数</span>
                                     <input type="number" id="bot_max_runs" value="0" min="0" class="lv-trial-input" style="
                                         width: 100%;
-                                        margin-top: 4px;
+                                        margin-top: 6px;
                                         background: ${v.bgInput};
-                                        border: 1px solid ${v.borderColor};
+                                        border: 1px solid ${v.borderLight};
                                         color: ${v.textPrimary};
-                                        padding: 6px 10px;
-                                        border-radius: 6px;
-                                        font-size: 12px;
+                                        padding: 10px 12px;
+                                        border-radius: 8px;
+                                        font-size: 13px;
+                                        transition: all 0.2s ease;
                                     ">
-                                    <span style="font-size: 10px; color: ${v.textMuted};">0 = 无限制</span>
+                                    <span style="font-size: 11px; color: ${v.textMuted};">0 = 无限制</span>
                                 </div>
                             </div>
 
-                            <div class="lv-row" style="display: flex; gap: 10px; margin-bottom: 10px;">
+                            <div class="lv-row" style="display: flex; gap: 12px; margin-bottom: 12px;">
                                 <div style="flex: 1;">
                                     <span class="lv-label" style="font-size: 11px; color: ${v.textSecondary};">目标藏宝图数</span>
                                     <input type="number" id="bot_target_maps" value="0" min="0" class="lv-trial-input" style="
                                         width: 100%;
-                                        margin-top: 4px;
+                                        margin-top: 6px;
                                         background: ${v.bgInput};
-                                        border: 1px solid ${v.borderColor};
+                                        border: 1px solid ${v.borderLight};
                                         color: ${v.textPrimary};
-                                        padding: 6px 10px;
-                                        border-radius: 6px;
+                                        padding: 10px 12px;
+                                        border-radius: 8px;
                                         font-size: 12px;
                                     ">
                                     <span style="font-size: 10px; color: ${v.textMuted};">0 = 无限制</span>
@@ -1130,96 +1126,100 @@
                                         border-radius: 6px;
                                         font-size: 12px;
                                     ">
-                                    <span style="font-size: 10px; color: ${v.textMuted};">0 = 不启用</span>
+                                    <span style="font-size: 11px; color: ${v.textMuted};">0 = 不启用</span>
                                 </div>
                             </div>
 
-                            <label style="display: flex; align-items: center; gap: 8px; margin-bottom: 8px; cursor: pointer;">
-                                <input type="checkbox" id="bot_use_ad" style="width: 16px; height: 16px;">
-                                <span style="font-size: 12px;">使用仙缘代替灵石</span>
+                            <label style="display: flex; align-items: center; gap: 10px; margin-bottom: 10px; cursor: pointer;">
+                                <input type="checkbox" id="bot_use_ad" style="width: 18px; height: 18px; accent-color: ${v.accentBlue};">
+                                <span style="font-size: 13px; color: ${v.textPrimary};">使用仙缘代替灵石</span>
                             </label>
 
-                            <label style="display: flex; align-items: center; gap: 8px; margin-bottom: 8px; cursor: pointer;">
-                                <input type="checkbox" id="bot_stop_no_free" style="width: 16px; height: 16px;">
-                                <span style="font-size: 12px;">没有免费重置时停止</span>
+                            <label style="display: flex; align-items: center; gap: 10px; margin-bottom: 10px; cursor: pointer;">
+                                <input type="checkbox" id="bot_stop_no_free" style="width: 18px; height: 18px; accent-color: ${v.accentBlue};">
+                                <span style="font-size: 13px; color: ${v.textPrimary};">没有免费重置时停止</span>
                             </label>
 
-                            <label style="display: flex; align-items: center; gap: 8px; margin-bottom: 8px; cursor: pointer;">
-                                <input type="checkbox" id="bot_auto_giveup" style="width: 16px; height: 16px;">
-                                <span style="font-size: 12px;">达到层数后自动放弃</span>
+                            <label style="display: flex; align-items: center; gap: 10px; margin-bottom: 10px; cursor: pointer;">
+                                <input type="checkbox" id="bot_auto_giveup" style="width: 18px; height: 18px; accent-color: ${v.accentBlue};">
+                                <span style="font-size: 13px; color: ${v.textPrimary};">达到层数后自动放弃</span>
                             </label>
 
-                            <div style="margin-bottom: 10px;">
+                            <div style="margin-bottom: 12px;">
                                 <span class="lv-label" style="font-size: 11px; color: ${v.textSecondary};">达到此层数后放弃(每5层给藏宝图)</span>
                                 <input type="number" id="bot_giveup_floor" value="0" min="0" step="5" class="lv-trial-input" style="
                                     width: 100%;
-                                    margin-top: 4px;
+                                    margin-top: 6px;
                                     background: ${v.bgInput};
-                                    border: 1px solid ${v.borderColor};
+                                    border: 1px solid ${v.borderLight};
                                     color: ${v.textPrimary};
-                                    padding: 6px 10px;
-                                    border-radius: 6px;
-                                    font-size: 12px;
+                                    padding: 10px 12px;
+                                    border-radius: 8px;
+                                    font-size: 13px;
+                                    transition: all 0.2s ease;
                                 ">
-                                <span style="font-size: 10px; color: ${v.textMuted};">0 = 不启用，建议设为5/10/15...</span>
+                                <span style="font-size: 11px; color: ${v.textMuted};">0 = 不启用，建议设为5/10/15...</span>
                             </div>
                         </div>
                     </div>
 
                     <!-- 战斗设置 -->
-                    <div class="lv-section" style="margin-bottom: 16px;">
-                        <div class="lv-section-title" style="font-size: 12px; color: ${v.textGold}; margin-bottom: 10px; font-weight: bold; display: flex; align-items: center; gap: 6px;">
-                            <span>▸</span> 战斗设置
+                    <div class="lv-section" style="margin-bottom: 20px;">
+                        <div class="lv-section-title" style="font-size: 12px; color: ${v.textMuted}; margin-bottom: 14px; font-weight: 500; letter-spacing: 0.5px;">
+                            战斗设置
                         </div>
                         <div class="lv-section-content">
-                            <div class="lv-row" style="display: flex; gap: 10px; margin-bottom: 10px;">
+                            <div class="lv-row" style="display: flex; gap: 12px; margin-bottom: 12px;">
                                 <div style="flex: 1;">
                                     <span class="lv-label" style="font-size: 11px; color: ${v.textSecondary};">战斗间隔(ms)</span>
                                     <input type="number" id="bot_delay_fight" value="1000" min="500" step="100" class="lv-trial-input" style="
                                         width: 100%;
-                                        margin-top: 4px;
+                                        margin-top: 6px;
                                         background: ${v.bgInput};
-                                        border: 1px solid ${v.borderColor};
+                                        border: 1px solid ${v.borderLight};
                                         color: ${v.textPrimary};
-                                        padding: 6px 10px;
-                                        border-radius: 6px;
-                                        font-size: 12px;
+                                        padding: 10px 12px;
+                                        border-radius: 8px;
+                                        font-size: 13px;
+                                        transition: all 0.2s ease;
                                     ">
                                 </div>
                                 <div style="flex: 1;">
                                     <span class="lv-label" style="font-size: 11px; color: ${v.textSecondary};">重置等待(ms)</span>
                                     <input type="number" id="bot_delay_reset" value="2000" min="500" step="100" class="lv-trial-input" style="
                                         width: 100%;
-                                        margin-top: 4px;
+                                        margin-top: 6px;
                                         background: ${v.bgInput};
-                                        border: 1px solid ${v.borderColor};
+                                        border: 1px solid ${v.borderLight};
                                         color: ${v.textPrimary};
-                                        padding: 6px 10px;
-                                        border-radius: 6px;
-                                        font-size: 12px;
+                                        padding: 10px 12px;
+                                        border-radius: 8px;
+                                        font-size: 13px;
+                                        transition: all 0.2s ease;
                                     ">
                                 </div>
                             </div>
 
-                            <div class="lv-row" style="display: flex; gap: 10px; margin-bottom: 10px;">
+                            <div class="lv-row" style="display: flex; gap: 12px; margin-bottom: 12px;">
                                 <div style="flex: 1;">
                                     <span class="lv-label" style="font-size: 11px; color: ${v.textSecondary};">天赋等待(ms)</span>
                                     <input type="number" id="bot_delay_buff" value="500" min="100" step="100" class="lv-trial-input" style="
                                         width: 100%;
-                                        margin-top: 4px;
+                                        margin-top: 6px;
                                         background: ${v.bgInput};
-                                        border: 1px solid ${v.borderColor};
+                                        border: 1px solid ${v.borderLight};
                                         color: ${v.textPrimary};
-                                        padding: 6px 10px;
-                                        border-radius: 6px;
-                                        font-size: 12px;
+                                        padding: 10px 12px;
+                                        border-radius: 8px;
+                                        font-size: 13px;
+                                        transition: all 0.2s ease;
                                     ">
                                 </div>
                                 <div style="flex: 1;">
                                     <span class="lv-label" style="font-size: 11px; color: ${v.textSecondary};">战斗超时(ms)</span>
                                     <input type="number" id="bot_fight_timeout" value="30000" min="5000" step="1000" class="lv-trial-input" style="
                                         width: 100%;
-                                        margin-top: 4px;
+                                        margin-top: 6px;
                                         background: ${v.bgInput};
                                         border: 1px solid ${v.borderColor};
                                         color: ${v.textPrimary};

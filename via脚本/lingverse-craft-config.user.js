@@ -720,7 +720,7 @@
     };
 
     
-    // 主题管理 - 自动适配游戏深色/浅色模式
+    // 主题管理 - 极简轻奢风格
     const Theme = {
         getCurrent() {
             const html = document.documentElement;
@@ -750,56 +750,46 @@
         getVars() {
             const isDark = this.isDark();
             return {
-
                 isDark,
+                // 极简轻奢配色 - 柔和浅蓝、浅灰、米白
+                bgPrimary: isDark ? '#1a1f2e' : '#f8f9fa',
+                bgSecondary: isDark ? '#232836' : '#f0f1f2',
+                bgCard: isDark ? '#2a3040' : '#ffffff',
+                bgCardHover: isDark ? '#323a4d' : '#f5f6f7',
+                bgPanel: isDark ? '#252b3a' : '#fafbfc',
+                bgInput: isDark ? '#1e2330' : '#ffffff',
 
-                bgPrimary: isDark ? '#0a0f1c' : '#f3f2f0',
-                bgSecondary: isDark ? '#111827' : '#eae9e7',
-                bgCard: isDark ? '#151d2e' : '#f9f9f8',
-                bgCardHover: isDark ? '#1a2540' : '#eeedeb',
-                bgPanel: isDark ? '#0e1525' : '#f0efed',
-                bgInput: isDark ? '#0d1420' : '#ffffff',
+                // 细线条、低对比度边框
+                borderColor: isDark ? 'rgba(148, 163, 184, 0.12)' : 'rgba(148, 163, 184, 0.2)',
+                borderLight: isDark ? 'rgba(148, 163, 184, 0.08)' : 'rgba(148, 163, 184, 0.12)',
+                borderActive: isDark ? 'rgba(96, 165, 250, 0.4)' : 'rgba(96, 165, 250, 0.5)',
 
-                borderColor: isDark ? 'rgba(201, 153, 58, 0.15)' : 'rgba(60, 60, 60, 0.12)',
-                borderGold: isDark ? 'rgba(201, 153, 58, 0.3)' : 'rgba(140, 60, 50, 0.25)',
-                borderActive: isDark ? 'rgba(201, 153, 58, 0.5)' : 'rgba(140, 60, 50, 0.4)',
+                // 文字颜色 - 柔和优雅
+                textPrimary: isDark ? '#e2e8f0' : '#1e293b',
+                textSecondary: isDark ? '#94a3b8' : '#64748b',
+                textMuted: isDark ? '#64748b' : '#94a3b8',
+                textAccent: isDark ? '#60a5fa' : '#3b82f6',
 
-                textPrimary: isDark ? '#e8e0d0' : '#1a1a1a',
-                textSecondary: isDark ? '#a8a090' : '#4a5a5a',
-                textMuted: isDark ? '#6a6560' : '#8a9090',
-                textGold: isDark ? '#c9993a' : '#b8463e',
-                textJade: isDark ? '#3dab97' : '#3a6a7a',
-                textPurple: isDark ? '#9a6ae0' : '#6a5a8a',
-                textRed: isDark ? '#e06060' : '#c04040',
-                textBlue: isDark ? '#60a0e0' : '#3a5a8a',
-                textGreen: isDark ? '#4ade80' : '#16a34a',
+                // 强调色 - 柔和蓝调
+                accentBlue: isDark ? '#60a5fa' : '#3b82f6',
+                accentGreen: isDark ? '#34d399' : '#10b981',
+                accentAmber: isDark ? '#fbbf24' : '#f59e0b',
+                accentRed: isDark ? '#f87171' : '#ef4444',
+                accentPurple: isDark ? '#a78bfa' : '#8b5cf6',
 
-                accentGold: isDark ? '#c9993a' : '#b8463e',
-                accentJade: isDark ? '#3dab97' : '#3a6a7a',
-                accentPurple: isDark ? '#9a6ae0' : '#6a5a8a',
-                accentRed: isDark ? '#e06060' : '#c04040',
+                // 轻质感阴影
+                shadowSm: isDark ? '0 1px 2px rgba(0, 0, 0, 0.1)' : '0 1px 3px rgba(0, 0, 0, 0.04)',
+                shadowMd: isDark ? '0 4px 6px rgba(0, 0, 0, 0.15)' : '0 4px 12px rgba(0, 0, 0, 0.05)',
+                shadowLg: isDark ? '0 10px 25px rgba(0, 0, 0, 0.25)' : '0 10px 40px rgba(0, 0, 0, 0.08)',
+                shadowHover: isDark ? '0 8px 20px rgba(0, 0, 0, 0.2)' : '0 8px 25px rgba(0, 0, 0, 0.06)',
 
-                gradientGold: isDark
-                    ? 'linear-gradient(135deg, #8a6a20 0%, #c9993a 50%, #8a6a20 100%)'
-                    : 'linear-gradient(135deg, #b84a40 0%, #d06858 50%, #b84a40 100%)',
-                gradientJade: isDark
-                    ? 'linear-gradient(135deg, #1a6b5a 0%, #3dab97 100%)'
-                    : 'linear-gradient(135deg, #3a6a7a 0%, #5a8a9a 100%)',
-                gradientPurple: isDark
-                    ? 'linear-gradient(135deg, #6a3a9a 0%, #9a6ae0 100%)'
-                    : 'linear-gradient(135deg, #5a4a7a 0%, #7a6a9a 100%)',
-
-                shadowSm: isDark ? '0 2px 8px rgba(0, 0, 0, 0.3)' : '0 2px 12px rgba(40, 40, 40, 0.06)',
-                shadowMd: isDark ? '0 4px 16px rgba(0, 0, 0, 0.4)' : '0 4px 20px rgba(40, 40, 40, 0.08)',
-                shadowLg: isDark ? '0 8px 32px rgba(0, 0, 0, 0.5)' : '0 8px 40px rgba(40, 40, 40, 0.12)',
-                shadowGlow: isDark ? '0 0 20px rgba(201, 153, 58, 0.15)' : '0 0 20px rgba(184, 70, 62, 0.1)',
-
+                // 品质颜色
                 rarity: {
-                    1: isDark ? '#9ca3af' : '#6b7280',
+                    1: isDark ? '#94a3b8' : '#64748b',
                     2: isDark ? '#60a5fa' : '#3b82f6',
-                    3: isDark ? '#fbbf24' : '#d97706',
-                    4: isDark ? '#c084fc' : '#9333ea',
-                    5: isDark ? '#f87171' : '#dc2626'
+                    3: isDark ? '#fbbf24' : '#f59e0b',
+                    4: isDark ? '#a78bfa' : '#8b5cf6',
+                    5: isDark ? '#f87171' : '#ef4444'
                 },
 
                 rarityNames: ['', '普通', '优良', '稀有', '史诗', '传说']
@@ -819,13 +809,14 @@
             const v = Theme.getVars();
 
             panel.style.background = v.bgPanel;
-            panel.style.borderColor = v.borderGold;
+            panel.style.borderColor = v.borderColor;
             panel.style.color = v.textPrimary;
             panel.style.boxShadow = v.shadowLg;
 
             const header = $('#lv-panel-header');
             if (header) {
-                header.style.background = v.gradientGold;
+                header.style.background = v.bgCard;
+                header.style.borderBottomColor = v.borderColor;
             }
 
             this.refreshDynamicStyles();
@@ -835,17 +826,19 @@
             const v = Theme.getVars();
 
             $$('.lv-btn-primary').forEach(btn => {
-                btn.style.background = v.gradientGold;
+                btn.style.background = v.accentBlue;
+                btn.style.color = '#fff';
             });
 
             $$('.lv-btn-secondary').forEach(btn => {
                 btn.style.background = v.bgCard;
-                btn.style.borderColor = v.borderGold;
-                btn.style.color = v.textGold;
+                btn.style.borderColor = v.borderColor;
+                btn.style.color = v.textSecondary;
             });
 
             $$('.lv-btn-jade').forEach(btn => {
-                btn.style.background = v.gradientJade;
+                btn.style.background = v.accentGreen;
+                btn.style.color = '#fff';
             });
 
             $$('.lv-select, .lv-input').forEach(el => {
@@ -856,13 +849,13 @@
 
             $$('.lv-card').forEach(card => {
                 card.style.background = v.bgCard;
-                card.style.borderColor = v.borderColor;
+                card.style.borderColor = v.borderLight;
             });
 
             const logPanel = $('#lv-log-panel');
             if (logPanel) {
                 logPanel.style.background = v.bgCard;
-                logPanel.style.borderColor = v.borderColor;
+                logPanel.style.borderColor = v.borderLight;
             }
         },
 
@@ -1088,9 +1081,9 @@
             return `
                 <!-- 标题栏 -->
                 <div id="lv-panel-header" style="
-                    background: ${v.gradientGold};
-                    padding: 14px 18px;
-                    border-bottom: 2px solid ${v.accentGold};
+                    background: ${v.bgCard};
+                    padding: 16px 20px;
+                    border-bottom: 1px solid ${v.borderColor};
                     display: flex;
                     justify-content: space-between;
                     align-items: center;
@@ -1098,50 +1091,49 @@
                     -webkit-user-select: none;
                     user-select: none;
                 ">
-                    <div style="display: flex; align-items: center; gap: 10px;">
-                        <span style="font-size: 22px; filter: drop-shadow(0 1px 2px rgba(0,0,0,0.3));">炼</span>
-                        <span style="font-weight: bold; color: #fff; text-shadow: 1px 1px 2px rgba(0,0,0,0.4); font-size: 16px;">自动炼造</span>
+                    <div style="display: flex; align-items: center; gap: 12px;">
+                        <span style="font-size: 18px; color: ${v.accentBlue};">◆</span>
+                        <span style="font-weight: 500; color: ${v.textPrimary}; font-size: 15px; letter-spacing: 0.5px;">自动炼造</span>
                         <span id="lv-run-status" style="
                             margin-left: 8px;
                             font-size: 11px;
-                            color: ${v.textPrimary};
-                            background: ${v.bgCard};
-                            padding: 3px 10px;
-                            border-radius: 12px;
-                            font-weight: bold;
-                            box-shadow: inset 0 1px 3px rgba(0,0,0,0.2);
+                            color: ${v.textSecondary};
+                            background: ${v.bgSecondary};
+                            padding: 4px 12px;
+                            border-radius: 20px;
+                            font-weight: 500;
                         ">未运行</span>
                     </div>
                     <div style="display: flex; gap: 8px;">
                         <button id="lv-btn-minimize" style="
-                            background: rgba(255,255,255,0.2);
-                            border: 1px solid rgba(255,255,255,0.4);
-                            color: #fff;
-                            width: 32px;
-                            height: 32px;
-                            border-radius: 50%;
+                            background: transparent;
+                            border: 1px solid ${v.borderColor};
+                            color: ${v.textSecondary};
+                            width: 28px;
+                            height: 28px;
+                            border-radius: 6px;
                             cursor: pointer;
-                            font-size: 16px;
+                            font-size: 14px;
                             display: flex;
                             align-items: center;
                             justify-content: center;
                             -webkit-tap-highlight-color: transparent;
-                            transition: all 0.2s;
+                            transition: all 0.2s ease;
                         ">−</button>
                         <button id="lv-btn-close" style="
-                            background: rgba(255,255,255,0.2);
-                            border: 1px solid rgba(255,255,255,0.4);
-                            color: #fff;
-                            width: 32px;
-                            height: 32px;
-                            border-radius: 50%;
+                            background: transparent;
+                            border: 1px solid ${v.borderColor};
+                            color: ${v.textSecondary};
+                            width: 28px;
+                            height: 28px;
+                            border-radius: 6px;
                             cursor: pointer;
-                            font-size: 18px;
+                            font-size: 14px;
                             display: flex;
                             align-items: center;
                             justify-content: center;
                             -webkit-tap-highlight-color: transparent;
-                            transition: all 0.2s;
+                            transition: all 0.2s ease;
                             user-select: none;
                         ">×</button>
                     </div>
@@ -1149,103 +1141,90 @@
 
                 <!-- 内容区 -->
                 <div id="lv-panel-content" style="
-                    padding: 14px;
+                    padding: 20px;
                     overflow-y: auto;
                     flex: 1;
                     -webkit-overflow-scrolling: touch;
                 ">
                     <!-- 炼造目标区 -->
-                    <div class="lv-section" style="margin-bottom: 16px;">
+                    <div class="lv-section" style="margin-bottom: 24px;">
                         <div style="
-                            font-size: 13px;
-                            color: ${v.textGold};
-                            margin-bottom: 12px;
-                            font-weight: bold;
-                            display: flex;
-                            align-items: center;
-                            gap: 6px;
-                            padding-bottom: 8px;
-                            border-bottom: 1px solid ${v.borderColor};
+                            font-size: 12px;
+                            color: ${v.textMuted};
+                            margin-bottom: 16px;
+                            font-weight: 500;
+                            letter-spacing: 1px;
+                            text-transform: uppercase;
                         ">
                             炼造目标
                         </div>
 
                         <!-- 炼丹 -->
-                        <div style="margin-bottom: 12px;">
+                        <div style="margin-bottom: 16px;">
                             <div style="
-                                font-size: 12px;
-                                color: ${v.textJade};
-                                margin-bottom: 6px;
-                                font-weight: bold;
-                                display: flex;
-                                align-items: center;
-                                gap: 4px;
+                                font-size: 11px;
+                                color: ${v.textSecondary};
+                                margin-bottom: 8px;
+                                font-weight: 500;
                             ">炼丹</div>
                             <select id="lv-target-alchemy" class="lv-select" style="
                                 width: 100%;
                                 background: ${v.bgInput};
-                                border: 1px solid ${v.borderColor};
+                                border: 1px solid ${v.borderLight};
                                 color: ${v.textPrimary};
-                                padding: 10px 12px;
-                                border-radius: 8px;
+                                padding: 12px 14px;
+                                border-radius: 10px;
                                 font-size: 13px;
                                 outline: none;
                                 cursor: pointer;
-                                transition: all 0.2s;
+                                transition: all 0.2s ease;
                             ">
                                 <option value="">-- 不自动炼丹 --</option>
                                 ${this.generateRecipeOptions(CACHE.alchemy, 'pillName', 'alchemy')}
                             </select>
                             <div id="lv-alchemy-desc" style="
-                                margin-top: 6px;
-                                padding: 8px 10px;
-                                background: ${v.bgCard};
-                                border: 1px solid ${v.borderColor};
-                                border-radius: 6px;
-                                font-size: 11px;
+                                margin-top: 8px;
+                                padding: 12px;
+                                background: ${v.bgSecondary};
+                                border-radius: 8px;
+                                font-size: 12px;
                                 color: ${v.textSecondary};
-                                line-height: 1.4;
-                                min-height: 20px;
+                                line-height: 1.5;
                                 display: none;
                             "></div>
                         </div>
 
                         <!-- 炼器 -->
-                        <div style="margin-bottom: 12px;">
+                        <div style="margin-bottom: 16px;">
                             <div style="
-                                font-size: 12px;
-                                color: ${v.textGold};
-                                margin-bottom: 6px;
-                                font-weight: bold;
-                                display: flex;
-                                align-items: center;
-                                gap: 4px;
+                                font-size: 11px;
+                                color: ${v.textSecondary};
+                                margin-bottom: 8px;
+                                font-weight: 500;
                             ">炼器</div>
                             <select id="lv-target-forge" class="lv-select" style="
                                 width: 100%;
                                 background: ${v.bgInput};
-                                border: 1px solid ${v.borderColor};
+                                border: 1px solid ${v.borderLight};
                                 color: ${v.textPrimary};
-                                padding: 10px 12px;
-                                border-radius: 8px;
+                                padding: 12px 14px;
+                                border-radius: 10px;
                                 font-size: 13px;
                                 outline: none;
                                 cursor: pointer;
-                                transition: all 0.2s;
+                                transition: all 0.2s ease;
                             ">
                                 <option value="">-- 不自动炼器 --</option>
                                 ${this.generateRecipeOptions(CACHE.forge, 'name', 'forge')}
                             </select>
                             <div id="lv-forge-desc" style="
-                                margin-top: 6px;
-                                padding: 8px 10px;
-                                background: ${v.bgCard};
-                                border: 1px solid ${v.borderColor};
-                                border-radius: 6px;
-                                font-size: 11px;
+                                margin-top: 8px;
+                                padding: 12px;
+                                background: ${v.bgSecondary};
+                                border-radius: 8px;
+                                font-size: 12px;
                                 color: ${v.textSecondary};
-                                line-height: 1.4;
-                                min-height: 20px;
+                                line-height: 1.5;
                                 display: none;
                             "></div>
                         </div>
@@ -1253,39 +1232,34 @@
                         <!-- 制符 -->
                         <div style="margin-bottom: 12px;">
                             <div style="
-                                font-size: 12px;
-                                color: ${v.textPurple};
-                                margin-bottom: 6px;
-                                font-weight: bold;
-                                display: flex;
-                                align-items: center;
-                                gap: 4px;
+                                font-size: 11px;
+                                color: ${v.textSecondary};
+                                margin-bottom: 8px;
+                                font-weight: 500;
                             ">制符</div>
                             <select id="lv-target-talisman" class="lv-select" style="
                                 width: 100%;
                                 background: ${v.bgInput};
-                                border: 1px solid ${v.borderColor};
+                                border: 1px solid ${v.borderLight};
                                 color: ${v.textPrimary};
-                                padding: 10px 12px;
-                                border-radius: 8px;
+                                padding: 12px 14px;
+                                border-radius: 10px;
                                 font-size: 13px;
                                 outline: none;
                                 cursor: pointer;
-                                transition: all 0.2s;
+                                transition: all 0.2s ease;
                             ">
                                 <option value="">-- 不自动制符 --</option>
                                 ${this.generateRecipeOptions(CACHE.talisman, 'name', 'talisman')}
                             </select>
                             <div id="lv-talisman-desc" style="
-                                margin-top: 6px;
-                                padding: 8px 10px;
-                                background: ${v.bgCard};
-                                border: 1px solid ${v.borderColor};
-                                border-radius: 6px;
-                                font-size: 11px;
+                                margin-top: 8px;
+                                padding: 12px;
+                                background: ${v.bgSecondary};
+                                border-radius: 8px;
+                                font-size: 12px;
                                 color: ${v.textSecondary};
-                                line-height: 1.4;
-                                min-height: 20px;
+                                line-height: 1.5;
                                 display: none;
                             "></div>
                         </div>
@@ -1293,19 +1267,19 @@
                         <!-- 刷新按钮 -->
                         <button id="lv-btn-refresh" class="lv-btn-secondary" style="
                             width: 100%;
-                            background: ${v.bgCard};
-                            border: 1px solid ${v.borderGold};
-                            color: ${v.textGold};
-                            padding: 10px;
-                            border-radius: 8px;
+                            background: transparent;
+                            border: 1px solid ${v.borderColor};
+                            color: ${v.textSecondary};
+                            padding: 12px;
+                            border-radius: 10px;
                             cursor: pointer;
-                            font-size: 12px;
-                            font-weight: bold;
+                            font-size: 13px;
+                            font-weight: 500;
                             display: flex;
                             align-items: center;
                             justify-content: center;
-                            gap: 6px;
-                            transition: all 0.2s;
+                            gap: 8px;
+                            transition: all 0.2s ease;
                         ">
                             刷新配方列表
                         </button>
@@ -1313,65 +1287,67 @@
 
                     <!-- 化身炼造区 -->
                     <div class="lv-card" style="
-                        margin-bottom: 16px;
+                        margin-bottom: 20px;
                         background: ${v.bgCard};
-                        border: 1px solid ${v.borderColor};
+                        border: 1px solid ${v.borderLight};
                         border-radius: 12px;
                         overflow: hidden;
+                        transition: all 0.3s ease;
                     ">
                         <div id="lv-incarnation-toggle" style="
-                            padding: 14px;
+                            padding: 16px;
                             cursor: pointer;
                             display: flex;
                             align-items: center;
                             justify-content: space-between;
-                            background: ${v.isDark ? 'rgba(201,153,58,0.08)' : 'rgba(184,70,62,0.05)'};
-                            transition: all 0.2s;
-                        " onmouseover="this.style.background='${v.isDark ? 'rgba(201,153,58,0.15)' : 'rgba(184,70,62,0.1)'}'" onmouseout="this.style.background='${v.isDark ? 'rgba(201,153,58,0.08)' : 'rgba(184,70,62,0.05)'}'">
+                            background: ${v.bgCard};
+                            transition: all 0.2s ease;
+                        " onmouseover="this.style.background='${v.bgCardHover}'" onmouseout="this.style.background='${v.bgCard}'">
                             <div style="
                                 font-size: 13px;
-                                color: ${v.textGold};
-                                font-weight: bold;
+                                color: ${v.textPrimary};
+                                font-weight: 500;
                                 display: flex;
                                 align-items: center;
-                                gap: 6px;
+                                gap: 8px;
                             ">
-                                <span id="lv-incarnation-icon">▶</span> 化身炼造
+                                <span id="lv-incarnation-icon" style="color: ${v.accentBlue};">▶</span> 化身炼造
                             </div>
                             <span id="lv-incarnation-status" style="
-                                font-size: 10px;
+                                font-size: 11px;
                                 color: ${v.textMuted};
-                                font-weight: normal;
+                                font-weight: 400;
                             ">检测中...</span>
                         </div>
 
-                        <div id="lv-incarnation-content" style="display: none; padding: 14px; border-top: 1px solid ${v.borderColor};">
+                        <div id="lv-incarnation-content" style="display: none; padding: 16px; border-top: 1px solid ${v.borderLight};">
                             <label style="
                                 display: flex;
                                 align-items: center;
-                                gap: 10px;
-                                margin-bottom: 12px;
+                                gap: 12px;
+                                margin-bottom: 16px;
                                 cursor: pointer;
                             ">
                                 <input type="checkbox" id="lv-incarnation-enabled" style="
                                     width: 18px;
                                     height: 18px;
-                                    accent-color: ${v.accentPurple};
+                                    accent-color: ${v.accentBlue};
                                 ">
-                                <span style="font-size: 12px;">启用化身自动炼造</span>
+                                <span style="font-size: 13px; color: ${v.textPrimary};">启用化身自动炼造</span>
                             </label>
 
-                            <div style="margin-bottom: 10px;">
-                                <span style="font-size: 11px; color: ${v.textSecondary};">炼造类型:</span>
+                            <div style="margin-bottom: 12px;">
+                                <span style="font-size: 11px; color: ${v.textSecondary};">炼造类型</span>
                                 <select id="lv-incarnation-type" class="lv-select" style="
                                     width: 100%;
-                                    margin-top: 6px;
+                                    margin-top: 8px;
                                     background: ${v.bgInput};
-                                    border: 1px solid ${v.borderColor};
+                                    border: 1px solid ${v.borderLight};
                                     color: ${v.textPrimary};
-                                    padding: 8px 10px;
-                                    border-radius: 6px;
-                                    font-size: 12px;
+                                    padding: 10px 12px;
+                                    border-radius: 8px;
+                                    font-size: 13px;
+                                    transition: all 0.2s ease;
                                 ">
                                     <option value="alchemy">炼丹</option>
                                     <option value="forge">炼器</option>
@@ -1379,42 +1355,45 @@
                                 </select>
                             </div>
 
-                            <div style="margin-bottom: 10px;">
-                                <span style="font-size: 11px; color: ${v.textSecondary};">炼造目标:</span>
+                            <div style="margin-bottom: 12px;">
+                                <span style="font-size: 11px; color: ${v.textSecondary};">炼造目标</span>
                                 <select id="lv-incarnation-target" class="lv-select" style="
                                     width: 100%;
-                                    margin-top: 6px;
+                                    margin-top: 8px;
                                     background: ${v.bgInput};
-                                    border: 1px solid ${v.borderColor};
+                                    border: 1px solid ${v.borderLight};
                                     color: ${v.textPrimary};
-                                    padding: 8px 10px;
-                                    border-radius: 6px;
-                                    font-size: 12px;
+                                    padding: 10px 12px;
+                                    border-radius: 8px;
+                                    font-size: 13px;
+                                    transition: all 0.2s ease;
                                 ">
                                     <option value="">-- 选择目标 --</option>
                                 </select>
                             </div>
 
-                            <div style="display: grid; grid-template-columns: 1fr 1fr; gap: 8px; margin-top: 12px;">
+                            <div style="display: grid; grid-template-columns: 1fr 1fr; gap: 10px; margin-top: 16px;">
                                 <button id="lv-btn-incarnation-condense" class="lv-btn-secondary" style="
-                                    background: ${v.bgCard};
-                                    border: 1px solid ${v.borderGold};
-                                    color: ${v.textGold};
-                                    padding: 8px;
-                                    border-radius: 6px;
+                                    background: transparent;
+                                    border: 1px solid ${v.borderColor};
+                                    color: ${v.textSecondary};
+                                    padding: 10px;
+                                    border-radius: 8px;
                                     cursor: pointer;
-                                    font-size: 11px;
-                                    font-weight: bold;
+                                    font-size: 12px;
+                                    font-weight: 500;
+                                    transition: all 0.2s ease;
                                 ">凝聚化身</button>
                                 <button id="lv-btn-incarnation-refine" class="lv-btn-secondary" style="
-                                    background: ${v.bgCard};
-                                    border: 1px solid ${v.borderGold};
-                                    color: ${v.textGold};
-                                    padding: 8px;
-                                    border-radius: 6px;
+                                    background: transparent;
+                                    border: 1px solid ${v.borderColor};
+                                    color: ${v.textSecondary};
+                                    padding: 10px;
+                                    border-radius: 8px;
                                     cursor: pointer;
-                                    font-size: 11px;
-                                    font-weight: bold;
+                                    font-size: 12px;
+                                    font-weight: 500;
+                                    transition: all 0.2s ease;
                                 ">精炼化身</button>
                             </div>
                         </div>
@@ -1422,67 +1401,69 @@
 
                     <!-- 许愿锁定区 -->
                     <div class="lv-card" style="
-                        margin-bottom: 16px;
+                        margin-bottom: 20px;
                         background: ${v.bgCard};
-                        border: 1px solid ${v.borderColor};
+                        border: 1px solid ${v.borderLight};
                         border-radius: 12px;
                         overflow: hidden;
+                        transition: all 0.3s ease;
                     ">
                         <div id="lv-wish-toggle" style="
-                            padding: 14px;
+                            padding: 16px;
                             cursor: pointer;
                             display: flex;
                             align-items: center;
                             justify-content: space-between;
-                            background: ${v.isDark ? 'rgba(76,175,80,0.08)' : 'rgba(76,175,80,0.05)'};
-                            transition: all 0.2s;
-                        " onmouseover="this.style.background='${v.isDark ? 'rgba(76,175,80,0.15)' : 'rgba(76,175,80,0.1)'}'" onmouseout="this.style.background='${v.isDark ? 'rgba(76,175,80,0.08)' : 'rgba(76,175,80,0.05)'}'">
+                            background: ${v.bgCard};
+                            transition: all 0.2s ease;
+                        " onmouseover="this.style.background='${v.bgCardHover}'" onmouseout="this.style.background='${v.bgCard}'">
                             <div style="
                                 font-size: 13px;
-                                color: ${v.textJade};
-                                font-weight: bold;
+                                color: ${v.textPrimary};
+                                font-weight: 500;
                                 display: flex;
                                 align-items: center;
-                                gap: 6px;
+                                gap: 8px;
                             ">
-                                <span id="lv-wish-icon">▶</span> <span>⭐</span> 许愿锁定
+                                <span id="lv-wish-icon" style="color: ${v.accentBlue};">▶</span> 许愿锁定
                             </div>
                             <span style="font-size: 11px; color: ${v.textMuted};">自动设置许愿目标</span>
                         </div>
 
-                        <div id="lv-wish-content" style="display: none; padding: 14px; border-top: 1px solid ${v.borderColor};">
+                        <div id="lv-wish-content" style="display: none; padding: 16px; border-top: 1px solid ${v.borderLight};">
                             <label style="
                                 display: flex;
                                 align-items: center;
-                                gap: 10px;
-                                margin-bottom: 12px;
-                                padding: 8px;
-                                background: ${v.isDark ? 'rgba(76,175,80,0.1)' : 'rgba(76,175,80,0.08)'};
-                                border-radius: 8px;
+                                gap: 12px;
+                                margin-bottom: 16px;
+                                padding: 12px;
+                                background: ${v.bgSecondary};
+                                border-radius: 10px;
                                 cursor: pointer;
                             ">
                                 <input type="checkbox" id="lv-wish-enabled" style="
                                     width: 18px;
                                     height: 18px;
-                                    accent-color: ${v.accentJade};
+                                    accent-color: ${v.accentBlue};
                                 ">
                                 <div style="flex: 1;">
-                                    <div style="color: ${v.textJade}; font-weight: bold; font-size: 12px;">启用许愿锁定</div>
-                                    <div style="color: ${v.textMuted}; font-size: 11px;">自动设置许愿目标提高成功率</div>
+                                    <div style="color: ${v.textPrimary}; font-weight: 500; font-size: 13px;">启用许愿锁定</div>
+                                    <div style="color: ${v.textMuted}; font-size: 12px; margin-top: 2px;">自动设置许愿目标提高成功率</div>
                                 </div>
                             </label>
 
-                            <div style="margin-bottom: 10px;">
-                                <span style="font-size: 11px; color: ${v.textSecondary};">许愿类型:</span>
+                            <div style="margin-bottom: 12px;">
+                                <span style="font-size: 11px; color: ${v.textSecondary};">许愿类型</span>
                                 <select id="lv-wish-type" class="lv-select" style="
                                     width: 100%;
-                                    margin-top: 6px;
+                                    margin-top: 8px;
                                     background: ${v.bgInput};
-                                    border: 1px solid ${v.borderColor};
+                                    border: 1px solid ${v.borderLight};
                                     color: ${v.textPrimary};
-                                    padding: 8px 10px;
-                                    border-radius: 6px;
-                                    font-size: 12px;
+                                    padding: 10px 12px;
+                                    border-radius: 8px;
+                                    font-size: 13px;
+                                    transition: all 0.2s ease;
                                 ">
                                     <option value="alchemy">炼丹</option>
                                     <option value="forge">炼器</option>
@@ -1490,33 +1471,35 @@
                                 </select>
                             </div>
 
-                            <div style="margin-bottom: 10px;">
-                                <span style="font-size: 11px; color: ${v.textSecondary};">许愿目标:</span>
+                            <div style="margin-bottom: 12px;">
+                                <span style="font-size: 11px; color: ${v.textSecondary};">许愿目标</span>
                                 <select id="lv-wish-target" class="lv-select" style="
                                     width: 100%;
-                                    margin-top: 6px;
+                                    margin-top: 8px;
                                     background: ${v.bgInput};
-                                    border: 1px solid ${v.borderColor};
+                                    border: 1px solid ${v.borderLight};
                                     color: ${v.textPrimary};
-                                    padding: 8px 10px;
-                                    border-radius: 6px;
-                                    font-size: 12px;
+                                    padding: 10px 12px;
+                                    border-radius: 8px;
+                                    font-size: 13px;
+                                    transition: all 0.2s ease;
                                 ">
                                     <option value="">-- 选择许愿目标 --</option>
                                 </select>
                             </div>
 
-                            <div style="margin-bottom: 10px;">
-                                <span style="font-size: 11px; color: ${v.textSecondary};">目标品质:</span>
+                            <div style="margin-bottom: 12px;">
+                                <span style="font-size: 11px; color: ${v.textSecondary};">目标品质</span>
                                 <select id="lv-wish-rarity" class="lv-select" style="
                                     width: 100%;
-                                    margin-top: 6px;
+                                    margin-top: 8px;
                                     background: ${v.bgInput};
-                                    border: 1px solid ${v.borderColor};
+                                    border: 1px solid ${v.borderLight};
                                     color: ${v.textPrimary};
-                                    padding: 8px 10px;
-                                    border-radius: 6px;
-                                    font-size: 12px;
+                                    padding: 10px 12px;
+                                    border-radius: 8px;
+                                    font-size: 13px;
+                                    transition: all 0.2s ease;
                                 ">
                                     <option value="1">普通</option>
                                     <option value="2">优秀</option>
@@ -1530,74 +1513,73 @@
 
                     <!-- 设置区 -->
                     <div class="lv-card" style="
-                        margin-bottom: 16px;
-                        padding: 14px;
+                        margin-bottom: 20px;
+                        padding: 16px;
                         background: ${v.bgCard};
-                        border: 1px solid ${v.borderColor};
+                        border: 1px solid ${v.borderLight};
                         border-radius: 12px;
                     ">
                         <div style="
-                            font-size: 13px;
-                            color: ${v.textGold};
-                            margin-bottom: 12px;
-                            font-weight: bold;
-                            display: flex;
-                            align-items: center;
-                            gap: 6px;
-                            padding-bottom: 8px;
-                            border-bottom: 1px solid ${v.borderColor};
+                            font-size: 12px;
+                            color: ${v.textMuted};
+                            margin-bottom: 16px;
+                            font-weight: 500;
+                            letter-spacing: 1px;
                         ">
                             设置
                         </div>
 
-                        <div style="display: grid; grid-template-columns: 1fr 1fr; gap: 12px; margin-bottom: 12px;">
-                            <label style="display: flex; align-items: center; gap: 8px; cursor: pointer;">
-                                <input type="checkbox" id="lv-use-quickbuy" checked style="accent-color: ${v.accentGold};">
-                                <span style="font-size: 12px;">自动补充材料</span>
+                        <div style="display: grid; grid-template-columns: 1fr 1fr; gap: 16px; margin-bottom: 16px;">
+                            <label style="display: flex; align-items: center; gap: 10px; cursor: pointer;">
+                                <input type="checkbox" id="lv-use-quickbuy" checked style="accent-color: ${v.accentBlue};">
+                                <span style="font-size: 13px; color: ${v.textPrimary};">自动补充材料</span>
                             </label>
 
-                            <label style="display: flex; align-items: center; gap: 8px; cursor: pointer;">
-                                <input type="checkbox" id="lv-auto-start" style="accent-color: ${v.accentGold};">
-                                <span style="font-size: 12px;">自动开始</span>
+                            <label style="display: flex; align-items: center; gap: 10px; cursor: pointer;">
+                                <input type="checkbox" id="lv-auto-start" style="accent-color: ${v.accentBlue};">
+                                <span style="font-size: 13px; color: ${v.textPrimary};">自动开始</span>
                             </label>
                         </div>
 
-                        <div style="display: flex; align-items: center; gap: 10px; margin-bottom: 10px;">
-                            <span style="font-size: 12px; color: ${v.textSecondary};">批量数量:</span>
+                        <div style="display: flex; align-items: center; gap: 12px; margin-bottom: 12px;">
+                            <span style="font-size: 12px; color: ${v.textSecondary};">批量数量</span>
                             <input type="number" id="lv-batch-size" value="10" min="1" max="50" style="
                                 width: 70px;
                                 background: ${v.bgInput};
-                                border: 1px solid ${v.borderColor};
+                                border: 1px solid ${v.borderLight};
                                 color: ${v.textPrimary};
-                                padding: 6px 10px;
-                                border-radius: 6px;
+                                padding: 8px 10px;
+                                border-radius: 8px;
                                 font-size: 13px;
                                 text-align: center;
+                                transition: all 0.2s ease;
                             ">
-                            <span style="font-size: 12px; color: ${v.textSecondary};">最多补充灵石:</span>
+                            <span style="font-size: 12px; color: ${v.textSecondary};">最多补充灵石</span>
                             <input type="number" id="lv-max-cost" value="5000" min="0" step="100" style="
                                 width: 90px;
                                 background: ${v.bgInput};
-                                border: 1px solid ${v.borderColor};
+                                border: 1px solid ${v.borderLight};
                                 color: ${v.textPrimary};
-                                padding: 6px 10px;
-                                border-radius: 6px;
+                                padding: 8px 10px;
+                                border-radius: 8px;
                                 font-size: 13px;
                                 text-align: center;
+                                transition: all 0.2s ease;
                             ">
                         </div>
 
-                        <div style="display: flex; align-items: center; gap: 10px;">
-                            <span style="font-size: 12px; color: ${v.textSecondary};">执行间隔:</span>
+                        <div style="display: flex; align-items: center; gap: 12px;">
+                            <span style="font-size: 12px; color: ${v.textSecondary};">执行间隔</span>
                             <input type="number" id="lv-interval" value="30" min="5" max="300" style="
                                 width: 70px;
                                 background: ${v.bgInput};
-                                border: 1px solid ${v.borderColor};
+                                border: 1px solid ${v.borderLight};
                                 color: ${v.textPrimary};
-                                padding: 6px 10px;
-                                border-radius: 6px;
+                                padding: 8px 10px;
+                                border-radius: 8px;
                                 font-size: 13px;
                                 text-align: center;
+                                transition: all 0.2s ease;
                             ">
                             <span style="font-size: 12px; color: ${v.textMuted};">秒</span>
                         </div>
@@ -1605,55 +1587,57 @@
 
                     <!-- 高级设置折叠面板 -->
                     <div class="lv-card" style="
-                        margin-bottom: 16px;
+                        margin-bottom: 20px;
                         background: ${v.bgCard};
-                        border: 1px solid ${v.borderColor};
+                        border: 1px solid ${v.borderLight};
                         border-radius: 12px;
                         overflow: hidden;
+                        transition: all 0.3s ease;
                     ">
                         <div id="lv-advanced-toggle" style="
-                            padding: 14px;
+                            padding: 16px;
                             cursor: pointer;
                             display: flex;
                             align-items: center;
                             justify-content: space-between;
-                            background: ${v.isDark ? 'rgba(201,153,58,0.08)' : 'rgba(184,70,62,0.05)'};
-                            transition: all 0.2s;
-                        " onmouseover="this.style.background='${v.isDark ? 'rgba(201,153,58,0.15)' : 'rgba(184,70,62,0.1)'}'" onmouseout="this.style.background='${v.isDark ? 'rgba(201,153,58,0.08)' : 'rgba(184,70,62,0.05)'}'">
+                            background: ${v.bgCard};
+                            transition: all 0.2s ease;
+                        " onmouseover="this.style.background='${v.bgCardHover}'" onmouseout="this.style.background='${v.bgCard}'">
                             <div style="
                                 font-size: 13px;
-                                color: ${v.textGold};
-                                font-weight: bold;
+                                color: ${v.textPrimary};
+                                font-weight: 500;
                                 display: flex;
                                 align-items: center;
-                                gap: 6px;
+                                gap: 8px;
                             ">
-                                <span id="lv-advanced-icon">▶</span> 高级设置
+                                <span id="lv-advanced-icon" style="color: ${v.accentBlue};">▶</span> 高级设置
                             </div>
                             <span style="font-size: 11px; color: ${v.textMuted};">自适应间隔 / 自动停止</span>
                         </div>
                         
-                        <div id="lv-advanced-content" style="display: none; padding: 14px; border-top: 1px solid ${v.borderColor};">
+                        <div id="lv-advanced-content" style="display: none; padding: 16px; border-top: 1px solid ${v.borderLight};">
                             <!-- 自适应间隔设置 -->
                             <div style="margin-bottom: 16px;">
-                                <label style="display: flex; align-items: center; gap: 8px; cursor: pointer; margin-bottom: 12px;">
-                                    <input type="checkbox" id="lv-adaptive-interval" checked style="accent-color: ${v.accentGold};">
-                                    <span style="font-size: 12px; font-weight: bold; color: ${v.textPrimary};">启用自适应间隔</span>
+                                <label style="display: flex; align-items: center; gap: 10px; cursor: pointer; margin-bottom: 12px;">
+                                    <input type="checkbox" id="lv-adaptive-interval" checked style="accent-color: ${v.accentBlue};">
+                                    <span style="font-size: 13px; font-weight: 500; color: ${v.textPrimary};">启用自适应间隔</span>
                                     <span style="font-size: 11px; color: ${v.textMuted};">(成功加速/失败减速)</span>
                                 </label>
                                 
-                                <div style="display: grid; grid-template-columns: 1fr 1fr; gap: 10px; margin-left: 26px;">
+                                <div style="display: grid; grid-template-columns: 1fr 1fr; gap: 12px; margin-left: 28px;">
                                     <div>
                                         <span style="font-size: 11px; color: ${v.textSecondary};">最小间隔</span>
                                         <input type="number" id="lv-min-interval" value="10" min="5" max="60" style="
                                             width: 100%;
                                             background: ${v.bgInput};
-                                            border: 1px solid ${v.borderColor};
+                                            border: 1px solid ${v.borderLight};
                                             color: ${v.textPrimary};
-                                            padding: 6px 10px;
-                                            border-radius: 6px;
-                                            font-size: 12px;
-                                            margin-top: 4px;
+                                            padding: 8px 10px;
+                                            border-radius: 8px;
+                                            font-size: 13px;
+                                            margin-top: 6px;
+                                            transition: all 0.2s ease;
                                         ">
                                     </div>
                                     <div>
@@ -1661,12 +1645,13 @@
                                         <input type="number" id="lv-max-interval" value="60" min="10" max="300" style="
                                             width: 100%;
                                             background: ${v.bgInput};
-                                            border: 1px solid ${v.borderColor};
+                                            border: 1px solid ${v.borderLight};
                                             color: ${v.textPrimary};
-                                            padding: 6px 10px;
-                                            border-radius: 6px;
-                                            font-size: 12px;
-                                            margin-top: 4px;
+                                            padding: 8px 10px;
+                                            border-radius: 8px;
+                                            font-size: 13px;
+                                            margin-top: 6px;
+                                            transition: all 0.2s ease;
                                         ">
                                     </div>
                                     <div>
@@ -1674,12 +1659,13 @@
                                         <input type="number" id="lv-success-decrease" value="2" min="0" max="10" style="
                                             width: 100%;
                                             background: ${v.bgInput};
-                                            border: 1px solid ${v.borderColor};
+                                            border: 1px solid ${v.borderLight};
                                             color: ${v.textPrimary};
-                                            padding: 6px 10px;
-                                            border-radius: 6px;
-                                            font-size: 12px;
-                                            margin-top: 4px;
+                                            padding: 8px 10px;
+                                            border-radius: 8px;
+                                            font-size: 13px;
+                                            margin-top: 6px;
+                                            transition: all 0.2s ease;
                                         ">
                                     </div>
                                     <div>
@@ -1687,43 +1673,44 @@
                                         <input type="number" id="lv-error-increase" value="5" min="0" max="20" style="
                                             width: 100%;
                                             background: ${v.bgInput};
-                                            border: 1px solid ${v.borderColor};
+                                            border: 1px solid ${v.borderLight};
                                             color: ${v.textPrimary};
-                                            padding: 6px 10px;
-                                            border-radius: 6px;
-                                            font-size: 12px;
-                                            margin-top: 4px;
+                                            padding: 8px 10px;
+                                            border-radius: 8px;
+                                            font-size: 13px;
+                                            margin-top: 6px;
+                                            transition: all 0.2s ease;
                                         ">
                                     </div>
                                 </div>
                             </div>
 
                             <!-- 分隔线 -->
-                            <div style="height: 1px; background: ${v.borderColor}; margin: 12px 0;"></div>
+                            <div style="height: 1px; background: ${v.borderLight}; margin: 16px 0;"></div>
 
                             <!-- 自动售卖设置 -->
                             <div style="margin-bottom: 16px;">
                                 <div style="
-                                    background: ${v.isDark ? 'rgba(184,70,62,0.15)' : 'rgba(184,70,62,0.1)'};
+                                    background: ${v.isDark ? 'rgba(248, 113, 113, 0.1)' : 'rgba(239, 68, 68, 0.05)'};
                                     border: 1px solid ${v.accentRed};
-                                    border-radius: 8px;
-                                    padding: 12px;
-                                    margin-bottom: 12px;
+                                    border-radius: 10px;
+                                    padding: 14px;
+                                    margin-bottom: 14px;
                                 ">
                                     <div style="
                                         display: flex;
                                         align-items: center;
                                         gap: 8px;
-                                        margin-bottom: 8px;
+                                        margin-bottom: 10px;
                                         color: ${v.accentRed};
-                                        font-weight: bold;
-                                        font-size: 12px;
+                                        font-weight: 500;
+                                        font-size: 13px;
                                     ">
-                                        <span style="font-size: 16px;">⚠️</span>
+                                        <span style="font-size: 14px;">!</span>
                                         <span>自动售卖风险提示</span>
                                     </div>
                                     <div style="
-                                        font-size: 11px;
+                                        font-size: 12px;
                                         color: ${v.textSecondary};
                                         line-height: 1.6;
                                     ">
@@ -1732,20 +1719,20 @@
                                     <label style="
                                         display: flex;
                                         align-items: center;
-                                        gap: 8px;
-                                        margin-top: 10px;
+                                        gap: 10px;
+                                        margin-top: 12px;
                                         cursor: pointer;
-                                        font-size: 11px;
+                                        font-size: 12px;
                                         color: ${v.textPrimary};
                                     ">
                                         <input type="checkbox" id="lv-autosell-confirm" style="accent-color: ${v.accentRed};">
-                                        <span style="font-weight: bold;">我已了解风险，启用自动售卖</span>
+                                        <span style="font-weight: 500;">我已了解风险，启用自动售卖</span>
                                     </label>
                                 </div>
 
                                 <!-- 自动售卖配置区域（默认禁用，需确认后才可编辑） -->
                                 <div id="lv-autosell-config" style="opacity: 0.5; pointer-events: none;">
-                                    <div style="font-size: 12px; color: ${v.textGold}; font-weight: bold; margin-bottom: 10px;">
+                                    <div style="font-size: 12px; color: ${v.textMuted}; font-weight: 500; margin-bottom: 12px; letter-spacing: 0.5px;">
                                         自动售卖配置
                                     </div>
                                     
@@ -1753,30 +1740,31 @@
                                     <label style="
                                         display: flex;
                                         align-items: center;
-                                        gap: 10px;
-                                        margin-bottom: 10px;
-                                        padding: 8px;
-                                        background: ${v.isDark ? 'rgba(201,153,58,0.1)' : 'rgba(184,70,62,0.08)'};
-                                        border-radius: 8px;
+                                        gap: 12px;
+                                        margin-bottom: 12px;
+                                        padding: 12px;
+                                        background: ${v.bgSecondary};
+                                        border-radius: 10px;
                                         cursor: pointer;
                                     ">
                                         <input type="checkbox" id="lv-autosell-batch-mode" style="
                                             width: 18px;
                                             height: 18px;
-                                            accent-color: ${v.accentGold};
+                                            accent-color: ${v.accentBlue};
                                         ">
                                         <div style="flex: 1;">
-                                            <div style="color: ${v.textGold}; font-weight: bold; font-size: 12px;">批量出售模式</div>
-                                            <div style="color: ${v.textMuted}; font-size: 11px;">一键出售所有类型物品（更快）</div>
+                                            <div style="color: ${v.textPrimary}; font-weight: 500; font-size: 13px;">批量出售模式</div>
+                                            <div style="color: ${v.textMuted}; font-size: 12px; margin-top: 2px;">一键出售所有类型物品（更快）</div>
                                         </div>
                                         <select id="lv-autosell-batch-rarity" class="lv-select" style="
-                                            width: 80px;
+                                            width: 90px;
                                             background: ${v.bgInput};
-                                            border: 1px solid ${v.borderColor};
+                                            border: 1px solid ${v.borderLight};
                                             color: ${v.textPrimary};
-                                            padding: 6px 10px;
-                                            border-radius: 6px;
-                                            font-size: 12px;
+                                            padding: 8px 10px;
+                                            border-radius: 8px;
+                                            font-size: 13px;
+                                            transition: all 0.2s ease;
                                         ">
                                             <option value="1">普通</option>
                                             <option value="2" selected>优良</option>
@@ -1967,95 +1955,92 @@
                     </div>
 
                     <!-- 操作按钮 -->
-                    <div style="display: flex; gap: 10px; margin-bottom: 12px;">
+                    <div style="display: flex; gap: 12px; margin-bottom: 16px;">
                         <button id="lv-btn-start" class="lv-btn-primary" style="
                             flex: 1;
-                            background: ${v.gradientGold};
+                            background: ${v.accentBlue};
                             border: none;
                             color: #fff;
-                            padding: 12px 16px;
+                            padding: 14px 18px;
                             border-radius: 10px;
                             cursor: pointer;
                             font-size: 14px;
-                            font-weight: bold;
+                            font-weight: 500;
                             box-shadow: ${v.shadowSm};
-                            transition: all 0.2s;
-                            text-shadow: 0 1px 2px rgba(0,0,0,0.3);
+                            transition: all 0.2s ease;
                         ">开始炼造</button>
 
                         <button id="lv-btn-once" class="lv-btn-jade" style="
-                            background: ${v.gradientJade};
+                            background: ${v.accentGreen};
                             border: none;
                             color: #fff;
-                            padding: 12px 16px;
+                            padding: 14px 18px;
                             border-radius: 10px;
                             cursor: pointer;
                             font-size: 14px;
-                            font-weight: bold;
+                            font-weight: 500;
                             box-shadow: ${v.shadowSm};
-                            transition: all 0.2s;
-                            text-shadow: 0 1px 2px rgba(0,0,0,0.3);
+                            transition: all 0.2s ease;
                         ">执行一次</button>
 
                         <button id="lv-btn-save" class="lv-btn-secondary" style="
-                            background: ${v.bgCard};
-                            border: 1px solid ${v.borderGold};
-                            color: ${v.textGold};
-                            padding: 12px 16px;
+                            background: transparent;
+                            border: 1px solid ${v.borderColor};
+                            color: ${v.textSecondary};
+                            padding: 14px 18px;
                             border-radius: 10px;
                             cursor: pointer;
-                            font-size: 13px;
-                            font-weight: bold;
-                            transition: all 0.2s;
+                            font-size: 14px;
+                            font-weight: 500;
+                            transition: all 0.2s ease;
                             white-space: nowrap;
                         ">保存配置</button>
                     </div>
 
                     <!-- 统计信息 -->
                     <div id="lv-stats" style="
-                        margin-bottom: 12px;
-                        padding: 12px 14px;
-                        background: ${v.bgCard};
-                        border: 1px solid ${v.borderColor};
+                        margin-bottom: 16px;
+                        padding: 14px 16px;
+                        background: ${v.bgSecondary};
                         border-radius: 10px;
                         font-size: 12px;
                         color: ${v.textSecondary};
                         display: flex;
                         justify-content: space-around;
                         flex-wrap: wrap;
-                        gap: 8px;
+                        gap: 12px;
                     ">
-                        <span>炼造: <b id="lv-stat-crafted" style="color: ${v.textJade};">0</b></span>
-                        <span>化身: <b id="lv-stat-incarnation" style="color: ${v.textPurple};">0</b></span>
-                        <span>售出: <b id="lv-stat-sold" style="color: ${v.textGold};">0</b></span>
-                        <span>花费: <b id="lv-stat-spent" style="color: ${v.textRed};">0</b></span>
+                        <span>炼造: <b id="lv-stat-crafted" style="color: ${v.accentGreen};">0</b></span>
+                        <span>化身: <b id="lv-stat-incarnation" style="color: ${v.accentPurple};">0</b></span>
+                        <span>售出: <b id="lv-stat-sold" style="color: ${v.accentAmber};">0</b></span>
+                        <span>花费: <b id="lv-stat-spent" style="color: ${v.accentRed};">0</b></span>
                     </div>
 
                     <!-- 日志面板 -->
-                    <div style="margin-bottom: 8px; display: flex; justify-content: space-between; align-items: center;">
-                        <span style="font-size: 12px; color: ${v.textSecondary};">运行日志</span>
+                    <div style="margin-bottom: 10px; display: flex; justify-content: space-between; align-items: center;">
+                        <span style="font-size: 12px; color: ${v.textMuted}; font-weight: 500;">运行日志</span>
                         <button id="lv-btn-clear-log" style="
                             font-size: 11px;
-                            padding: 4px 10px;
-                            background: ${v.bgCard};
-                            border: 1px solid ${v.borderColor};
+                            padding: 6px 12px;
+                            background: transparent;
+                            border: 1px solid ${v.borderLight};
                             color: ${v.textMuted};
                             border-radius: 6px;
                             cursor: pointer;
-                            transition: all 0.2s;
-                        " onmouseover="this.style.color='${v.textRed}'" onmouseout="this.style.color='${v.textMuted}'">清除日志</button>
+                            transition: all 0.2s ease;
+                        " onmouseover="this.style.color='${v.accentRed}'; this.style.borderColor='${v.accentRed}'" onmouseout="this.style.color='${v.textMuted}'; this.style.borderColor='${v.borderLight}'">清除日志</button>
                     </div>
                     <div id="lv-log-panel" style="
                         max-height: 150px;
                         overflow-y: auto;
                         background: ${v.bgCard};
-                        border: 1px solid ${v.borderColor};
+                        border: 1px solid ${v.borderLight};
                         border-radius: 10px;
-                        padding: 12px;
-                        font-size: 11px;
+                        padding: 14px;
+                        font-size: 12px;
                         font-family: 'Consolas', 'Monaco', monospace;
                         display: none;
-                        line-height: 1.5;
+                        line-height: 1.6;
                     "></div>
                 </div>
             `;
@@ -2349,7 +2334,7 @@
                 return;
             }
 
-            const v = this.getThemeValues();
+            const v = Theme.getVars();
             let html = '';
 
             // 消耗信息区域
