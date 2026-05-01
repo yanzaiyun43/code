@@ -1,7 +1,7 @@
 // ==UserScript==
 // @name         灵界宗门极简轻奢美化
 // @namespace    http://tampermonkey.net/
-// @version      1.2.0
+// @version      1.2.1
 // @description  为灵界游戏宗门模块提供极简轻奢风格美化，支持深色/浅色模式切换，全覆盖所有宗门功能（九霄宗+自建宗门）
 // @author       You
 // @match        *://*/game.html*
@@ -120,17 +120,29 @@
             --sect-font-mono: "SF Mono", Monaco, "Cascadia Code", monospace;
         }
 
-        /* 主题过渡 */
-        .sect-beautify-enabled,
-        .sect-beautify-enabled *,
-        .sect-beautify-enabled *::before,
-        .sect-beautify-enabled *::after {
+        /* 主题过渡 - 只对特定属性进行过渡，避免性能问题 */
+        .sect-beautify-enabled {
             transition: background-color var(--sect-transition-slow),
-                        border-color var(--sect-transition-slow),
-                        color var(--sect-transition-slow),
-                        box-shadow var(--sect-transition-slow),
-                        transform var(--sect-transition),
-                        opacity var(--sect-transition) !important;
+                        border-color var(--sect-transition-slow);
+        }
+
+        .sect-beautify-enabled .sect-tab,
+        .sect-beautify-enabled .btn-action,
+        .sect-beautify-enabled .sect-stat-item,
+        .sect-beautify-enabled .sect-task-card,
+        .sect-beautify-enabled .sect-shop-item,
+        .sect-beautify-enabled .sect-member-row,
+        .sect-beautify-enabled .sect-donate-row,
+        .sect-beautify-enabled .garden-pot,
+        .sect-beautify-enabled .psect-farm-plot,
+        .sect-beautify-enabled .psect-stat-card,
+        .sect-beautify-enabled .psect-facility-btn,
+        .sect-beautify-enabled .sect-browse-card,
+        .sect-beautify-enabled .ranking-item,
+        .sect-beautify-enabled .modal-btn,
+        .sect-beautify-enabled .pager-btn,
+        .sect-beautify-enabled .court-card {
+            transition: all var(--sect-transition);
         }
 
         /* 页面淡入 */
@@ -2004,26 +2016,35 @@
         observeMutations() {
             // 监听动态添加的内容
             const observer = new MutationObserver((mutations) => {
+                let shouldMark = false;
                 mutations.forEach((mutation) => {
                     mutation.addedNodes.forEach((node) => {
                         if (node.nodeType === 1) {
                             // 检查是否是宗门相关元素
                             if (node.id && node.id.startsWith('sect')) {
                                 node.classList.add('sect-beautify-enabled');
+                                shouldMark = true;
                             }
                             // 检查子元素
                             if (node.querySelectorAll) {
-                                node.querySelectorAll('[id^="sect"]').forEach(el => {
+                                const sectElements = node.querySelectorAll('[id^="sect"]');
+                                sectElements.forEach(el => {
                                     el.classList.add('sect-beautify-enabled');
                                 });
+                                if (sectElements.length > 0) shouldMark = true;
                             }
                             // 检查模态框
                             if (node.classList && node.classList.contains('modal-overlay--top')) {
                                 node.classList.add('sect-beautify-enabled');
+                                shouldMark = true;
                             }
                         }
                     });
                 });
+                // 只在有需要时才重新标记
+                if (shouldMark) {
+                    this.markSectPanel();
+                }
             });
 
             observer.observe(document.body, {
@@ -2031,8 +2052,8 @@
                 subtree: true
             });
 
-            // 定期检查
-            setInterval(() => this.markSectPanel(), 2000);
+            // 只在初始化时执行一次，之后依靠MutationObserver
+            setTimeout(() => this.markSectPanel(), 1000);
         }
     };
 
