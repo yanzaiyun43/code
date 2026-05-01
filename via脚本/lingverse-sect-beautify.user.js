@@ -1,7 +1,7 @@
 // ==UserScript==
 // @name         灵界宗门极简轻奢美化
 // @namespace    http://tampermonkey.net/
-// @version      1.2.1
+// @version      1.2.2
 // @description  为灵界游戏宗门模块提供极简轻奢风格美化，支持深色/浅色模式切换，全覆盖所有宗门功能（九霄宗+自建宗门）
 // @author       You
 // @match        *://*/game.html*
@@ -1934,26 +1934,42 @@
         },
 
         markSectPanel() {
-            const elements = [
-                document.getElementById('sectPanel'),
-                document.getElementById('sectJoinedView'),
-                document.getElementById('sectUnjoinedView'),
-                document.getElementById('sectTabInfo'),
-                document.getElementById('sectTabTasks'),
-                document.getElementById('sectTabStorage'),
-                document.getElementById('sectTabShop'),
-                document.getElementById('sectTabGarden'),
-                document.getElementById('sectTabMembers'),
-            ];
+            try {
+                const elements = [
+                    document.getElementById('sectPanel'),
+                    document.getElementById('sectJoinedView'),
+                    document.getElementById('sectUnjoinedView'),
+                    document.getElementById('sectTabInfo'),
+                    document.getElementById('sectTabTasks'),
+                    document.getElementById('sectTabStorage'),
+                    document.getElementById('sectTabShop'),
+                    document.getElementById('sectTabGarden'),
+                    document.getElementById('sectTabMembers'),
+                ];
 
-            elements.forEach(el => {
-                if (el) el.classList.add('sect-beautify-enabled');
-            });
+                elements.forEach(el => {
+                    if (el && el.classList) {
+                        try {
+                            el.classList.add('sect-beautify-enabled');
+                        } catch (e) {
+                            // 忽略单个元素错误
+                        }
+                    }
+                });
 
-            // 标记模态框
-            document.querySelectorAll('.modal-overlay--top, .ui-scrollable-modal').forEach(el => {
-                el.classList.add('sect-beautify-enabled');
-            });
+                // 标记模态框
+                document.querySelectorAll('.modal-overlay--top, .ui-scrollable-modal').forEach(el => {
+                    if (el && el.classList) {
+                        try {
+                            el.classList.add('sect-beautify-enabled');
+                        } catch (e) {
+                            // 忽略单个元素错误
+                        }
+                    }
+                });
+            } catch (e) {
+                console.warn('[SectBeautify] markSectPanel error:', e);
+            }
         },
 
         toggleTheme() {
@@ -1990,6 +2006,8 @@
                 mutations.forEach((mutation) => {
                     if (mutation.type === 'attributes' && mutation.attributeName === 'class') {
                         const target = mutation.target;
+                        // 确保 target 存在且是元素节点
+                        if (!target || !target.nodeType || target.nodeType !== 1) return;
                         if (target.id && target.id.startsWith('sect')) {
                             if (!target.classList.contains('hidden')) {
                                 target.classList.add('sect-beautify-enabled');
@@ -2007,8 +2025,12 @@
 
             targets.forEach(target => {
                 if (target) {
-                    observer.observe(target, { attributes: true });
-                    target.classList.add('sect-beautify-enabled');
+                    try {
+                        observer.observe(target, { attributes: true });
+                        target.classList.add('sect-beautify-enabled');
+                    } catch (e) {
+                        console.warn('[SectBeautify] Failed to observe element:', e);
+                    }
                 }
             });
         },
@@ -2018,10 +2040,16 @@
             const observer = new MutationObserver((mutations) => {
                 let shouldMark = false;
                 mutations.forEach((mutation) => {
+                    // 确保 addedNodes 存在
+                    if (!mutation.addedNodes || mutation.addedNodes.length === 0) return;
+                    
                     mutation.addedNodes.forEach((node) => {
-                        if (node.nodeType === 1) {
+                        // 确保 node 存在且是元素节点
+                        if (!node || node.nodeType !== 1) return;
+                        
+                        try {
                             // 检查是否是宗门相关元素
-                            if (node.id && node.id.startsWith('sect')) {
+                            if (node.id && typeof node.id === 'string' && node.id.startsWith('sect')) {
                                 node.classList.add('sect-beautify-enabled');
                                 shouldMark = true;
                             }
@@ -2029,7 +2057,9 @@
                             if (node.querySelectorAll) {
                                 const sectElements = node.querySelectorAll('[id^="sect"]');
                                 sectElements.forEach(el => {
-                                    el.classList.add('sect-beautify-enabled');
+                                    if (el && el.classList) {
+                                        el.classList.add('sect-beautify-enabled');
+                                    }
                                 });
                                 if (sectElements.length > 0) shouldMark = true;
                             }
@@ -2038,22 +2068,38 @@
                                 node.classList.add('sect-beautify-enabled');
                                 shouldMark = true;
                             }
+                        } catch (e) {
+                            // 忽略单个节点处理错误
                         }
                     });
                 });
                 // 只在有需要时才重新标记
                 if (shouldMark) {
-                    this.markSectPanel();
+                    try {
+                        this.markSectPanel();
+                    } catch (e) {
+                        console.warn('[SectBeautify] markSectPanel error:', e);
+                    }
                 }
             });
 
-            observer.observe(document.body, {
-                childList: true,
-                subtree: true
-            });
+            try {
+                observer.observe(document.body, {
+                    childList: true,
+                    subtree: true
+                });
+            } catch (e) {
+                console.warn('[SectBeautify] Failed to observe body:', e);
+            }
 
             // 只在初始化时执行一次，之后依靠MutationObserver
-            setTimeout(() => this.markSectPanel(), 1000);
+            setTimeout(() => {
+                try {
+                    this.markSectPanel();
+                } catch (e) {
+                    console.warn('[SectBeautify] Initial markSectPanel error:', e);
+                }
+            }, 1000);
         }
     };
 
