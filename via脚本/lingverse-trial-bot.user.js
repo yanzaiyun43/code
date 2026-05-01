@@ -1,7 +1,7 @@
 // ==UserScript==
 // @name         灵界 LingVerse 天道试炼刷取助手
 // @namespace    lingverse-trial-bot
-// @version      2.1.21
+// @version      3.1.21
 // @description  天道试炼塔自动化：自动重置、自动战斗、自动选择天赋、统计藏宝图收益
 // @author       LingVerse
 // @match        https://ling.muge.info/*
@@ -1423,29 +1423,31 @@
                     </div>
 
                     <!-- 操作按钮 -->
-                    <div style="display: flex; gap: 10px; margin-bottom: 16px;">
+                    <div style="display: flex; gap: 12px; margin-bottom: 20px;">
                         <button id="bot_trial_start" style="
                             flex: 1;
-                            background: ${v.gradientGold};
+                            background: ${v.accentBlue};
                             border: none;
                             color: #fff;
-                            padding: 12px;
-                            border-radius: 8px;
+                            padding: 14px;
+                            border-radius: 10px;
                             cursor: pointer;
                             font-size: 14px;
-                            font-weight: bold;
+                            font-weight: 500;
+                            transition: all 0.2s ease;
                         ">开始刷取</button>
                         <button id="bot_trial_stop" style="
                             flex: 1;
-                            background: ${v.bgCard};
-                            border: 1px solid ${v.textRed}80;
-                            color: ${v.textRed};
-                            padding: 12px;
-                            border-radius: 8px;
+                            background: transparent;
+                            border: 1px solid ${v.accentRed};
+                            color: ${v.accentRed};
+                            padding: 14px;
+                            border-radius: 10px;
                             cursor: pointer;
                             font-size: 14px;
-                            font-weight: bold;
+                            font-weight: 500;
                             opacity: 0.5;
+                            transition: all 0.2s ease;
                         ">停止</button>
                     </div>
 
@@ -1907,35 +1909,72 @@
                     padding: 8px !important;
                 }
             }
-            /* 收起状态更小 - 调整宽度和位置 */
+            /* 收起状态 - 极简悬浮胶囊 */
             #bot_trial_panel.bot-minimized {
-                max-height: 48px !important;
-                overflow: hidden !important;
                 width: auto !important;
-                min-width: 100px !important;
-                max-width: 140px !important;
+                min-width: unset !important;
+                max-width: unset !important;
+                height: auto !important;
+                max-height: unset !important;
+                overflow: visible !important;
+                background: transparent !important;
+                border: none !important;
+                box-shadow: none !important;
+                border-radius: 0 !important;
+            }
+            #bot_trial_panel.bot-minimized #bot_trial_header {
+                background: ${v.bgCard} !important;
+                border: 1px solid ${v.borderLight} !important;
+                border-radius: 50px !important;
+                padding: 10px 16px !important;
+                box-shadow: ${v.shadowMd} !important;
+                backdrop-filter: blur(10px) !important;
+                -webkit-backdrop-filter: blur(10px) !important;
+                transition: all 0.3s cubic-bezier(0.4, 0, 0.2, 1) !important;
+                cursor: pointer !important;
+            }
+            #bot_trial_panel.bot-minimized #bot_trial_header:hover {
+                transform: translateY(-2px) !important;
+                box-shadow: ${v.shadowHover} !important;
+                border-color: ${v.borderActive} !important;
             }
             #bot_trial_panel.bot-minimized #bot_trial_content {
                 display: none !important;
             }
-            #bot_trial_panel.bot-minimized #bot_trial_status {
-                display: none !important;
-            }
-            /* 收起时隐藏标题文字，只保留图标 */
-            #bot_trial_panel.bot-minimized #bot_trial_header span:nth-child(2) {
-                display: none !important;
-            }
-            /* 收起时让图标居中 */
             #bot_trial_panel.bot-minimized #bot_trial_header > div:first-child {
-                justify-content: center !important;
-                width: 100%;
+                gap: 10px !important;
+            }
+            #bot_trial_panel.bot-minimized #bot_trial_header span:nth-child(2) {
+                font-size: 13px !important;
+                font-weight: 500 !important;
+                color: ${v.textPrimary} !important;
+                display: block !important;
+            }
+            #bot_trial_panel.bot-minimized #bot_trial_status {
+                display: inline-block !important;
+                padding: 3px 10px !important;
+                font-size: 10px !important;
+                margin-left: 4px !important;
+            }
+            #bot_trial_panel.bot-minimized #bot_trial_close {
+                display: none !important;
+            }
+            #bot_trial_panel.bot-minimized #bot_trial_minimize {
+                width: 24px !important;
+                height: 24px !important;
+                border: none !important;
+                background: ${v.bgSecondary} !important;
+                color: ${v.textSecondary} !important;
+                font-size: 12px !important;
+                margin-left: 6px !important;
             }
             /* 移动端收起状态 */
             @media (max-width: 480px) {
-                #bot_trial_panel.bot-minimized {
-                    max-height: 44px !important;
-                    min-width: 90px !important;
-                    max-width: 120px !important;
+                #bot_trial_panel.bot-minimized #bot_trial_header {
+                    padding: 8px 14px !important;
+                }
+                #bot_trial_panel.bot-minimized #bot_trial_header span:nth-child(2) {
+                    font-size: 12px !important;
                 }
             }
         `;

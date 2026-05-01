@@ -1,7 +1,7 @@
 // ==UserScript==
 // @name         灵界 LingVerse 炼造配置面板
 // @namespace    lingverse-craft-config
-// @version      2.1.42
+// @version      3.1.42
 // @description  炼造自动化配置：支持炼丹/炼器/制符/化身炼造、许愿锁定、自动售卖、深色/浅色模式跟随游戏主题
 // @author       LingVerse
 // @match        https://ling.muge.info/*
@@ -1007,7 +1007,8 @@
                 flex-direction: column;
                 overflow: hidden;
                 font-family: KaiTi, 楷体, STKaiti, "Noto Serif SC", serif;
-                transition: all 0.3s ease;
+                transition: background 0.3s ease, color 0.3s ease, border-color 0.3s ease, box-shadow 0.3s ease;
+                will-change: transform, left, top;
             `;
 
             panel.innerHTML = this.generatePanelHTML();
@@ -1613,7 +1614,7 @@
                             ">
                                 <span id="lv-advanced-icon" style="color: ${v.accentBlue};">▶</span> 高级设置
                             </div>
-                            <span style="font-size: 11px; color: ${v.textMuted};">自适应间隔 / 自动停止</span>
+                            <span style="font-size: 11px; color: ${v.textMuted};">自适应间隔 / 自动售卖</span>
                         </div>
                         
                         <div id="lv-advanced-content" style="display: none; padding: 16px; border-top: 1px solid ${v.borderLight};">
@@ -1838,117 +1839,6 @@
                                             <option value="3">稀有</option>
                                         </select>
                                     </label>
-                                </div>
-                            </div>
-
-                            <!-- 自动停止设置 -->
-                            <div>
-                                <label style="display: flex; align-items: center; gap: 8px; cursor: pointer; margin-bottom: 12px;">
-                                    <input type="checkbox" id="lv-autostop-enabled" checked style="accent-color: ${v.accentRed};">
-                                    <span style="font-size: 12px; font-weight: bold; color: ${v.textPrimary};">启用自动停止</span>
-                                </label>
-                                
-                                <div style="margin-left: 26px; display: grid; grid-template-columns: 1fr 1fr; gap: 8px;">
-                                    <label style="display: flex; align-items: center; gap: 6px; cursor: pointer; font-size: 11px;">
-                                        <input type="checkbox" id="lv-autostop-spirit" checked style="accent-color: ${v.accentGold};">
-                                        <span>灵石不足</span>
-                                    </label>
-                                    <label style="display: flex; align-items: center; gap: 6px; cursor: pointer; font-size: 11px;">
-                                        <input type="checkbox" id="lv-autostop-mp" checked style="accent-color: ${v.accentGold};">
-                                        <span>灵力不足</span>
-                                    </label>
-                                    <label style="display: flex; align-items: center; gap: 6px; cursor: pointer; font-size: 11px;">
-                                        <input type="checkbox" id="lv-autostop-stamina" checked style="accent-color: ${v.accentGold};">
-                                        <span>神识不足</span>
-                                    </label>
-                                    <label style="display: flex; align-items: center; gap: 6px; cursor: pointer; font-size: 11px;">
-                                        <input type="checkbox" id="lv-autostop-inventory" checked style="accent-color: ${v.accentGold};">
-                                        <span>背包满</span>
-                                    </label>
-                                    <label style="display: flex; align-items: center; gap: 6px; cursor: pointer; font-size: 11px;">
-                                        <input type="checkbox" id="lv-autostop-meditating" checked style="accent-color: ${v.accentGold};">
-                                        <span>冥想中</span>
-                                    </label>
-                                    <label style="display: flex; align-items: center; gap: 6px; cursor: pointer; font-size: 11px;">
-                                        <input type="checkbox" id="lv-autostop-cost" checked style="accent-color: ${v.accentGold};">
-                                        <span>达到最大花费</span>
-                                    </label>
-                                    <label style="display: flex; align-items: center; gap: 6px; cursor: pointer; font-size: 11px;">
-                                        <input type="checkbox" id="lv-autostop-error" checked style="accent-color: ${v.accentGold};">
-                                        <span>连续错误</span>
-                                    </label>
-                                </div>
-
-                                <!-- 阈值设置 -->
-                                <div style="margin-left: 26px; margin-top: 12px; display: grid; grid-template-columns: 1fr 1fr 1fr; gap: 10px;">
-                                    <div>
-                                        <span style="font-size: 11px; color: ${v.textSecondary};">灵石阈值</span>
-                                        <input type="number" id="lv-spirit-threshold" value="100" min="0" step="100" style="
-                                            width: 100%;
-                                            background: ${v.bgInput};
-                                            border: 1px solid ${v.borderColor};
-                                            color: ${v.textPrimary};
-                                            padding: 6px 10px;
-                                            border-radius: 6px;
-                                            font-size: 12px;
-                                            margin-top: 4px;
-                                        " title="灵石低于此值时停止">
-                                    </div>
-                                    <div>
-                                        <span style="font-size: 11px; color: ${v.textSecondary};">灵力阈值</span>
-                                        <input type="number" id="lv-mp-threshold" value="10" min="0" step="1" style="
-                                            width: 100%;
-                                            background: ${v.bgInput};
-                                            border: 1px solid ${v.borderColor};
-                                            color: ${v.textPrimary};
-                                            padding: 6px 10px;
-                                            border-radius: 6px;
-                                            font-size: 12px;
-                                            margin-top: 4px;
-                                        " title="灵力低于此值时停止">
-                                    </div>
-                                    <div>
-                                        <span style="font-size: 11px; color: ${v.textSecondary};">神识阈值</span>
-                                        <input type="number" id="lv-stamina-threshold" value="10" min="0" step="1" style="
-                                            width: 100%;
-                                            background: ${v.bgInput};
-                                            border: 1px solid ${v.borderColor};
-                                            color: ${v.textPrimary};
-                                            padding: 6px 10px;
-                                            border-radius: 6px;
-                                            font-size: 12px;
-                                            margin-top: 4px;
-                                        " title="神识低于此值时停止">
-                                    </div>
-                                </div>
-                                
-                                <div style="margin-left: 26px; margin-top: 12px; display: flex; gap: 10px;">
-                                    <div style="flex: 1;">
-                                        <span style="font-size: 11px; color: ${v.textSecondary};">最大花费(灵石)</span>
-                                        <input type="number" id="lv-max-craft-cost" value="100000" min="1000" step="1000" style="
-                                            width: 100%;
-                                            background: ${v.bgInput};
-                                            border: 1px solid ${v.borderColor};
-                                            color: ${v.textPrimary};
-                                            padding: 6px 10px;
-                                            border-radius: 6px;
-                                            font-size: 12px;
-                                            margin-top: 4px;
-                                        ">
-                                    </div>
-                                    <div style="flex: 1;">
-                                        <span style="font-size: 11px; color: ${v.textSecondary};">最大连续错误</span>
-                                        <input type="number" id="lv-max-errors" value="5" min="1" max="20" style="
-                                            width: 100%;
-                                            background: ${v.bgInput};
-                                            border: 1px solid ${v.borderColor};
-                                            color: ${v.textPrimary};
-                                            padding: 6px 10px;
-                                            border-radius: 6px;
-                                            font-size: 12px;
-                                            margin-top: 4px;
-                                        ">
-                                    </div>
                                 </div>
                             </div>
                         </div>
@@ -2339,18 +2229,18 @@
 
             // 消耗信息区域
             const costs = [];
-            if (recipe.mpCost > 0) costs.push(`灵力 ${recipe.mpCost}`);
-            if (recipe.spiritCost > 0) costs.push(`神识 ${recipe.spiritCost}`);
+            if (recipe.mpCost > 0) costs.push(`消耗灵力 ${recipe.mpCost}`);
+            if (recipe.spiritCost > 0) costs.push(`消耗神识 ${recipe.spiritCost}`);
             if (costs.length > 0) {
                 html += `<div style="
                     display: flex;
                     gap: 12px;
-                    padding: 6px 10px;
-                    background: ${v.isDark ? 'rgba(255,152,0,0.15)' : 'rgba(255,152,0,0.1)'};
-                    border-radius: 4px;
+                    padding: 8px 12px;
+                    background: ${v.bgSecondary};
+                    border-radius: 6px;
                     margin-bottom: 8px;
                     font-size: 12px;
-                    color: ${v.isDark ? '#ffb74d' : '#e65100'};
+                    color: ${v.accentAmber};
                     font-weight: 500;
                 ">${costs.join('')}</div>`;
             }
@@ -2449,6 +2339,15 @@
 
             let isDragging = false;
             let startX, startY, startLeft, startTop;
+            let rafId = null;
+            let currentX = 0, currentY = 0;
+
+            // 使用 requestAnimationFrame 优化拖动性能
+            const updatePosition = () => {
+                if (!isDragging) return;
+                panel.style.transform = `translate3d(${currentX}px, ${currentY}px, 0)`;
+                rafId = null;
+            };
 
             // 鼠标事件
             header.addEventListener('mousedown', (e) => {
@@ -2458,21 +2357,38 @@
                 const rect = panel.getBoundingClientRect();
                 startLeft = rect.left;
                 startTop = rect.top;
-                panel.style.transform = 'none';
+                currentX = 0;
+                currentY = 0;
                 panel.style.left = startLeft + 'px';
                 panel.style.top = startTop + 'px';
+                panel.style.transform = 'translate3d(0, 0, 0)';
+                panel.style.transition = 'none';
             });
 
             document.addEventListener('mousemove', (e) => {
                 if (!isDragging) return;
-                const dx = e.clientX - startX;
-                const dy = e.clientY - startY;
-                panel.style.left = (startLeft + dx) + 'px';
-                panel.style.top = (startTop + dy) + 'px';
+                currentX = e.clientX - startX;
+                currentY = e.clientY - startY;
+                if (!rafId) {
+                    rafId = requestAnimationFrame(updatePosition);
+                }
             });
 
             document.addEventListener('mouseup', () => {
+                if (!isDragging) return;
                 isDragging = false;
+                if (rafId) {
+                    cancelAnimationFrame(rafId);
+                    rafId = null;
+                }
+                // 拖动结束后恢复过渡效果
+                const v = Theme.getVars();
+                panel.style.transition = 'background 0.3s ease, color 0.3s ease, border-color 0.3s ease, box-shadow 0.3s ease';
+                // 将 transform 转换为 left/top
+                const rect = panel.getBoundingClientRect();
+                panel.style.left = rect.left + 'px';
+                panel.style.top = rect.top + 'px';
+                panel.style.transform = 'none';
             });
 
             // 触摸事件（移动端支持）
@@ -2484,23 +2400,40 @@
                 const rect = panel.getBoundingClientRect();
                 startLeft = rect.left;
                 startTop = rect.top;
-                panel.style.transform = 'none';
+                currentX = 0;
+                currentY = 0;
                 panel.style.left = startLeft + 'px';
                 panel.style.top = startTop + 'px';
+                panel.style.transform = 'translate3d(0, 0, 0)';
+                panel.style.transition = 'none';
             }, { passive: false });
 
             document.addEventListener('touchmove', (e) => {
                 if (!isDragging) return;
                 e.preventDefault();
                 const touch = e.touches[0];
-                const dx = touch.clientX - startX;
-                const dy = touch.clientY - startY;
-                panel.style.left = (startLeft + dx) + 'px';
-                panel.style.top = (startTop + dy) + 'px';
+                currentX = touch.clientX - startX;
+                currentY = touch.clientY - startY;
+                if (!rafId) {
+                    rafId = requestAnimationFrame(updatePosition);
+                }
             }, { passive: false });
 
             document.addEventListener('touchend', () => {
+                if (!isDragging) return;
                 isDragging = false;
+                if (rafId) {
+                    cancelAnimationFrame(rafId);
+                    rafId = null;
+                }
+                // 拖动结束后恢复过渡效果
+                const v = Theme.getVars();
+                panel.style.transition = 'background 0.3s ease, color 0.3s ease, border-color 0.3s ease, box-shadow 0.3s ease';
+                // 将 transform 转换为 left/top
+                const rect = panel.getBoundingClientRect();
+                panel.style.left = rect.left + 'px';
+                panel.style.top = rect.top + 'px';
+                panel.style.transform = 'none';
             });
         },
 
@@ -3632,49 +3565,82 @@
                     font-size: 12px !important;
                 }
             }
-            /* 收起状态更小 - 调整宽度和位置 */
+            /* 收起状态 - 极简悬浮胶囊 */
             #lv-craft-panel.lv-minimized {
-                max-height: 48px !important;
-                overflow: hidden !important;
                 width: auto !important;
-                min-width: 100px !important;
-                max-width: 140px !important;
+                min-width: unset !important;
+                max-width: unset !important;
+                height: auto !important;
+                max-height: unset !important;
+                overflow: visible !important;
+                background: transparent !important;
+                border: none !important;
+                box-shadow: none !important;
+                border-radius: 0 !important;
+            }
+            #lv-craft-panel.lv-minimized #lv-panel-header {
+                background: ${v.bgCard} !important;
+                border: 1px solid ${v.borderLight} !important;
+                border-radius: 50px !important;
+                padding: 10px 16px !important;
+                box-shadow: ${v.shadowMd} !important;
+                backdrop-filter: blur(10px) !important;
+                -webkit-backdrop-filter: blur(10px) !important;
+                transition: all 0.3s cubic-bezier(0.4, 0, 0.2, 1) !important;
+                cursor: pointer !important;
+            }
+            #lv-craft-panel.lv-minimized #lv-panel-header:hover {
+                transform: translateY(-2px) !important;
+                box-shadow: ${v.shadowHover} !important;
+                border-color: ${v.borderActive} !important;
             }
             #lv-craft-panel.lv-minimized #lv-panel-content {
                 display: none !important;
             }
-            #lv-craft-panel.lv-minimized #lv-run-status {
-                display: none !important;
-            }
-            /* 收起时隐藏标题文字，只保留图标 */
-            #lv-craft-panel.lv-minimized #lv-panel-header span:nth-child(2) {
-                display: none !important;
-            }
-            /* 收起时让图标居中 */
             #lv-craft-panel.lv-minimized #lv-panel-header > div:first-child {
-                justify-content: center !important;
-                width: 100%;
+                gap: 10px !important;
+            }
+            #lv-craft-panel.lv-minimized #lv-panel-header span:nth-child(2) {
+                font-size: 13px !important;
+                font-weight: 500 !important;
+                color: ${v.textPrimary} !important;
+                display: block !important;
+            }
+            #lv-craft-panel.lv-minimized #lv-run-status {
+                display: inline-block !important;
+                padding: 3px 10px !important;
+                font-size: 10px !important;
+                margin-left: 4px !important;
+            }
+            #lv-craft-panel.lv-minimized #lv-btn-close {
+                display: none !important;
+            }
+            #lv-craft-panel.lv-minimized #lv-btn-minimize {
+                width: 24px !important;
+                height: 24px !important;
+                border: none !important;
+                background: ${v.bgSecondary} !important;
+                color: ${v.textSecondary} !important;
+                font-size: 12px !important;
+                margin-left: 6px !important;
             }
             /* 移动端收起状态 */
             @media (max-width: 480px) {
-                #lv-craft-panel.lv-minimized {
-                    max-height: 44px !important;
-                    min-width: 90px !important;
-                    max-width: 120px !important;
+                #lv-craft-panel.lv-minimized #lv-panel-header {
+                    padding: 8px 14px !important;
+                }
+                #lv-craft-panel.lv-minimized #lv-panel-header span:nth-child(2) {
+                    font-size: 12px !important;
                 }
             }
             /* 超小屏幕适配 */
             @media (max-width: 360px) {
                 #lv-craft-panel {
                     width: 98% !important;
-                    border-radius: 8px !important;
+                    border-radius: 12px !important;
                 }
                 #lv-panel-content {
-                    padding: 10px !important;
-                }
-                #lv-craft-panel.lv-minimized {
-                    min-width: 90px !important;
-                    max-width: 120px !important;
+                    padding: 16px !important;
                 }
             }
         `;
