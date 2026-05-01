@@ -1,7 +1,7 @@
 // ==UserScript==
 // @name         灵界 LingVerse 炼造配置面板
 // @namespace    lingverse-craft-config
-// @version      3.1.5
+// @version      3.1.51
 // @description  炼造自动化配置：支持炼丹/炼器/制符/化身炼造、许愿锁定、自动售卖、深色/浅色模式跟随游戏主题
 // @author       LingVerse
 // @match        https://ling.muge.info/*
@@ -871,8 +871,6 @@
                 margin-bottom: 20px;
                 padding-bottom: 16px;
                 border-bottom: 1px solid var(--border-color);
-                width: 100%;
-                box-sizing: border-box;
             `;
 
             const title = document.createElement('h3');
@@ -880,7 +878,7 @@
             title.textContent = '炼造助手';
             title.style.cssText = `
                 font-size: 13px;
-                color: #c9993a;
+                color: var(--text-gold);
                 letter-spacing: 2px;
                 margin-bottom: 12px;
                 padding-bottom: 6px;
@@ -889,37 +887,31 @@
 
             const btn = document.createElement('button');
             btn.id = 'lv-craft-sidebar-btn';
-            btn.textContent = '打开炼造面板';
+            btn.innerHTML = '<span id="lv-btn-text">加载中...</span>';
+            btn.disabled = true;
             btn.style.cssText = `
                 width: 100%;
                 padding: 10px 12px;
-                background: ${v.isDark ? 'rgba(201, 153, 58, 0.2)' : 'rgba(201, 153, 58, 0.15)'};
-                border: 1px solid ${v.isDark ? 'rgba(201, 153, 58, 0.4)' : 'rgba(201, 153, 58, 0.3)'};
+                background: ${v.isDark ? 'rgba(128, 128, 128, 0.2)' : 'rgba(128, 128, 128, 0.15)'};
+                border: 1px solid ${v.isDark ? 'rgba(128, 128, 128, 0.4)' : 'rgba(128, 128, 128, 0.3)'};
                 border-radius: 6px;
-                color: #c9993a;
+                color: ${v.textMuted};
                 font-size: 13px;
                 font-weight: bold;
-                cursor: pointer;
-                font-family: KaiTi, 楷体, STKaiti, "Noto Serif SC", serif;
-                transition: all 0.2s;
+                cursor: not-allowed;
+                transition: all 0.2s ease;
                 display: block;
                 text-align: center;
                 -webkit-tap-highlight-color: transparent;
-                box-sizing: border-box;
+                font-family: KaiTi, 楷体, STKaiti, "Noto Serif SC", serif;
             `;
-
-            btn.addEventListener('mouseenter', () => {
-                btn.style.background = v.isDark ? 'rgba(201, 153, 58, 0.35)' : 'rgba(201, 153, 58, 0.25)';
-                btn.style.borderColor = v.isDark ? 'rgba(201, 153, 58, 0.6)' : 'rgba(201, 153, 58, 0.4)';
-            });
-            btn.addEventListener('mouseleave', () => {
-                btn.style.background = v.isDark ? 'rgba(201, 153, 58, 0.2)' : 'rgba(201, 153, 58, 0.15)';
-                btn.style.borderColor = v.isDark ? 'rgba(201, 153, 58, 0.4)' : 'rgba(201, 153, 58, 0.3)';
-            });
 
             btn.addEventListener('click', async (e) => {
                 e.preventDefault();
                 e.stopPropagation();
+                // 添加点击视觉反馈
+                btn.style.transform = 'scale(0.98)';
+                setTimeout(() => btn.style.transform = 'scale(1)', 100);
                 await this.togglePanel();
             });
 
@@ -949,6 +941,12 @@
             btn.addEventListener('mouseleave', () => {
                 btn.style.background = v.isDark ? 'rgba(201, 153, 58, 0.2)' : 'rgba(184, 70, 62, 0.15)';
                 btn.style.borderColor = v.isDark ? 'rgba(201, 153, 58, 0.4)' : 'rgba(184, 70, 62, 0.3)';
+            });
+            btn.addEventListener('mousedown', () => {
+                btn.style.transform = 'scale(0.96)';
+            });
+            btn.addEventListener('mouseup', () => {
+                btn.style.transform = 'scale(1)';
             });
 
             Logger.info('配方加载完成，炼造助手已就绪');
@@ -3673,13 +3671,20 @@
                 Logger.warn('未找到侧边栏，按钮可能无法显示');
             });
 
-        waitForAPI().then(() => {
-
-            CraftManager.loadRecipes();
+        waitForAPI().then(async () => {
+            try {
+                await CraftManager.loadRecipes();
+            } catch (e) {
+                Logger.error('初始化加载配方失败: ' + e.message);
+                UI.enableSidebarButton();
+            }
 
             if (CONFIG.general.autoStart) {
                 CraftManager.start();
             }
+        }).catch(e => {
+            Logger.error('API初始化失败: ' + e.message);
+            UI.enableSidebarButton();
         });
     }
 

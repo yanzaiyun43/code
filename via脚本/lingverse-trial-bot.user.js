@@ -1,7 +1,7 @@
 // ==UserScript==
 // @name         灵界 LingVerse 天道试炼刷取助手
 // @namespace    lingverse-trial-bot
-// @version      3.1.22
+// @version      3.1.23
 // @description  天道试炼塔自动化：自动重置、自动战斗、自动选择天赋、统计藏宝图收益
 // @author       LingVerse
 // @match        https://ling.muge.info/*
@@ -1834,6 +1834,12 @@
             btn.addEventListener('mouseleave', () => {
                 btn.style.background = v.isDark ? 'rgba(201, 153, 58, 0.2)' : 'rgba(201, 153, 58, 0.15)';
                 btn.style.borderColor = v.isDark ? 'rgba(201, 153, 58, 0.4)' : 'rgba(201, 153, 58, 0.3)';
+            });
+            btn.addEventListener('mousedown', () => {
+                btn.style.transform = 'scale(0.96)';
+            });
+            btn.addEventListener('mouseup', () => {
+                btn.style.transform = 'scale(1)';
             });
 
             btn.addEventListener('click', (e) => {
