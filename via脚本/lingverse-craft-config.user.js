@@ -1,7 +1,7 @@
 // ==UserScript==
 // @name         灵界 LingVerse 炼造配置面板
 // @namespace    lingverse-craft-config
-// @version      3.1.43
+// @version      3.1.5
 // @description  炼造自动化配置：支持炼丹/炼器/制符/化身炼造、许愿锁定、自动售卖、深色/浅色模式跟随游戏主题
 // @author       LingVerse
 // @match        https://ling.muge.info/*
@@ -871,6 +871,8 @@
                 margin-bottom: 20px;
                 padding-bottom: 16px;
                 border-bottom: 1px solid var(--border-color);
+                width: 100%;
+                box-sizing: border-box;
             `;
 
             const title = document.createElement('h3');
@@ -878,7 +880,7 @@
             title.textContent = '炼造助手';
             title.style.cssText = `
                 font-size: 13px;
-                color: var(--text-gold);
+                color: #c9993a;
                 letter-spacing: 2px;
                 margin-bottom: 12px;
                 padding-bottom: 6px;
@@ -887,24 +889,33 @@
 
             const btn = document.createElement('button');
             btn.id = 'lv-craft-sidebar-btn';
-            btn.innerHTML = '<span id="lv-btn-text">加载中...</span>';
-            btn.disabled = true;
+            btn.textContent = '打开炼造面板';
             btn.style.cssText = `
                 width: 100%;
                 padding: 10px 12px;
-                background: ${v.isDark ? 'rgba(128, 128, 128, 0.2)' : 'rgba(128, 128, 128, 0.15)'};
-                border: 1px solid ${v.isDark ? 'rgba(128, 128, 128, 0.4)' : 'rgba(128, 128, 128, 0.3)'};
+                background: ${v.isDark ? 'rgba(201, 153, 58, 0.2)' : 'rgba(201, 153, 58, 0.15)'};
+                border: 1px solid ${v.isDark ? 'rgba(201, 153, 58, 0.4)' : 'rgba(201, 153, 58, 0.3)'};
                 border-radius: 6px;
-                color: ${v.textMuted};
+                color: #c9993a;
                 font-size: 13px;
                 font-weight: bold;
-                cursor: not-allowed;
-                transition: all 0.2s ease;
+                cursor: pointer;
+                font-family: KaiTi, 楷体, STKaiti, "Noto Serif SC", serif;
+                transition: all 0.2s;
                 display: block;
                 text-align: center;
                 -webkit-tap-highlight-color: transparent;
-                font-family: KaiTi, 楷体, STKaiti, "Noto Serif SC", serif;
+                box-sizing: border-box;
             `;
+
+            btn.addEventListener('mouseenter', () => {
+                btn.style.background = v.isDark ? 'rgba(201, 153, 58, 0.35)' : 'rgba(201, 153, 58, 0.25)';
+                btn.style.borderColor = v.isDark ? 'rgba(201, 153, 58, 0.6)' : 'rgba(201, 153, 58, 0.4)';
+            });
+            btn.addEventListener('mouseleave', () => {
+                btn.style.background = v.isDark ? 'rgba(201, 153, 58, 0.2)' : 'rgba(201, 153, 58, 0.15)';
+                btn.style.borderColor = v.isDark ? 'rgba(201, 153, 58, 0.4)' : 'rgba(201, 153, 58, 0.3)';
+            });
 
             btn.addEventListener('click', async (e) => {
                 e.preventDefault();
