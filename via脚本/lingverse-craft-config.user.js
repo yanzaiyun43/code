@@ -1,7 +1,7 @@
 // ==UserScript==
 // @name         灵界 LingVerse 炼造配置面板
 // @namespace    lingverse-craft-config
-// @version      2.1.41
+// @version      2.1.42
 // @description  炼造自动化配置：支持炼丹/炼器/制符/化身炼造、许愿锁定、自动售卖、深色/浅色模式跟随游戏主题
 // @author       LingVerse
 // @match        https://ling.muge.info/*
@@ -2334,7 +2334,7 @@
 
             if (!selectedName) {
                 descEl.style.display = 'none';
-                descEl.textContent = '';
+                descEl.innerHTML = '';
                 return;
             }
 
@@ -2345,51 +2345,89 @@
             const recipe = cache.find(r => r[nameField] === selectedName);
             if (!recipe) {
                 descEl.style.display = 'none';
-                descEl.textContent = '';
+                descEl.innerHTML = '';
                 return;
             }
 
-            let descText = '';
+            const v = this.getThemeValues();
+            let html = '';
 
-            // 显示消耗信息（灵力、神识）
+            // 消耗信息区域
             const costs = [];
-            if (recipe.mpCost > 0) costs.push(`灵 ${recipe.mpCost}`);
-            if (recipe.spiritCost > 0) costs.push(`神 ${recipe.spiritCost}`);
+            if (recipe.mpCost > 0) costs.push(`灵力 ${recipe.mpCost}`);
+            if (recipe.spiritCost > 0) costs.push(`神识 ${recipe.spiritCost}`);
             if (costs.length > 0) {
-                descText = costs.join(' | ');
+                html += `<div style="
+                    display: flex;
+                    gap: 12px;
+                    padding: 6px 10px;
+                    background: ${v.isDark ? 'rgba(255,152,0,0.15)' : 'rgba(255,152,0,0.1)'};
+                    border-radius: 4px;
+                    margin-bottom: 8px;
+                    font-size: 12px;
+                    color: ${v.isDark ? '#ffb74d' : '#e65100'};
+                    font-weight: 500;
+                ">${costs.join('')}</div>`;
             }
 
             // 炼器配方显示属性
             if (type === 'forge') {
                 const stats = [];
-                if (recipe.baseAttack > 0) stats.push(`攻击+${recipe.baseAttack}`);
-                if (recipe.baseDefense > 0) stats.push(`防御+${recipe.baseDefense}`);
-                if (recipe.baseHp > 0) stats.push(`生命+${recipe.baseHp}`);
-                if (recipe.baseSpirit > 0) stats.push(`神识+${recipe.baseSpirit}`);
-                if (recipe.baseCapacity > 0) stats.push(`容量+${recipe.baseCapacity}`);
+                if (recipe.baseAttack > 0) stats.push(`攻击 +${recipe.baseAttack}`);
+                if (recipe.baseDefense > 0) stats.push(`防御 +${recipe.baseDefense}`);
+                if (recipe.baseHp > 0) stats.push(`生命 +${recipe.baseHp}`);
+                if (recipe.baseSpirit > 0) stats.push(`神识 +${recipe.baseSpirit}`);
+                if (recipe.baseCapacity > 0) stats.push(`容量 +${recipe.baseCapacity}`);
 
                 if (stats.length > 0) {
-                    descText = descText ? `${descText}\n${stats.join(' | ')}` : stats.join(' | ');
+                    html += `<div style="
+                        display: flex;
+                        flex-wrap: wrap;
+                        gap: 8px;
+                        padding: 6px 10px;
+                        background: ${v.isDark ? 'rgba(76,175,80,0.15)' : 'rgba(76,175,80,0.1)'};
+                        border-radius: 4px;
+                        margin-bottom: 8px;
+                        font-size: 12px;
+                        color: ${v.isDark ? '#81c784' : '#2e7d32'};
+                    ">${stats.join('')}</div>`;
                 }
-            }
-
-            // 添加描述
-            if (recipe.description) {
-                descText = descText ? `${descText}\n${recipe.description}` : recipe.description;
             }
 
             // 制符显示成功率
             if (type === 'talisman' && recipe.successRate) {
-                const rateText = `成功率: ${Math.round(recipe.successRate * 100)}%`;
-                descText = descText ? `${descText}\n${rateText}` : rateText;
+                const rate = Math.round(recipe.successRate * 100);
+                const rateColor = rate >= 80 ? '#4caf50' : rate >= 50 ? '#ff9800' : '#f44336';
+                html += `<div style="
+                    display: inline-block;
+                    padding: 4px 10px;
+                    background: ${v.isDark ? 'rgba(33,150,243,0.15)' : 'rgba(33,150,243,0.1)'};
+                    border-radius: 4px;
+                    margin-bottom: 8px;
+                    font-size: 12px;
+                    color: ${rateColor};
+                    font-weight: 500;
+                ">成功率 ${rate}%</div>`;
             }
 
-            if (descText) {
-                descEl.textContent = descText;
+            // 描述区域
+            if (recipe.description) {
+                html += `<div style="
+                    padding: 8px 10px;
+                    background: ${v.isDark ? 'rgba(255,255,255,0.05)' : 'rgba(0,0,0,0.03)'};
+                    border-radius: 4px;
+                    font-size: 12px;
+                    color: ${v.textSecondary};
+                    line-height: 1.5;
+                ">${recipe.description}</div>`;
+            }
+
+            if (html) {
+                descEl.innerHTML = html;
                 descEl.style.display = 'block';
             } else {
                 descEl.style.display = 'none';
-                descEl.textContent = '';
+                descEl.innerHTML = '';
             }
         },
 

@@ -1,7 +1,7 @@
 // ==UserScript==
 // @name         灵界 LingVerse 天道试炼刷取助手
 // @namespace    lingverse-trial-bot
-// @version      2.1.20
+// @version      2.1.21
 // @description  天道试炼塔自动化：自动重置、自动战斗、自动选择天赋、统计藏宝图收益
 // @author       LingVerse
 // @match        https://ling.muge.info/*
@@ -145,7 +145,7 @@
 
         // 开始/重置试炼
         async startTrial(bot_useAdPoints = false) {
-            return this.request('POST', '/api/trial-tower/start', { bot_useAdPoints });
+            return this.request('POST', '/api/trial-tower/start', { useAdPoints: bot_useAdPoints });
         },
 
         // 挑战当前层
@@ -165,7 +165,7 @@
 
         // 刷新天赋选项
         async refreshBuff(bot_useAdPoints = false) {
-            return this.request('POST', '/api/trial-tower/refresh-buff', { bot_useAdPoints });
+            return this.request('POST', '/api/trial-tower/refresh-buff', { useAdPoints: bot_useAdPoints });
         },
 
         // 获取背包物品
