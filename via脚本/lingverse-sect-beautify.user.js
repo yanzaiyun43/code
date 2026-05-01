@@ -1,7 +1,7 @@
 // ==UserScript==
 // @name         灵界宗门极简轻奢美化
 // @namespace    http://tampermonkey.net/
-// @version      2.0.0
+// @version      2.0.1
 // @description  宗门模块全面美化，自动跟随游戏主题，优化排版和交互
 // @author       You
 // @match        *://*/game.html*
@@ -19,25 +19,47 @@
 
     // 获取游戏当前主题
     function getGameTheme() {
-        const html = document.documentElement;
-        if (html.classList.contains('theme-dark')) return 'dark';
-        if (html.classList.contains('theme-light')) return 'light';
-        // 默认检测
-        const bg = getComputedStyle(document.body).backgroundColor;
-        if (bg && (bg.includes('10') || bg.includes('0, 0, 0') || bg.includes('11'))) return 'dark';
-        return 'light';
+        try {
+            const html = document.documentElement;
+            if (html && html.classList) {
+                if (html.classList.contains('theme-dark')) return 'dark';
+                if (html.classList.contains('theme-light')) return 'light';
+            }
+            // 默认检测
+            if (document.body) {
+                const bg = getComputedStyle(document.body).backgroundColor;
+                if (bg && (bg.includes('10') || bg.includes('0, 0, 0') || bg.includes('11'))) return 'dark';
+            }
+        } catch (e) {
+            // 出错时返回深色主题作为默认
+        }
+        return 'dark';
     }
 
-    // 监听主题变化
+    // 监听主题变化 - 使用被动方式避免冲突
+    let lastTheme = null;
     function watchThemeChange() {
-        const observer = new MutationObserver((mutations) => {
-            mutations.forEach((mutation) => {
-                if (mutation.attributeName === 'class') {
+        try {
+            // 使用 requestAnimationFrame 轮询检查主题变化，避免 MutationObserver 冲突
+            function checkTheme() {
+                const currentTheme = getGameTheme();
+                if (currentTheme !== lastTheme) {
+                    lastTheme = currentTheme;
                     applyThemeStyles();
                 }
-            });
-        });
-        observer.observe(document.documentElement, { attributes: true });
+                requestAnimationFrame(checkTheme);
+            }
+            // 每秒检查一次主题变化（降低频率减少冲突）
+            setInterval(() => {
+                const currentTheme = getGameTheme();
+                if (currentTheme !== lastTheme) {
+                    lastTheme = currentTheme;
+                    applyThemeStyles();
+                }
+            }, 1000);
+        } catch (e) {
+            console.log('[宗门美化] 主题监听失败:', e);
+        }
     }
 
     // 生成样式
@@ -656,31 +678,41 @@
     // 应用样式
     let styleElement = null;
     function applyThemeStyles() {
-        if (styleElement) {
-            styleElement.remove();
+        try {
+            if (styleElement && styleElement.parentNode) {
+                styleElement.remove();
+            }
+            styleElement = document.createElement('style');
+            styleElement.id = 'sect-beautify-v2';
+            styleElement.textContent = generateStyles();
+            if (document.head) {
+                document.head.appendChild(styleElement);
+            }
+        } catch (e) {
+            console.log('[宗门美化] 应用样式失败:', e);
         }
-        styleElement = document.createElement('style');
-        styleElement.id = 'sect-beautify-v2';
-        styleElement.textContent = generateStyles();
-        document.head.appendChild(styleElement);
     }
 
     // 初始化
     function init() {
-        applyThemeStyles();
-        watchThemeChange();
-        
-        // 延迟应用，确保DOM已准备好
-        setTimeout(applyThemeStyles, 500);
-        setTimeout(applyThemeStyles, 2000);
-        
-        // 监听宗门按钮点击
-        const sectBtn = document.getElementById('sectBtn');
-        if (sectBtn) {
-            sectBtn.addEventListener('click', () => {
-                setTimeout(applyThemeStyles, 100);
-                setTimeout(applyThemeStyles, 500);
-            });
+        try {
+            applyThemeStyles();
+            watchThemeChange();
+            
+            // 延迟应用，确保DOM已准备好
+            setTimeout(applyThemeStyles, 500);
+            setTimeout(applyThemeStyles, 2000);
+            
+            // 监听宗门按钮点击
+            const sectBtn = document.getElementById('sectBtn');
+            if (sectBtn) {
+                sectBtn.addEventListener('click', () => {
+                    setTimeout(applyThemeStyles, 100);
+                    setTimeout(applyThemeStyles, 500);
+                });
+            }
+        } catch (e) {
+            console.log('[宗门美化] 初始化失败:', e);
         }
     }
 
