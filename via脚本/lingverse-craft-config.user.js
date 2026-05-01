@@ -1,7 +1,7 @@
 // ==UserScript==
 // @name         灵界 LingVerse 炼造配置面板
 // @namespace    lingverse-craft-config
-// @version      3.1.51
+// @version      3.1.52
 // @description  炼造自动化配置：支持炼丹/炼器/制符/化身炼造、许愿锁定、自动售卖、深色/浅色模式跟随游戏主题
 // @author       LingVerse
 // @match        https://ling.muge.info/*
@@ -2020,6 +2020,42 @@
         },
 
         bindPanelEvents() {
+            const v = Theme.getVars();
+
+            // 为面板按钮添加视觉反馈效果
+            const addButtonFeedback = (btnId) => {
+                const btn = $(btnId);
+                if (!btn) return;
+
+                btn.addEventListener('mouseenter', () => {
+                    if (btn.disabled) return;
+                    btn.style.transform = 'translateY(-1px)';
+                    btn.style.boxShadow = '0 4px 12px rgba(0,0,0,0.15)';
+                });
+
+                btn.addEventListener('mouseleave', () => {
+                    btn.style.transform = '';
+                    btn.style.boxShadow = '';
+                });
+
+                btn.addEventListener('mousedown', () => {
+                    if (btn.disabled) return;
+                    btn.style.transform = 'scale(0.96)';
+                });
+
+                btn.addEventListener('mouseup', () => {
+                    btn.style.transform = 'translateY(-1px)';
+                });
+            };
+
+            // 为主按钮添加反馈
+            addButtonFeedback('#lv-btn-start');
+            addButtonFeedback('#lv-btn-once');
+            addButtonFeedback('#lv-btn-save');
+            addButtonFeedback('#lv-btn-refresh');
+            addButtonFeedback('#lv-btn-incarnation-condense');
+            addButtonFeedback('#lv-btn-incarnation-refine');
+            addButtonFeedback('#lv-btn-clear-log');
 
             $('#lv-btn-close')?.addEventListener('click', (e) => {
                 e.preventDefault();
