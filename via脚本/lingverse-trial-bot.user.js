@@ -1,7 +1,7 @@
 // ==UserScript==
 // @name         灵界 LingVerse 天道试炼刷取助手
 // @namespace    lingverse-trial-bot
-// @version      3.1.24
+// @version      3.1.25
 // @description  天道试炼塔自动化：自动重置、自动战斗、自动选择天赋、统计藏宝图收益
 // @author       LingVerse
 // @match        https://ling.muge.info/*
@@ -1435,7 +1435,7 @@
                             font-size: 14px;
                             font-weight: 500;
                             transition: all 0.2s ease;
-                        ">开始刷取</button>
+                        " onmouseover="this.style.transform='translateY(-2px)'; this.style.boxShadow='0 6px 16px rgba(59, 130, 246, 0.35)'" onmouseout="this.style.transform=''; this.style.boxShadow=''" onmousedown="this.style.transform='scale(0.96)'" onmouseup="this.style.transform='translateY(-2px)'">开始刷取</button>
                         <button id="bot_trial_stop" style="
                             flex: 1;
                             background: transparent;
@@ -1448,7 +1448,7 @@
                             font-weight: 500;
                             opacity: 0.5;
                             transition: all 0.2s ease;
-                        ">停止</button>
+                        " onmouseover="this.style.transform='translateY(-2px)'; this.style.opacity='1'" onmouseout="this.style.transform=''; this.style.opacity='0.5'" onmousedown="this.style.transform='scale(0.96)'" onmouseup="this.style.transform='translateY(-2px)'">停止</button>
                     </div>
 
                     <!-- 日志面板 -->
@@ -1480,38 +1480,6 @@
         },
 
         bindEvents() {
-            // 为面板按钮添加视觉反馈效果
-            const addButtonFeedback = (btnId) => {
-                const btn = $(btnId);
-                if (!btn) return;
-
-                btn.addEventListener('mouseenter', () => {
-                    if (btn.disabled) return;
-                    btn.style.transform = 'translateY(-1px)';
-                    btn.style.boxShadow = '0 4px 12px rgba(0,0,0,0.15)';
-                });
-
-                btn.addEventListener('mouseleave', () => {
-                    btn.style.transform = '';
-                    btn.style.boxShadow = '';
-                });
-
-                btn.addEventListener('mousedown', () => {
-                    if (btn.disabled) return;
-                    btn.style.transform = 'scale(0.96)';
-                });
-
-                btn.addEventListener('mouseup', () => {
-                    btn.style.transform = 'translateY(-1px)';
-                });
-            };
-
-            // 为主按钮添加反馈
-            addButtonFeedback('#bot_trial_start');
-            addButtonFeedback('#bot_trial_stop');
-            addButtonFeedback('#bot_clear_log');
-            addButtonFeedback('#bot_advanced_toggle');
-
             $('#bot_trial_close')?.addEventListener('click', () => this.closePanel());
             $('#bot_trial_minimize')?.addEventListener('click', () => this.toggleMinimize());
 

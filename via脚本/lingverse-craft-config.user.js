@@ -1,7 +1,7 @@
 // ==UserScript==
 // @name         灵界 LingVerse 炼造配置面板
 // @namespace    lingverse-craft-config
-// @version      3.1.52
+// @version      3.1.53
 // @description  炼造自动化配置：支持炼丹/炼器/制符/化身炼造、许愿锁定、自动售卖、深色/浅色模式跟随游戏主题
 // @author       LingVerse
 // @match        https://ling.muge.info/*
@@ -1867,7 +1867,7 @@
                             font-weight: 500;
                             box-shadow: ${v.shadowSm};
                             transition: all 0.2s ease;
-                        ">开始炼造</button>
+                        " onmouseover="this.style.transform='translateY(-2px)'; this.style.boxShadow='0 6px 16px rgba(59, 130, 246, 0.35)'" onmouseout="this.style.transform=''; this.style.boxShadow=''" onmousedown="this.style.transform='scale(0.96)'" onmouseup="this.style.transform='translateY(-2px)'">开始炼造</button>
 
                         <button id="lv-btn-once" class="lv-btn-jade" style="
                             background: ${v.accentGreen};
@@ -1880,7 +1880,7 @@
                             font-weight: 500;
                             box-shadow: ${v.shadowSm};
                             transition: all 0.2s ease;
-                        ">执行一次</button>
+                        " onmouseover="this.style.transform='translateY(-2px)'; this.style.boxShadow='0 6px 16px rgba(16, 185, 129, 0.35)'" onmouseout="this.style.transform=''; this.style.boxShadow=''" onmousedown="this.style.transform='scale(0.96)'" onmouseup="this.style.transform='translateY(-2px)'">执行一次</button>
 
                         <button id="lv-btn-save" class="lv-btn-secondary" style="
                             background: transparent;
@@ -1893,7 +1893,7 @@
                             font-weight: 500;
                             transition: all 0.2s ease;
                             white-space: nowrap;
-                        ">保存配置</button>
+                        " onmouseover="this.style.transform='translateY(-2px)'; this.style.borderColor='${v.accentBlue}'; this.style.color='${v.accentBlue}'" onmouseout="this.style.transform=''; this.style.borderColor='${v.borderColor}'; this.style.color='${v.textSecondary}'" onmousedown="this.style.transform='scale(0.96)'" onmouseup="this.style.transform='translateY(-2px)'">保存配置</button>
                     </div>
 
                     <!-- 统计信息 -->
@@ -2020,43 +2020,6 @@
         },
 
         bindPanelEvents() {
-            const v = Theme.getVars();
-
-            // 为面板按钮添加视觉反馈效果
-            const addButtonFeedback = (btnId) => {
-                const btn = $(btnId);
-                if (!btn) return;
-
-                btn.addEventListener('mouseenter', () => {
-                    if (btn.disabled) return;
-                    btn.style.transform = 'translateY(-1px)';
-                    btn.style.boxShadow = '0 4px 12px rgba(0,0,0,0.15)';
-                });
-
-                btn.addEventListener('mouseleave', () => {
-                    btn.style.transform = '';
-                    btn.style.boxShadow = '';
-                });
-
-                btn.addEventListener('mousedown', () => {
-                    if (btn.disabled) return;
-                    btn.style.transform = 'scale(0.96)';
-                });
-
-                btn.addEventListener('mouseup', () => {
-                    btn.style.transform = 'translateY(-1px)';
-                });
-            };
-
-            // 为主按钮添加反馈
-            addButtonFeedback('#lv-btn-start');
-            addButtonFeedback('#lv-btn-once');
-            addButtonFeedback('#lv-btn-save');
-            addButtonFeedback('#lv-btn-refresh');
-            addButtonFeedback('#lv-btn-incarnation-condense');
-            addButtonFeedback('#lv-btn-incarnation-refine');
-            addButtonFeedback('#lv-btn-clear-log');
-
             $('#lv-btn-close')?.addEventListener('click', (e) => {
                 e.preventDefault();
                 e.stopPropagation();
@@ -3212,7 +3175,7 @@
                 
                 const totalCost = previewCost || (quickBuyCost * buyAmount);
                 
-                Logger.info(`${name} 需要补充: ${buyAmount}份, 预计费用: ${totalCost}灵石, canQuickBuy=${canQuickBuy}`);
+                Logger.info(`${name} 需要补充: ${buyAmount}份, 预计费用: ${totalCost}灵石`);
                 
                 if (totalCost > CONFIG.general.maxQuickBuyCost) {
                     Logger.warn(`${name} 批量补充费用过高(${totalCost}灵石)，尝试单次炼制`);
