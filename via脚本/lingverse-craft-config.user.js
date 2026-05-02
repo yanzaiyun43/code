@@ -1,7 +1,7 @@
 // ==UserScript==
 // @name         灵界 LingVerse 炼造配置面板
 // @namespace    lingverse-craft-config
-// @version      3.1.8
+// @version      3.1.9
 // @description  炼造自动化配置：支持炼丹/炼器/制符/化身炼造、许愿锁定、自动售卖、深色/浅色模式跟随游戏主题
 // @author       LingVerse
 // @match        https://ling.muge.info/*
@@ -2243,7 +2243,9 @@
             let html = '';
 
             // 境界要求区域
-            if (recipe.unlockStageName) {
+            const realmNames = _win.REALM_NAMES || window.REALM_NAMES || ['锻体期', '练气期', '筑基期', '金丹期', '元婴期', '化神期', '炼虚期', '合道期', '大乘期', '渡劫期', '真仙境', '玄仙境', '金仙境', '太乙真仙', '大罗金仙', '仙王境', '仙尊境', '仙帝境', '道祖境', '天道境'];
+            const stageName = recipe.minStage > 0 ? realmNames[recipe.minStage] : (recipe.unlockStageName || '');
+            if (stageName) {
                 html += `<div style="
                     display: inline-block;
                     padding: 4px 10px;
@@ -2253,7 +2255,7 @@
                     font-size: 12px;
                     color: ${v.isDark ? '#64b5f6' : '#1976d2'};
                     font-weight: 500;
-                ">${recipe.unlockStageName}</div>`;
+                ">${stageName}</div>`;
             }
 
             // 消耗信息区域
