@@ -1,7 +1,7 @@
 // ==UserScript==
 // @name         灵界 LingVerse 炼造配置面板
 // @namespace    lingverse-craft-config
-// @version      3.1.9
+// @version      3.2.0
 // @description  炼造自动化配置：支持炼丹/炼器/制符/化身炼造、许愿锁定、自动售卖、深色/浅色模式跟随游戏主题
 // @author       LingVerse
 // @match        https://ling.muge.info/*
@@ -2255,7 +2255,7 @@
                     font-size: 12px;
                     color: ${v.isDark ? '#64b5f6' : '#1976d2'};
                     font-weight: 500;
-                ">${stageName}</div>`;
+                ">需要境界: ${stageName}+</div>`;
             }
 
             // 消耗信息区域
