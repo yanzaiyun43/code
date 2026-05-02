@@ -1,7 +1,7 @@
 // ==UserScript==
 // @name         灵界 LingVerse 炼造配置面板
 // @namespace    lingverse-craft-config
-// @version      3.1.7
+// @version      3.1.8
 // @description  炼造自动化配置：支持炼丹/炼器/制符/化身炼造、许愿锁定、自动售卖、深色/浅色模式跟随游戏主题
 // @author       LingVerse
 // @match        https://ling.muge.info/*
@@ -2242,6 +2242,20 @@
             const v = Theme.getVars();
             let html = '';
 
+            // 境界要求区域
+            if (recipe.unlockStageName) {
+                html += `<div style="
+                    display: inline-block;
+                    padding: 4px 10px;
+                    background: ${v.isDark ? 'rgba(33,150,243,0.15)' : 'rgba(33,150,243,0.1)'};
+                    border-radius: 4px;
+                    margin-bottom: 8px;
+                    font-size: 12px;
+                    color: ${v.isDark ? '#64b5f6' : '#1976d2'};
+                    font-weight: 500;
+                ">${recipe.unlockStageName}</div>`;
+            }
+
             // 消耗信息区域
             const costs = [];
             if (recipe.mpCost > 0) costs.push(`消耗灵力 ${recipe.mpCost}`);
@@ -2251,11 +2265,11 @@
                     display: flex;
                     gap: 12px;
                     padding: 8px 12px;
-                    background: ${v.bgSecondary};
+                    background: ${v.isDark ? 'rgba(25,118,210,0.12)' : 'rgba(25,118,210,0.08)'};
                     border-radius: 6px;
                     margin-bottom: 8px;
                     font-size: 12px;
-                    color: ${v.accentAmber};
+                    color: ${v.isDark ? '#90caf9' : '#1565c0'};
                     font-weight: 500;
                 ">${costs.join('')}</div>`;
             }
@@ -2275,11 +2289,11 @@
                         flex-wrap: wrap;
                         gap: 8px;
                         padding: 6px 10px;
-                        background: ${v.isDark ? 'rgba(76,175,80,0.15)' : 'rgba(76,175,80,0.1)'};
+                        background: ${v.isDark ? 'rgba(3,169,244,0.12)' : 'rgba(3,169,244,0.08)'};
                         border-radius: 4px;
                         margin-bottom: 8px;
                         font-size: 12px;
-                        color: ${v.isDark ? '#81c784' : '#2e7d32'};
+                        color: ${v.isDark ? '#4fc3f7' : '#0288d1'};
                     ">${stats.join('')}</div>`;
                 }
             }
