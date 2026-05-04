@@ -1,7 +1,7 @@
 // ==UserScript==
 // @name         灵界 LingVerse 炼造配置面板
 // @namespace    lingverse-craft-config
-// @version      3.2.2
+// @version      3.2.3
 // @description  炼造自动化配置：支持炼丹/炼器/制符/化身炼造、许愿锁定、自动售卖、深色/浅色模式跟随游戏主题
 // @author       LingVerse
 // @match        https://ling.muge.info/*
@@ -216,8 +216,10 @@
                 return { shouldStop: true, reason: '背包即将满，请清理背包' };
             }
 
-            if (autoStop.onMeditating && this.monitor.isMeditating) {
-                return { shouldStop: true, reason: '正在冥想中，无法炼造' };
+            // 冥想检查：如果化身已掌炉，则冥想不阻止炼造
+            const incarnationCraftEnabled = CACHE.incarnationStatus?.craftEnabled;
+            if (autoStop.onMeditating && this.monitor.isMeditating && !incarnationCraftEnabled) {
+                return { shouldStop: true, reason: '正在冥想中（化身未掌炉），无法炼造' };
             }
 
             if (autoStop.onMaxCostReached && this.monitor.totalSpent >= autoStop.maxCraftCost) {
@@ -1387,6 +1389,32 @@
                                 ">
                                     <option value="">-- 选择目标 --</option>
                                 </select>
+                            </div>
+
+                            <!-- 化身统计信息 --
+                            <div id="lv-incarnation-stats" style="
+                                margin-top: 16px;
+                                padding: 12px;
+                                background: ${v.isDark ? 'rgba(33,150,243,0.08)' : 'rgba(33,150,243,0.05)'};
+                                border-radius: 8px;
+                                border: 1px solid ${v.borderLight};
+                            ">
+                                <div style="font-size: 11px; color: ${v.textSecondary}; margin-bottom: 8px;">代工功劳簿</div>
+                                <div style="display: grid; grid-template-columns: repeat(3, 1fr); gap: 8px; text-align: center;">
+                                    <div>
+                                        <div id="lv-incarnation-craft-count" style="font-size: 16px; font-weight: 600; color: ${v.accentBlue};">0</div>
+                                        <div style="font-size: 10px; color: ${v.textMuted};">总代工次数</div>
+                                    </div>
+                                    <div>
+                                        <div id="lv-incarnation-mp" style="font-size: 16px; font-weight: 600; color: ${v.textJade};">0/0</div>
+                                        <div style="font-size: 10px; color: ${v.textMuted};">化身灵力</div>
+                                    </div>
+                                    <div>
+                                        <div id="lv-incarnation-spirit" style="font-size: 16px; font-weight: 600; color: ${v.textGold};">0/0</div>
+                                        <div style="font-size: 10px; color: ${v.textMuted};">化身神识</div>
+                                    </div>
+                                </div>
+                                <div id="lv-incarnation-last-craft" style="font-size: 10px; color: ${v.textSecondary}; margin-top: 8px; text-align: center;">尚未代工</div>
                             </div>
 
                             <div style="display: grid; grid-template-columns: 1fr 1fr; gap: 10px; margin-top: 16px;">
@@ -2709,18 +2737,51 @@
 
         updateIncarnationStatus() {
             const statusEl = $('#lv-incarnation-status');
-            if (!statusEl || !CACHE.incarnationStatus) return;
+            const statsEl = $('#lv-incarnation-stats');
+            if (!CACHE.incarnationStatus) return;
 
             const status = CACHE.incarnationStatus;
-            if (status.isCondensed) {
-                statusEl.textContent = `${status.name || '化身'} Lv.${status.refineLevel || 0}`;
-                statusEl.style.color = Theme.getVars().textJade;
-            } else if (!status.realmUnlocked) {
-                statusEl.textContent = '化神期解锁化身';
-                statusEl.style.color = Theme.getVars().textMuted;
-            } else {
-                statusEl.textContent = '未凝聚化身';
-                statusEl.style.color = Theme.getVars().textMuted;
+
+            // 更新头部状态
+            if (statusEl) {
+                if (status.isCondensed) {
+                    statusEl.textContent = `${status.name || '化身'} Lv.${status.refineLevel || 0}`;
+                    statusEl.style.color = Theme.getVars().textJade;
+                } else if (!status.realmUnlocked) {
+                    statusEl.textContent = '化神期解锁化身';
+                    statusEl.style.color = Theme.getVars().textMuted;
+                } else {
+                    statusEl.textContent = '未凝聚化身';
+                    statusEl.style.color = Theme.getVars().textMuted;
+                }
+            }
+
+            // 更新统计面板
+            if (statsEl && status.isCondensed) {
+                statsEl.style.display = 'block';
+
+                const countEl = $('#lv-incarnation-craft-count');
+                const mpEl = $('#lv-incarnation-mp');
+                const spiritEl = $('#lv-incarnation-spirit');
+                const lastCraftEl = $('#lv-incarnation-last-craft');
+
+                if (countEl) countEl.textContent = status.craftCount || 0;
+                if (mpEl) mpEl.textContent = `${status.mp || 0}/${status.maxMp || 0}`;
+                if (spiritEl) spiritEl.textContent = `${status.spirit || 0}/${status.maxSpirit || 0}`;
+
+                if (lastCraftEl) {
+                    if (status.craftCount > 0 && status.lastCraftAt) {
+                        const lastTime = new Date(status.lastCraftAt * 1000).toLocaleString('zh-CN', {
+                            month: 'short', day: 'numeric', hour: '2-digit', minute: '2-digit'
+                        });
+                        const summary = status.lastCraftSummary || '一次代工';
+                        lastCraftEl.textContent = `最近一次：${summary} · ${lastTime}`;
+                    } else {
+                        lastCraftEl.textContent = '尚未代工';
+                    }
+                }
+            } else if (statsEl) {
+                statsEl.style.display = 'none';
             }
         },
 
@@ -2912,11 +2973,12 @@
                 return;
             }
 
-            // 检测冥想状态 - 冥想中跳过本次但不停止，下次继续检测
+            // 检测冥想状态 - 如果化身未掌炉且本体在冥想中，则跳过
             const isMeditating = await this.isMeditating();
             STATE.monitor.isMeditating = isMeditating;
-            if (isMeditating) {
-                Logger.warn('冥想中无法炼造，跳过本次执行，退出冥想后将自动恢复');
+            const incarnationCraftEnabled = CACHE.incarnationStatus?.craftEnabled;
+            if (isMeditating && !incarnationCraftEnabled) {
+                Logger.warn('冥想中无法炼造（化身未掌炉），跳过本次执行');
                 // 冥想时不停止，只是跳过本次，下次执行时重新检测
                 return;
             }
