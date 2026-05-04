@@ -1,7 +1,7 @@
 // ==UserScript==
 // @name         灵界 LingVerse 炼造配置面板
 // @namespace    lingverse-craft-config
-// @version      3.3.2
+// @version      3.3.3
 // @description  炼造自动化配置：支持炼丹/炼器/制符、许愿锁定、自动售卖、深色/浅色模式跟随游戏主题
 // @author       LingVerse
 // @match        https://ling.muge.info/*
@@ -3265,13 +3265,29 @@
                 const res = await API.getMeditateStatus();
                 if (res.code === 200 && res.data) {
                     if (res.data.isMeditating || res.data.startTime > 0) {
+                        Logger.info('本体正在冥想中');
                         return true;
                     }
-                    // API返回未冥想，直接返回false（优先相信API）
-                    return false;
+                    // API返回未冥想，继续检查化身状态
                 }
             } catch (e) {
                 // API失败时回退到页面变量检测
+            }
+
+            // 检查化身是否启用炼造
+            // 如果化身启用了炼造，本体冥想不影响化身炼造
+            try {
+                const incRes = await API.getIncarnationStatus();
+                if (incRes.code === 200 && incRes.data) {
+                    const status = incRes.data;
+                    // 如果化身已凝聚且启用了炼造，跳过本体冥想检测
+                    if (status.isCondensed && status.craftEnabled) {
+                        Logger.info('化身已启用炼造，跳过本体冥想检测');
+                        return false;
+                    }
+                }
+            } catch (e) {
+                // 忽略化身状态检测错误
             }
 
             // 回退：使用页面变量和DOM检测
