@@ -1,7 +1,7 @@
 // ==UserScript==
 // @name         灵界 LingVerse 炼造配置面板
 // @namespace    lingverse-craft-config
-// @version      3.2.4
+// @version      3.2.5
 // @description  炼造自动化配置：支持炼丹/炼器/制符/化身炼造、许愿锁定、自动售卖、深色/浅色模式跟随游戏主题
 // @author       LingVerse
 // @match        https://ling.muge.info/*
@@ -2088,26 +2088,106 @@
             });
 
             $('#lv-btn-incarnation-condense')?.addEventListener('click', async () => {
+                const status = CACHE.incarnationStatus;
+                if (!status) {
+                    Logger.warn('化身状态未知，请稍后重试');
+                    return;
+                }
+
+                if (status.isCondensed) {
+                    Logger.warn('化身已凝聚，无需再次凝聚');
+                    return;
+                }
+
+                if (!status.realmUnlocked) {
+                    Logger.warn('化神期后方可凝聚化身');
+                    return;
+                }
+
+                // 检查材料是否足够
+                const condenseMaterials = status.condenseMaterials || [];
+                const hasEnoughMaterials = condenseMaterials.every(m => (m.have || 0) >= (m.need || 0));
+
+                if (!hasEnoughMaterials) {
+                    // 尝试一键补全材料
+                    Logger.info('化身凝聚材料不足，尝试一键补全...');
+                    try {
+                        const quickBuyRes = await API.quickBuyMats('incarnation_condense', '', null, 1);
+                        if (quickBuyRes.code === 200) {
+                            Logger.success('材料补全成功');
+                            // 重新加载状态后再次尝试凝聚
+                            await CraftManager.loadIncarnationStatus();
+                        } else {
+                            Logger.warn(`材料补全失败: ${quickBuyRes.message || '未知错误'}`);
+                            return;
+                        }
+                    } catch (e) {
+                        Logger.error(`材料补全失败: ${e.message}`);
+                        return;
+                    }
+                }
+
+                // 执行凝聚
                 try {
                     const res = await API.condenseIncarnation();
                     if (res.code === 200) {
                         Logger.success('化身凝聚成功');
                         await CraftManager.loadIncarnationStatus();
+                    } else {
+                        Logger.warn(`化身凝聚失败: ${res.message || '未知错误'}`);
                     }
                 } catch (e) {
-                    Logger.error('化身凝聚失败: ' + e.message);
+                    Logger.error(`化身凝聚失败: ${e.message}`);
                 }
             });
 
             $('#lv-btn-incarnation-refine')?.addEventListener('click', async () => {
+                const status = CACHE.incarnationStatus;
+                if (!status || !status.isCondensed) {
+                    Logger.warn('化身未凝聚，无法精炼');
+                    return;
+                }
+
+                // 检查是否已达到上限
+                if ((status.refineLevel || 0) >= (status.maxRefineLevel || 0)) {
+                    Logger.warn('化身精炼已达上限');
+                    return;
+                }
+
+                // 检查材料是否足够
+                const refineMaterials = status.refineMaterials || [];
+                const hasEnoughMaterials = refineMaterials.every(m => (m.have || 0) >= (m.need || 0));
+
+                if (!hasEnoughMaterials) {
+                    // 尝试一键补全材料
+                    Logger.info('化身精炼材料不足，尝试一键补全...');
+                    try {
+                        const quickBuyRes = await API.quickBuyMats('incarnation_refine', '', null, 1);
+                        if (quickBuyRes.code === 200) {
+                            Logger.success('材料补全成功');
+                            // 重新加载状态后再次尝试精炼
+                            await CraftManager.loadIncarnationStatus();
+                        } else {
+                            Logger.warn(`材料补全失败: ${quickBuyRes.message || '未知错误'}`);
+                            return;
+                        }
+                    } catch (e) {
+                        Logger.error(`材料补全失败: ${e.message}`);
+                        return;
+                    }
+                }
+
+                // 执行精炼
                 try {
                     const res = await API.refineIncarnation();
                     if (res.code === 200) {
                         Logger.success('化身精炼成功');
                         await CraftManager.loadIncarnationStatus();
+                    } else {
+                        Logger.warn(`化身精炼失败: ${res.message || '未知错误'}`);
                     }
                 } catch (e) {
-                    Logger.error('化身精炼失败: ' + e.message);
+                    Logger.error(`化身精炼失败: ${e.message}`);
                 }
             });
 
@@ -2738,6 +2818,8 @@
         updateIncarnationStatus() {
             const statusEl = $('#lv-incarnation-status');
             const statsEl = $('#lv-incarnation-stats');
+            const condenseBtn = $('#lv-btn-incarnation-condense');
+            const refineBtn = $('#lv-btn-incarnation-refine');
             if (!CACHE.incarnationStatus) return;
 
             const status = CACHE.incarnationStatus;
@@ -2753,6 +2835,22 @@
                 } else {
                     statusEl.textContent = '未凝聚化身';
                     statusEl.style.color = Theme.getVars().textMuted;
+                }
+            }
+
+            // 显示/隐藏凝聚/精炼按钮
+            if (condenseBtn) {
+                condenseBtn.style.display = status.isCondensed ? 'none' : 'block';
+            }
+            if (refineBtn) {
+                if (!status.isCondensed) {
+                    refineBtn.style.display = 'none';
+                } else {
+                    refineBtn.style.display = 'block';
+                    // 更新按钮文本和状态
+                    const refineAtMax = (status.refineLevel || 0) >= (status.maxRefineLevel || 0);
+                    refineBtn.textContent = refineAtMax ? '已至上限' : '精炼化身';
+                    refineBtn.disabled = refineAtMax || !status.canRefine;
                 }
             }
 
@@ -3481,12 +3579,51 @@
                 return;
             }
 
+            // 确保化身掌炉已开启
+            if (!CACHE.incarnationStatus?.craftEnabled) {
+                try {
+                    await API.toggleIncarnationCraft(true);
+                    Logger.info('已开启化身掌炉');
+                    // 更新本地状态
+                    CACHE.incarnationStatus.craftEnabled = true;
+                } catch (e) {
+                    Logger.warn(`开启化身掌炉失败: ${e.message}`);
+                }
+            }
+
+            // 执行实际炼造
             try {
-                await API.toggleIncarnationCraft(true);
-                Logger.success(`化身开始炼造: ${targetName}`);
-                STATE.stats.incarnationCrafted++;
+                const idField = type === 'alchemy' ? 'pillId' : 'recipeId';
+                const id = recipe[idField];
+                const requestCount = Math.min(CONFIG.general.batchSize, 50);
+
+                let res;
+                if (type === 'alchemy') {
+                    res = await API.batchCraftAlchemy(id, requestCount);
+                } else if (type === 'forge') {
+                    res = await API.batchCraftForge(id, requestCount);
+                } else {
+                    res = await API.batchCraftTalisman(id, requestCount);
+                }
+
+                if (res.code === 200) {
+                    let actualCount = res.data?.count || res.data?.crafted;
+                    if (!actualCount && res.data?.message) {
+                        const match = res.data.message.match(/(\d+)次/);
+                        if (match) actualCount = parseInt(match[1]);
+                    }
+                    actualCount = actualCount || 1;
+
+                    Logger.success(`化身炼造成功: ${targetName} x${actualCount}`);
+                    STATE.stats.incarnationCrafted += actualCount;
+                    STATE.stats.crafted += actualCount;
+                    return { count: actualCount };
+                } else {
+                    Logger.warn(`化身炼造失败: ${res.message || '未知错误'}`);
+                }
             } catch (e) {
-                Logger.error('化身炼造失败: ' + e.message);
+                Logger.error(`化身炼造失败: ${e.message}`);
+                throw e;
             }
         },
 
