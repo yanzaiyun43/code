@@ -1,7 +1,7 @@
 // ==UserScript==
 // @name         灵界 LingVerse 炼造配置面板
 // @namespace    lingverse-craft-config
-// @version      3.3.4
+// @version      3.3.5
 // @description  炼造自动化配置：支持炼丹/炼器/制符、许愿锁定、自动售卖、深色/浅色模式跟随游戏主题
 // @author       LingVerse
 // @match        https://ling.muge.info/*
@@ -1121,6 +1121,8 @@
                     <div id="lv-incarnation-info" style="display: flex; align-items: center; gap: 12px; color: ${v.textMuted};">
                         <span id="lv-incarnation-name"></span>
                         <span id="lv-incarnation-level"></span>
+                        <span id="lv-incarnation-mp" style="color: ${v.accentBlue};"></span>
+                        <span id="lv-incarnation-spirit" style="color: ${v.accentPurple};"></span>
                     </div>
                 </div>
 
@@ -2535,6 +2537,8 @@
             const text = $('#lv-incarnation-text');
             const nameEl = $('#lv-incarnation-name');
             const levelEl = $('#lv-incarnation-level');
+            const mpEl = $('#lv-incarnation-mp');
+            const spiritEl = $('#lv-incarnation-spirit');
             const v = Theme.getVars();
 
             if (!indicator || !text) return;
@@ -2547,6 +2551,8 @@
                     text.style.color = v.textMuted;
                     nameEl.textContent = '';
                     levelEl.textContent = '';
+                    if (mpEl) mpEl.textContent = '';
+                    if (spiritEl) spiritEl.textContent = '';
                     return;
                 }
 
@@ -2559,6 +2565,8 @@
                     text.style.color = v.textMuted;
                     nameEl.textContent = '';
                     levelEl.textContent = '';
+                    if (mpEl) mpEl.textContent = '';
+                    if (spiritEl) spiritEl.textContent = '';
                     return;
                 }
 
@@ -2569,6 +2577,8 @@
                     text.style.color = '#ff9800';
                     nameEl.textContent = '';
                     levelEl.textContent = '';
+                    if (mpEl) mpEl.textContent = '';
+                    if (spiritEl) spiritEl.textContent = '';
                     return;
                 }
 
@@ -2582,6 +2592,18 @@
                 nameEl.style.color = v.textPrimary;
                 levelEl.textContent = `Lv.${status.refineLevel || 0}`;
                 levelEl.style.color = v.accentBlue;
+
+                // 显示灵力和神识
+                if (mpEl) {
+                    const mp = status.mp || status.currentMp || 0;
+                    const maxMp = status.maxMp || status.maxMp || 0;
+                    mpEl.textContent = `灵力:${mp}/${maxMp}`;
+                }
+                if (spiritEl) {
+                    const spirit = status.spirit || status.currentSpirit || 0;
+                    const maxSpirit = status.maxSpirit || status.maxSpirit || 0;
+                    spiritEl.textContent = `神识:${spirit}/${maxSpirit}`;
+                }
 
             } catch (e) {
                 indicator.style.background = v.textMuted;
@@ -2707,6 +2729,18 @@
                 return;
             }
 
+            // 获取化身状态，用于区分本体/化身炼造
+            let incarnationEnabled = false;
+            try {
+                const incRes = await API.getIncarnationStatus();
+                if (incRes.code === 200 && incRes.data) {
+                    const status = incRes.data;
+                    incarnationEnabled = status.isCondensed && status.craftEnabled;
+                }
+            } catch (e) {
+                // 忽略错误
+            }
+
             // 检测冥想状态
             const isMeditating = await this.isMeditating();
             STATE.monitor.isMeditating = isMeditating;
@@ -2733,21 +2767,25 @@
             // 设置许愿目标
             await this.setWishTarget();
 
+            // 炼造主体标识
+            const crafter = incarnationEnabled ? '【化身】' : '【本体】';
+
             try {
                 let craftedCount = 0;
                 let hasError = false;
 
                 if (CONFIG.targets.alchemy) {
                     try {
-                        const result = await this.craftByName('alchemy', CONFIG.targets.alchemy);
+                        const result = await this.craftByName('alchemy', CONFIG.targets.alchemy, incarnationEnabled);
                         if (result && result.count) {
                             craftedCount += result.count;
                             STATE.recordSuccess();
+                            Logger.success(`${crafter}炼丹成功: ${CONFIG.targets.alchemy} x${result.count}`);
                         }
                     } catch (e) {
                         hasError = true;
                         const errorCount = STATE.recordError(e.errorType);
-                        Logger.error(`炼丹失败: ${e.message}`);
+                        Logger.error(`${crafter}炼丹失败: ${e.message}`);
                         
 
                         if (e.errorType === API.ErrorTypes.INSUFFICIENT && 
@@ -2763,29 +2801,31 @@
 
                 if (CONFIG.targets.forge) {
                     try {
-                        const result = await this.craftByName('forge', CONFIG.targets.forge);
+                        const result = await this.craftByName('forge', CONFIG.targets.forge, incarnationEnabled);
                         if (result && result.count) {
                             craftedCount += result.count;
                             STATE.recordSuccess();
+                            Logger.success(`${crafter}炼器成功: ${CONFIG.targets.forge} x${result.count}`);
                         }
                     } catch (e) {
                         hasError = true;
                         const errorCount = STATE.recordError(e.errorType);
-                        Logger.error(`炼器失败: ${e.message}`);
+                        Logger.error(`${crafter}炼器失败: ${e.message}`);
                     }
                 }
 
                 if (CONFIG.targets.talisman) {
                     try {
-                        const result = await this.craftByName('talisman', CONFIG.targets.talisman);
+                        const result = await this.craftByName('talisman', CONFIG.targets.talisman, incarnationEnabled);
                         if (result && result.count) {
                             craftedCount += result.count;
                             STATE.recordSuccess();
+                            Logger.success(`${crafter}制符成功: ${CONFIG.targets.talisman} x${result.count}`);
                         }
                     } catch (e) {
                         hasError = true;
                         const errorCount = STATE.recordError(e.errorType);
-                        Logger.error(`制符失败: ${e.message}`);
+                        Logger.error(`${crafter}制符失败: ${e.message}`);
                     }
                 }
 
@@ -2808,11 +2848,11 @@
                 }
 
                 if (CONFIG.general.adaptiveInterval) {
-                    Logger.info(`当前炼制间隔: ${STATE.monitor.currentInterval}秒`);
+                    Logger.info(`${crafter}当前炼制间隔: ${STATE.monitor.currentInterval}秒`);
                 }
 
             } catch (e) {
-                Logger.error('执行失败: ' + e.message);
+                Logger.error(`${crafter}执行失败: ${e.message}`);
                 STATE.recordError();
             }
         },
@@ -2883,9 +2923,12 @@
             }
         },
 
-        async craftByName(type, name) {
+        async craftByName(type, name, useIncarnation = false) {
+            // 炼造主体标识
+            const crafter = useIncarnation ? '【化身】' : '【本体】';
+            
             // 每次炼制前刷新配方数据，确保材料数量最新
-            Logger.info(`【本体】${name} 刷新配方数据...`);
+            Logger.info(`${crafter}${name} 刷新配方数据...`);
             await CraftManager.loadRecipes(true);
 
             const cache = type === 'alchemy' ? CACHE.alchemy :
@@ -2897,7 +2940,7 @@
             });
 
             if (!recipe) {
-                Logger.warn(`【本体】未找到配方: ${name}`);
+                Logger.warn(`${crafter}未找到配方: ${name}`);
                 return { count: 0 };
             }
 
@@ -2909,10 +2952,10 @@
 
             if (!canCraft) {
                 if (!canQuickBuy || !CONFIG.general.useQuickBuy) {
-                    Logger.warn(`【本体】${name} 不可炼制`);
+                    Logger.warn(`${crafter}${name} 不可炼制`);
                     return { count: 0 };
                 }
-                Logger.info(`【本体】${name} 材料不足，将使用灵石补充`);
+                Logger.info(`${crafter}${name} 材料不足，将使用灵石补充`);
             }
 
             // 使用配置的batchSize作为目标炼制次数
@@ -2933,9 +2976,13 @@
             if (needBuy && CONFIG.general.useQuickBuy) {
                 // 检查是否可以补充材料
                 if (!canQuickBuy) {
-                    Logger.warn(`【本体】${name} 材料不足且无法快速购买，跳过`);
-                    // 使用现有材料炼制
+                    // 无法快速购买，使用现有材料炼制
                     const adjustedRequestCount = maxCraftableCount;
+                    if (adjustedRequestCount <= 0) {
+                        Logger.warn(`${crafter}${name} 材料不足且无法快速购买，无材料可炼制`);
+                        return { count: 0 };
+                    }
+                    Logger.info(`${crafter}${name} 材料不足且无法快速购买，仅炼制已有材料 ${adjustedRequestCount} 个`);
                     let res;
                     if (type === 'alchemy') {
                         res = await API.batchCraftAlchemy(id, adjustedRequestCount);
@@ -2951,11 +2998,11 @@
                             if (match) actualCount = parseInt(match[1]);
                         }
                         actualCount = actualCount || adjustedRequestCount;
-                        Logger.success(res.data?.message || `【本体】${name} x${actualCount} 炼制成功`);
+                        Logger.success(res.data?.message || `${crafter}${name} x${actualCount} 炼制成功`);
                         STATE.stats.crafted += actualCount;
                         return { count: actualCount };
                     } else {
-                        Logger.error(`【本体】${name} 炼制失败: ${res.message}`);
+                        Logger.error(`${crafter}${name} 炼制失败: ${res.message}`);
                         return { count: 0 };
                     }
                 }
@@ -2971,10 +3018,10 @@
                     if (previewRes.code === 200 && previewRes.data) {
                         previewCost = previewRes.data.totalCost || previewRes.data.cost || 0;
                         quickBuyCost = Math.floor(previewCost / buyAmount);
-                        Logger.info(`【本体】${name} 预览补充费用: ${previewCost}灵石 (${buyAmount}份)`);
+                        Logger.info(`${crafter}${name} 预览补充费用: ${previewCost}灵石 (${buyAmount}份)`);
                     }
                 } catch (e) {
-                    Logger.warn(`【本体】${name} 获取预览费用失败: ${e.message}`);
+                    Logger.warn(`${crafter}${name} 获取预览费用失败: ${e.message}`);
                 }
                 
                 // 如果preview也获取不到，使用配方中的quickBuyCost或估算
@@ -2984,23 +3031,23 @@
                 
                 const totalCost = previewCost || (quickBuyCost * buyAmount);
                 
-                Logger.info(`【本体】${name} 需要补充: ${buyAmount}份, 预计费用: ${totalCost}灵石`);
+                Logger.info(`${crafter}${name} 需要补充: ${buyAmount}份, 预计费用: ${totalCost}灵石`);
                 
                 if (totalCost > CONFIG.general.maxQuickBuyCost) {
-                    Logger.warn(`【本体】${name} 批量补充费用过高(${totalCost}灵石)，尝试单次炼制`);
-                    return this.craftSingle(type, name);
+                    Logger.warn(`${crafter}${name} 批量补充费用过高(${totalCost}灵石)，尝试单次炼制`);
+                    return this.craftSingle(type, name, useIncarnation);
                 }
 
-                Logger.info(`【本体】${name} 补充${buyAmount}份材料中...`);
+                Logger.info(`${crafter}${name} 补充${buyAmount}份材料中...`);
                 try {
                     const buyRes = await API.quickBuyMats(type, id, buyAmount);
                     if (buyRes.code === 200) {
                         // 使用API返回的实际费用
                         const actualCost = buyRes.data?.totalCost || buyRes.data?.cost || totalCost;
                         STATE.stats.spent += actualCost;
-                        Logger.success(`【本体】${name} 材料补充成功，花费${actualCost}灵石`);
+                        Logger.success(`${crafter}${name} 材料补充成功，花费${actualCost}灵石`);
                         // 补充成功后，直接使用requestCount炼制（不再检查材料）
-                        Logger.info(`【本体】${name} 材料已补充，炼制${requestCount}次...`);
+                        Logger.info(`${crafter}${name} 材料已补充，炼制${requestCount}次...`);
                         let res;
                         if (type === 'alchemy') {
                             res = await API.batchCraftAlchemy(id, requestCount);
@@ -3016,16 +3063,16 @@
                                 if (match) actualCount = parseInt(match[1]);
                             }
                             actualCount = actualCount || requestCount;
-                            Logger.success(res.data?.message || `【本体】${name} x${actualCount} 炼制成功`);
+                            Logger.success(res.data?.message || `${crafter}${name} x${actualCount} 炼制成功`);
                             STATE.stats.crafted += actualCount;
                             return { count: actualCount };
                         } else {
-                            Logger.error(`【本体】${name} 炼制失败: ${res.message}`);
+                            Logger.error(`${crafter}${name} 炼制失败: ${res.message}`);
                             return { count: 0 };
                         }
                     } else if (buyRes.message && buyRes.message.includes('无需补充')) {
                         // 材料已经足够，直接尝试炼制
-                        Logger.info(`【本体】${name} 材料已足够，直接炼制${maxCraftableCount}次`);
+                        Logger.info(`${crafter}${name} 材料已足够，直接炼制${maxCraftableCount}次`);
                         // 调整请求数量为实际可炼次数
                         const adjustedRequestCount = maxCraftableCount;
                         let res;
@@ -3043,21 +3090,21 @@
                                 if (match) actualCount = parseInt(match[1]);
                             }
                             actualCount = actualCount || adjustedRequestCount;
-                            Logger.success(res.data?.message || `【本体】${name} x${actualCount} 炼制成功`);
+                            Logger.success(res.data?.message || `${crafter}${name} x${actualCount} 炼制成功`);
                             STATE.stats.crafted += actualCount;
                             return { count: actualCount };
                         } else {
-                            Logger.error(`【本体】${name} 炼制失败: ${res.message}`);
+                            Logger.error(`${crafter}${name} 炼制失败: ${res.message}`);
                             return { count: 0 };
                         }
                     } else {
-                        Logger.error(`【本体】${name} 补充失败: ${buyRes.message}`);
+                        Logger.error(`${crafter}${name} 补充失败: ${buyRes.message}`);
                         return { count: 0 };
                     }
                 } catch (e) {
                     if (e.message && e.message.includes('无需补充')) {
                         // 材料已经足够，直接尝试炼制
-                        Logger.info(`【本体】${name} 材料已足够，直接炼制${maxCraftableCount}次`);
+                        Logger.info(`${crafter}${name} 材料已足够，直接炼制${maxCraftableCount}次`);
                         const adjustedRequestCount = maxCraftableCount;
                         let res;
                         if (type === 'alchemy') {
@@ -3074,19 +3121,19 @@
                                 if (match) actualCount = parseInt(match[1]);
                             }
                             actualCount = actualCount || adjustedRequestCount;
-                            Logger.success(res.data?.message || `【本体】${name} x${actualCount} 炼制成功`);
+                            Logger.success(res.data?.message || `${crafter}${name} x${actualCount} 炼制成功`);
                             STATE.stats.crafted += actualCount;
                             return { count: actualCount };
                         } else {
-                            Logger.error(`【本体】${name} 炼制失败: ${res.message}`);
+                            Logger.error(`${crafter}${name} 炼制失败: ${res.message}`);
                             return { count: 0 };
                         }
                     }
-                    Logger.error(`【本体】${name} 补充异常: ${e.message}`);
+                    Logger.error(`${crafter}${name} 补充异常: ${e.message}`);
                     return { count: 0 };
                 }
             } else if (needBuy && !CONFIG.general.useQuickBuy) {
-                Logger.warn(`【本体】${name} 材料不足且自动补充已禁用`);
+                Logger.warn(`${crafter}${name} 材料不足且自动补充已禁用`);
                 return { count: 0 };
             }
             try {
@@ -3125,7 +3172,10 @@
             }
         },
 
-        async craftSingle(type, name) {
+        async craftSingle(type, name, useIncarnation = false) {
+            // 炼造主体标识
+            const crafter = useIncarnation ? '【化身】' : '【本体】';
+            
             const cache = type === 'alchemy' ? CACHE.alchemy :
                          type === 'forge' ? CACHE.forge : CACHE.talisman;
 
@@ -3135,7 +3185,7 @@
             });
 
             if (!recipe) {
-                Logger.warn(`【本体】未找到配方: ${name}`);
+                Logger.warn(`${crafter}未找到配方: ${name}`);
                 return { count: 0 };
             }
 
@@ -3163,16 +3213,16 @@
                     }
                     actualCount = actualCount || 1;
 
-                    const msg = res.data?.message || `【本体】${name} x${actualCount} 单次炼制成功`;
+                    const msg = res.data?.message || `${crafter}${name} x${actualCount} 单次炼制成功`;
                     Logger.success(msg);
                     STATE.stats.crafted += actualCount;
                     return { count: actualCount };
                 } else {
-                    Logger.error(`【本体】${name} 单次炼制失败: ${res.message}`);
+                    Logger.error(`${crafter}${name} 单次炼制失败: ${res.message}`);
                     return { count: 0 };
                 }
             } catch (e) {
-                Logger.error(`【本体】${name} 单次炼制异常: ${e.message}`);
+                Logger.error(`${crafter}${name} 单次炼制异常: ${e.message}`);
                 return { count: 0 };
             }
         },
