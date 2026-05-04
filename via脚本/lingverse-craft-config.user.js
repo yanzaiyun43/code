@@ -1,7 +1,7 @@
 // ==UserScript==
 // @name         灵界 LingVerse 炼造配置面板
 // @namespace    lingverse-craft-config
-// @version      3.2.8
+// @version      3.2.9
 // @description  炼造自动化配置：支持炼丹/炼器/制符/化身炼造、许愿锁定、自动售卖、深色/浅色模式跟随游戏主题
 // @author       LingVerse
 // @match        https://ling.muge.info/*
@@ -3243,8 +3243,11 @@
 
                 if (CONFIG.targets.incarnation.enabled && CONFIG.targets.incarnation.target) {
                     try {
-                        await this.craftIncarnation();
-                        STATE.recordSuccess();
+                        const result = await this.craftIncarnation();
+                        if (result && result.count) {
+                            craftedCount += result.count;
+                            STATE.recordSuccess();
+                        }
                     } catch (e) {
                         hasError = true;
                         STATE.recordError(e.errorType);
@@ -3726,7 +3729,9 @@
                     }
                     actualCount = actualCount || 1;
 
-                    Logger.success(`化身炼造成功: ${targetName} x${actualCount}`);
+                    // 使用游戏返回的完整消息
+                    const msg = res.data?.message || `化身炼造成功: ${targetName} x${actualCount}`;
+                    Logger.success(msg);
                     STATE.stats.incarnationCrafted += actualCount;
                     STATE.stats.crafted += actualCount;
                     return { count: actualCount };
