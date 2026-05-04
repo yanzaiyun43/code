@@ -1,7 +1,7 @@
 // ==UserScript==
 // @name         灵界 LingVerse 炼造配置面板
 // @namespace    lingverse-craft-config
-// @version      3.2.0
+// @version      3.2.2
 // @description  炼造自动化配置：支持炼丹/炼器/制符/化身炼造、许愿锁定、自动售卖、深色/浅色模式跟随游戏主题
 // @author       LingVerse
 // @match        https://ling.muge.info/*
@@ -2712,9 +2712,12 @@
             if (!statusEl || !CACHE.incarnationStatus) return;
 
             const status = CACHE.incarnationStatus;
-            if (status.hasIncarnation) {
-                statusEl.textContent = `${status.name || '化身'} Lv.${status.level || 0}`;
+            if (status.isCondensed) {
+                statusEl.textContent = `${status.name || '化身'} Lv.${status.refineLevel || 0}`;
                 statusEl.style.color = Theme.getVars().textJade;
+            } else if (!status.realmUnlocked) {
+                statusEl.textContent = '化神期解锁化身';
+                statusEl.style.color = Theme.getVars().textMuted;
             } else {
                 statusEl.textContent = '未凝聚化身';
                 statusEl.style.color = Theme.getVars().textMuted;
@@ -3122,7 +3125,7 @@
 
             if (!canCraft) {
                 if (!canQuickBuy || !CONFIG.general.useQuickBuy) {
-                    Logger.warn(`${name} 不可炼制(canQuickBuy=${canQuickBuy}, useQuickBuy=${CONFIG.general.useQuickBuy})`);
+                    Logger.warn(`${name} 不可炼制`);
                     return { count: 0 };
                 }
                 Logger.info(`${name} 材料不足，将使用灵石补充`);
@@ -3139,7 +3142,6 @@
                     return Math.floor((m.have || 0) / m.need);
                 });
                 maxCraftableCount = Math.min(...materialLimits, requestCount);
-                Logger.info(`${name} 材料情况: 目标${requestCount}次, 可炼${maxCraftableCount}次, 材料详情:`, recipe.materials.map(m => `${m.name}:${m.have}/${m.need}`).join(', '));
             }
 
             // 检查材料是否足够
@@ -3147,7 +3149,7 @@
             if (needBuy && CONFIG.general.useQuickBuy) {
                 // 检查是否可以补充材料
                 if (!canQuickBuy) {
-                    Logger.warn(`${name} 材料仅够炼制${maxCraftableCount}次（目标${requestCount}次），下次将尝试恢复${requestCount}次`);
+                    Logger.warn(`${name} 材料不足且无法快速购买，跳过`);
                     // 使用现有材料炼制
                     const adjustedRequestCount = maxCraftableCount;
                     let res;
@@ -3392,8 +3394,12 @@
         },
 
         async craftIncarnation() {
-            if (!CACHE.incarnationStatus?.hasIncarnation) {
-                Logger.warn('未凝聚化身，无法炼造');
+            if (!CACHE.incarnationStatus?.isCondensed) {
+                if (!CACHE.incarnationStatus?.realmUnlocked) {
+                    Logger.warn('化神期解锁化身后方可炼造');
+                } else {
+                    Logger.warn('未凝聚化身，无法炼造');
+                }
                 return;
             }
 
