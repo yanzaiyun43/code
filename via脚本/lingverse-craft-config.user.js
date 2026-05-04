@@ -1,7 +1,7 @@
 // ==UserScript==
 // @name         灵界 LingVerse 炼造配置面板
 // @namespace    lingverse-craft-config
-// @version      3.3.3
+// @version      3.3.4
 // @description  炼造自动化配置：支持炼丹/炼器/制符、许愿锁定、自动售卖、深色/浅色模式跟随游戏主题
 // @author       LingVerse
 // @match        https://ling.muge.info/*
@@ -3260,7 +3260,22 @@
         },
 
         async isMeditating() {
-            // 优先使用API获取最新的冥想状态，避免页面变量未更新
+            // 首先检查化身状态 - 如果化身启用了炼造，跳过本体冥想检测
+            try {
+                const incRes = await API.getIncarnationStatus();
+                if (incRes.code === 200 && incRes.data) {
+                    const status = incRes.data;
+                    // 如果化身已凝聚且启用了炼造，本体冥想不影响炼造
+                    if (status.isCondensed && status.craftEnabled) {
+                        Logger.info('化身已启用炼造，跳过冥想检测');
+                        return false;
+                    }
+                }
+            } catch (e) {
+                // 忽略化身状态检测错误，继续检测本体
+            }
+
+            // 检测本体冥想状态
             try {
                 const res = await API.getMeditateStatus();
                 if (res.code === 200 && res.data) {
@@ -3268,26 +3283,11 @@
                         Logger.info('本体正在冥想中');
                         return true;
                     }
-                    // API返回未冥想，继续检查化身状态
+                    // API返回未冥想
+                    return false;
                 }
             } catch (e) {
                 // API失败时回退到页面变量检测
-            }
-
-            // 检查化身是否启用炼造
-            // 如果化身启用了炼造，本体冥想不影响化身炼造
-            try {
-                const incRes = await API.getIncarnationStatus();
-                if (incRes.code === 200 && incRes.data) {
-                    const status = incRes.data;
-                    // 如果化身已凝聚且启用了炼造，跳过本体冥想检测
-                    if (status.isCondensed && status.craftEnabled) {
-                        Logger.info('化身已启用炼造，跳过本体冥想检测');
-                        return false;
-                    }
-                }
-            } catch (e) {
-                // 忽略化身状态检测错误
             }
 
             // 回退：使用页面变量和DOM检测
