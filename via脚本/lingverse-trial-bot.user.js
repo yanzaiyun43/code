@@ -1,7 +1,7 @@
 // ==UserScript==
 // @name         灵界 LingVerse 天道试炼刷取助手
 // @namespace    lingverse-trial-bot
-// @version      3.1.4
+// @version      3.1.5
 // @description  天道试炼塔自动化：自动重置、自动战斗、自动选择天赋、统计藏宝图收益
 // @author       LingVerse
 // @match        https://ling.muge.info/*
@@ -94,7 +94,11 @@
         },
 
         logs: [],
-        bot_lastResetTime: 0
+        bot_lastResetTime: 0,
+        
+        // 藏宝图交易记录
+        mapTradeLogs: [],
+        lastMapTradeUpdate: 0
     };
 
     // API管理
@@ -732,19 +736,48 @@
 
                 // 获取求购列表
                 const buyReqRes = await bot_API.getBuyRequests();
-                const buyRequests = (buyReqRes.data || []).filter(req =>
+                const allBuyRequests = buyReqRes.data || [];
+                
+                // 记录到交易日志面板
+                bot_UI.addMapTradeLog('info', { message: `开始查询藏宝图市场...` });
+                
+                // 记录所有藏宝图求购单
+                const allMapRequests = allBuyRequests.filter(req => req.name && req.name.includes('藏宝图'));
+                bot_UI.addMapTradeLog('info', { message: `市场共有 ${allMapRequests.length} 个藏宝图求购单` });
+                allMapRequests.forEach(req => {
+                    bot_UI.addMapTradeLog('buy_request', {
+                        name: req.name,
+                        unitPrice: req.unitPrice,
+                        remainingQty: req.remainingQty,
+                        templateId: req.templateId
+                    });
+                });
+                
+                // 记录我的藏宝图
+                bot_UI.addMapTradeLog('info', { message: `我的背包:` });
+                mapItems.forEach(item => {
+                    bot_UI.addMapTradeLog('my_maps', {
+                        name: item.name,
+                        quantity: item.quantity,
+                        templateId: item.templateId
+                    });
+                });
+                
+                const buyRequests = allBuyRequests.filter(req =>
                     req.name && req.name.includes('藏宝图') &&
                     req.unitPrice >= bot_CONFIG.bot_minMapPrice &&
                     !req.isMine
                 );
 
                 if (buyRequests.length === 0) {
+                    bot_UI.addMapTradeLog('skip', { reason: `未找到价格 ≥ ${bot_CONFIG.bot_minMapPrice} 的藏宝图求购单` });
                     bot_Logger.warn(`未找到价格 ≥ ${bot_CONFIG.bot_minMapPrice} 的藏宝图求购单`);
                     return false;
                 }
 
                 // 按价格排序（从高到低）
                 buyRequests.sort((a, b) => b.unitPrice - a.unitPrice);
+                bot_UI.addMapTradeLog('info', { message: `符合条件的求购单 (≥${bot_CONFIG.bot_minMapPrice}灵石): ${buyRequests.length}个` });
 
                 let soldCount = 0;
                 let earnedStone = 0;
@@ -761,7 +794,12 @@
                         if (request.remainingQty <= 0) continue;
 
                         // 检查是否是同一种藏宝图
-                        if (request.templateId !== mapItem.templateId) continue;
+                        if (request.templateId !== mapItem.templateId) {
+                            bot_UI.addMapTradeLog('skip', { 
+                                reason: `类型不匹配: ${mapItem.name}(templateId:${mapItem.templateId}) ≠ ${request.name}(templateId:${request.templateId})` 
+                            });
+                            continue;
+                        }
 
                         const sellQty = Math.min(remainingQty, request.remainingQty, bot_totalMaps - soldCount);
 
@@ -775,9 +813,20 @@
                                 soldCount += sellQty;
                                 remainingQty -= sellQty;
                                 request.remainingQty -= sellQty;
+                                
+                                // 记录出售成功
+                                bot_UI.addMapTradeLog('sold', {
+                                    qty: sellQty,
+                                    price: request.unitPrice,
+                                    earned: netEarning,
+                                    fee: fee,
+                                    name: mapItem.name
+                                });
+                                
                                 bot_Logger.success(`出售 ${sellQty} 个藏宝图 @ ${request.unitPrice}灵石，获得 ${netEarning} 灵石(手续费${fee})`);
                             }
                         } catch (e) {
+                            bot_UI.addMapTradeLog('error', { message: `出售失败: ${e.message}` });
                             bot_Logger.error(`出售失败: ${e.message}`);
                         }
 
@@ -786,9 +835,11 @@
                 }
 
                 if (soldCount > 0) {
+                    bot_UI.addMapTradeLog('info', { message: `出售完成: 售出 ${soldCount} 个，共获得 ${earnedStone} 灵石` });
                     bot_Logger.gold(`藏宝图出售完成: 售出 ${soldCount} 个，共获得 ${earnedStone} 灵石`);
                     return true;
                 } else {
+                    bot_UI.addMapTradeLog('skip', { reason: '未能成功出售任何藏宝图 (可能原因: 类型不匹配/价格低于设置/被锁定)' });
                     bot_Logger.warn('未能成功出售任何藏宝图');
                     bot_Logger.info('可能原因: 1.没有符合条件的求购单 2.藏宝图类型不匹配 3.求购价格低于设置 4.藏宝图被锁定或有交易冷却');
                     return false;
@@ -797,6 +848,75 @@
             } catch (e) {
                 bot_Logger.error(`出售藏宝图时出错: ${e.message}`);
                 return false;
+            }
+        },
+
+        // 刷新交易日志（手动查询当前市场）
+        async refreshTradeLog() {
+            try {
+                bot_UI.addMapTradeLog('info', { message: '--- 手动刷新 ---' });
+                
+                // 获取背包藏宝图
+                const invRes = await bot_API.getInventory();
+                const inventory = invRes.data || [];
+                const mapItems = inventory.filter(item => item.name && item.name.includes('藏宝图'));
+                
+                if (mapItems.length === 0) {
+                    bot_UI.addMapTradeLog('info', { message: '背包中没有藏宝图' });
+                } else {
+                    bot_UI.addMapTradeLog('info', { message: `我的藏宝图 (${mapItems.length}种):` });
+                    mapItems.forEach(item => {
+                        bot_UI.addMapTradeLog('my_maps', {
+                            name: item.name,
+                            quantity: item.quantity || 1,
+                            templateId: item.templateId
+                        });
+                    });
+                }
+                
+                // 获取求购列表
+                const buyReqRes = await bot_API.getBuyRequests();
+                const allBuyRequests = buyReqRes.data || [];
+                const allMapRequests = allBuyRequests.filter(req => req.name && req.name.includes('藏宝图'));
+                
+                if (allMapRequests.length === 0) {
+                    bot_UI.addMapTradeLog('info', { message: '当前没有藏宝图求购单' });
+                } else {
+                    bot_UI.addMapTradeLog('info', { message: `市场求购单 (${allMapRequests.length}个):` });
+                    allMapRequests.forEach(req => {
+                        bot_UI.addMapTradeLog('buy_request', {
+                            name: req.name,
+                            unitPrice: req.unitPrice,
+                            remainingQty: req.remainingQty,
+                            templateId: req.templateId
+                        });
+                    });
+                }
+                
+                // 分析匹配情况
+                if (mapItems.length > 0 && allMapRequests.length > 0) {
+                    let matchCount = 0;
+                    for (const item of mapItems) {
+                        const matches = allMapRequests.filter(req => 
+                            req.templateId === item.templateId && 
+                            req.unitPrice >= bot_CONFIG.bot_minMapPrice
+                        );
+                        if (matches.length > 0) {
+                            const bestMatch = matches.sort((a, b) => b.unitPrice - a.unitPrice)[0];
+                            bot_UI.addMapTradeLog('info', { 
+                                message: `✓ ${item.name} 可出售 @ ${bestMatch.unitPrice}灵石 (最高)` 
+                            });
+                            matchCount++;
+                        }
+                    }
+                    if (matchCount === 0) {
+                        bot_UI.addMapTradeLog('skip', { reason: '没有符合条件的匹配 (价格低于设置或类型不匹配)' });
+                    }
+                }
+                
+                bot_UI.addMapTradeLog('info', { message: '--- 刷新完成 ---' });
+            } catch (e) {
+                bot_UI.addMapTradeLog('error', { message: `刷新失败: ${e.message}` });
             }
         }
     };
@@ -910,6 +1030,7 @@
 
             this.bindEvents();
             this.loadConfig();
+            this.loadMapTradeLogs(); // 加载历史交易记录
             this.makeDraggable();
             this.updateTheme();
         },
@@ -1474,6 +1595,44 @@
                         font-family: 'Consolas', 'Monaco', monospace;
                         line-height: 1.5;
                     "></div>
+
+                    <!-- 藏宝图交易记录 -->
+                    <div style="margin-top: 16px; margin-bottom: 8px; display: flex; justify-content: space-between; align-items: center;">
+                        <span style="font-size: 12px; color: ${v.accentAmber};">📜 藏宝图交易记录</span>
+                        <div style="display: flex; gap: 8px;">
+                            <button id="bot_refresh_map_log" style="
+                                font-size: 11px;
+                                padding: 4px 10px;
+                                background: ${v.bgCard};
+                                border: 1px solid ${v.borderColor};
+                                color: ${v.textMuted};
+                                border-radius: 6px;
+                                cursor: pointer;
+                            ">刷新</button>
+                            <button id="bot_clear_map_log" style="
+                                font-size: 11px;
+                                padding: 4px 10px;
+                                background: ${v.bgCard};
+                                border: 1px solid ${v.borderColor};
+                                color: ${v.textMuted};
+                                border-radius: 6px;
+                                cursor: pointer;
+                            ">清除</button>
+                        </div>
+                    </div>
+                    <div id="bot_map_trade_logs" class="lv-trial-card" style="
+                        max-height: 200px;
+                        overflow-y: auto;
+                        background: ${v.bgCard};
+                        border: 1px solid ${v.borderColor};
+                        border-radius: 10px;
+                        padding: 12px;
+                        font-size: 11px;
+                        font-family: 'Consolas', 'Monaco', monospace;
+                        line-height: 1.5;
+                    ">
+                        <div style="color: ${v.textMuted}; text-align: center;">暂无交易记录</div>
+                    </div>
                 </div>
             `;
         },
@@ -1494,6 +1653,16 @@
             $('#bot_clear_log')?.addEventListener('click', () => {
                 bot_STATE.logs = [];
                 this.updateLogPanel();
+            });
+
+            // 藏宝图交易记录按钮
+            $('#bot_clear_map_log')?.addEventListener('click', () => {
+                bot_STATE.mapTradeLogs = [];
+                this.updateMapTradePanel();
+            });
+
+            $('#bot_refresh_map_log')?.addEventListener('click', () => {
+                bot_MapTrader.refreshTradeLog();
             });
 
             // 高级设置折叠/展开
@@ -1774,6 +1943,104 @@
 
             // 同时更新统计
             this.updateStats();
+        },
+
+        // 添加藏宝图交易记录
+        addMapTradeLog(type, data) {
+            const time = new Date().toLocaleTimeString('zh-CN', { hour12: false });
+            bot_STATE.mapTradeLogs.unshift({
+                time,
+                type, // 'buy_request', 'my_maps', 'sold', 'error', 'info', 'skip'
+                data
+            });
+            // 最多保留100条记录
+            if (bot_STATE.mapTradeLogs.length > 100) {
+                bot_STATE.mapTradeLogs = bot_STATE.mapTradeLogs.slice(0, 100);
+            }
+            bot_STATE.lastMapTradeUpdate = Date.now();
+            this.saveMapTradeLogs();
+            this.updateMapTradePanel();
+        },
+
+        // 更新藏宝图交易记录面板
+        updateMapTradePanel() {
+            const panel = $('#bot_map_trade_logs');
+            if (!panel) return;
+
+            if (bot_STATE.mapTradeLogs.length === 0) {
+                panel.innerHTML = '<div style="color: #6a6560; text-align: center;">暂无交易记录</div>';
+                return;
+            }
+
+            const v = bot_Theme.getVars();
+            const html = bot_STATE.mapTradeLogs.map(log => {
+                let content = '';
+                let color = v.textSecondary;
+                
+                switch (log.type) {
+                    case 'buy_request':
+                        color = '#60a0e0';
+                        content = `<strong>市场求购:</strong> ${log.data.name} @ ${log.data.unitPrice}灵石 (剩余${log.data.remainingQty})`;
+                        break;
+                    case 'my_maps':
+                        color = '#c9993a';
+                        content = `<strong>我的藏宝图:</strong> ${log.data.name} (数量: ${log.data.quantity})`;
+                        break;
+                    case 'sold':
+                        color = '#3dab97';
+                        content = `<strong>✓ 出售成功:</strong> ${log.data.qty}个 @ ${log.data.price}灵石，获得${log.data.earned}灵石`;
+                        break;
+                    case 'skip':
+                        color = '#e0a030';
+                        content = `<strong>⚠ 跳过:</strong> ${log.data.reason}`;
+                        break;
+                    case 'error':
+                        color = '#e06060';
+                        content = `<strong>✗ 错误:</strong> ${log.data.message}`;
+                        break;
+                    case 'info':
+                        color = v.textMuted;
+                        content = log.data.message;
+                        break;
+                }
+
+                return `<div style="color: ${color}; margin-bottom: 4px; padding: 4px 0; border-bottom: 1px solid ${v.borderLight};">
+                    <span style="color: #6a6560; font-size: 10px;">[${log.time}]</span> ${content}
+                </div>`;
+            }).join('');
+
+            panel.innerHTML = html;
+            panel.scrollTop = 0; // 新记录在上方
+        },
+
+        // 保存交易日志到 localStorage
+        saveMapTradeLogs() {
+            try {
+                const data = {
+                    logs: bot_STATE.mapTradeLogs,
+                    savedAt: Date.now()
+                };
+                localStorage.setItem('lv_trial_map_trade_logs', JSON.stringify(data));
+            } catch (e) {
+                console.error('保存交易日志失败:', e);
+            }
+        },
+
+        // 从 localStorage 加载交易日志
+        loadMapTradeLogs() {
+            try {
+                const saved = localStorage.getItem('lv_trial_map_trade_logs');
+                if (saved) {
+                    const data = JSON.parse(saved);
+                    if (data && data.logs && Array.isArray(data.logs)) {
+                        bot_STATE.mapTradeLogs = data.logs;
+                        bot_STATE.lastMapTradeUpdate = data.savedAt || Date.now();
+                        this.updateMapTradePanel();
+                    }
+                }
+            } catch (e) {
+                console.error('加载交易日志失败:', e);
+            }
         },
 
         createSidebarButton() {

@@ -1,8 +1,8 @@
 // ==UserScript==
 // @name         灵界 LingVerse 炼造配置面板
 // @namespace    lingverse-craft-config
-// @version      3.3.0
-// @description  炼造自动化配置：支持炼丹/炼器/制符/化身炼造、许愿锁定、自动售卖、深色/浅色模式跟随游戏主题
+// @version      3.3.2
+// @description  炼造自动化配置：支持炼丹/炼器/制符、许愿锁定、自动售卖、深色/浅色模式跟随游戏主题
 // @author       LingVerse
 // @match        https://ling.muge.info/*
 // @match        http://ling.muge.info/*
@@ -24,12 +24,7 @@
         targets: {
             alchemy: '',
             forge: '',
-            talisman: '',
-            incarnation: {
-                enabled: false,
-                type: 'alchemy',
-                target: ''
-            }
+            talisman: ''
         },
 
         autoSell: {
@@ -41,12 +36,6 @@
         },
 
         wishLock: { enabled: false, type: 'alchemy', targetName: '', targetRarity: 4 },
-
-        incarnation: {
-            autoFeedPills: false,
-            autoEquip: false,
-            feedPillType: 'cultivation'
-        },
 
         general: {
             batchSize: 10,
@@ -89,13 +78,11 @@
         panelOpen: false,
         panelMinimized: false,
         autoCraftTimer: null,
-        autoIncarnationTimer: null,
         stats: {
             crafted: 0,
             soldPills: 0,
             soldEquip: 0,
             spent: 0,
-            incarnationCrafted: 0,
             pillsFed: 0,
             errors: 0,
             lastErrorTime: 0,
@@ -103,7 +90,6 @@
         },
         logs: [],
         playerInfo: null,
-        incarnationInfo: null,
         
 
         monitor: {
@@ -184,7 +170,6 @@
             this.stats.soldPills = 0;
             this.stats.soldEquip = 0;
             this.stats.spent = 0;
-            this.stats.incarnationCrafted = 0;
             this.stats.pillsFed = 0;
             this.stats.errors = 0;
             this.monitor.consecutiveErrors = 0;
@@ -216,10 +201,9 @@
                 return { shouldStop: true, reason: '背包即将满，请清理背包' };
             }
 
-            // 冥想检查：如果化身已掌炉，则冥想不阻止炼造
-            const incarnationCraftEnabled = CACHE.incarnationStatus?.craftEnabled;
-            if (autoStop.onMeditating && this.monitor.isMeditating && !incarnationCraftEnabled) {
-                return { shouldStop: true, reason: '正在冥想中（化身未掌炉），无法炼造' };
+            // 冥想检查
+            if (autoStop.onMeditating && this.monitor.isMeditating) {
+                return { shouldStop: true, reason: '正在冥想中，无法炼造' };
             }
 
             if (autoStop.onMaxCostReached && this.monitor.totalSpent >= autoStop.maxCraftCost) {
@@ -243,7 +227,6 @@
         talisman: [],
         inventory: [],
         playerInfo: null,
-        incarnationStatus: null,
         lastUpdate: 0,
         
 
@@ -578,6 +561,15 @@
             });
         },
 
+        // ==================== 化身系统 ====================
+        async getIncarnationStatus() {
+            return this.request('GET', '/api/game/incarnation/status');
+        },
+
+        async toggleIncarnationCraft(enabled) {
+            return this.request('POST', '/api/game/incarnation/toggle-craft', { enabled });
+        },
+
         // ==================== 出售物品 ====================
 
         async previewBatchSell(maxRarity, scope = null) {
@@ -599,56 +591,6 @@
         // ==================== 许愿 ====================
         async setWishTarget(targetId) {
             return this.request('POST', '/api/game/crafting/wish', { targetId });
-        },
-
-        // ==================== 化身系统 ====================
-        async getIncarnationStatus() {
-            return this.request('GET', '/api/game/incarnation/status');
-        },
-
-        async toggleIncarnationCraft(enabled) {
-            return this.request('POST', '/api/game/incarnation/toggle-craft', { enabled });
-        },
-
-        async condenseIncarnation() {
-            return this.request('POST', '/api/game/incarnation/condense');
-        },
-
-        async refineIncarnation() {
-            return this.request('POST', '/api/game/incarnation/refine');
-        },
-
-        async breakthroughIncarnation() {
-            return this.request('POST', '/api/game/incarnation/breakthrough');
-        },
-
-        async getIncarnationCultivationPills() {
-            return this.request('GET', '/api/game/incarnation/cultivation-pills');
-        },
-
-        async consumeIncarnationPill(itemId) {
-            return this.request('POST', '/api/game/incarnation/consume-pill', { itemId });
-        },
-
-        async consumeAllIncarnationPills() {
-            return this.request('POST', '/api/game/incarnation/consume-pill-all', {});
-        },
-
-        async getIncarnationAvailableEquip(slot) {
-            const query = slot ? `?slot=${slot}` : '';
-            return this.request('GET', `/api/game/incarnation/available-equip${query}`);
-        },
-
-        async equipIncarnation(itemId) {
-            return this.request('POST', '/api/game/incarnation/equip', { itemId });
-        },
-
-        async unequipIncarnation(slot) {
-            return this.request('POST', '/api/game/incarnation/unequip', { slot });
-        },
-
-        async renameIncarnation(name) {
-            return this.request('POST', '/api/game/incarnation/rename', { name });
         },
 
         // ==================== 师徒炼造目标 ====================
@@ -999,9 +941,6 @@
             if (CACHE.alchemy.length === 0) {
                 await CraftManager.loadRecipes();
             }
-            if (CACHE.incarnationStatus === null) {
-                await CraftManager.loadIncarnationStatus();
-            }
 
             const v = Theme.getVars();
             const panel = document.createElement('div');
@@ -1037,7 +976,10 @@
             this.makePanelDraggable();
             this.updateTheme();
             
-            // 重新排列面板区域顺序：设置区 -> 高级设置 -> 化身炼造 -> 许愿锁定 -> 按钮 -> 日志
+            // 更新化身状态
+            this.updateIncarnationStatus();
+            
+            // 重新排列面板区域顺序：设置区 -> 高级设置 -> 许愿锁定 -> 按钮 -> 日志
             this.reorderPanelSections();
         },
 
@@ -1052,7 +994,6 @@
             const sections = {
                 target: null,      // 炼造目标区 .lv-section
                 settings: null,    // 设置区 .lv-card 包含 #lv-interval
-                incarnation: null, // 化身炼造 .lv-card 包含 #lv-incarnation-toggle
                 wish: null,        // 许愿锁定 .lv-card 包含 #lv-wish-toggle
                 advanced: null,    // 高级设置 .lv-card 包含 #lv-advanced-toggle
                 buttons: null,     // 操作按钮 div 包含 #lv-btn-start
@@ -1073,9 +1014,7 @@
                 } else if (child.querySelector('#lv-btn-start')) {
                     sections.buttons = child;
                 } else if (child.classList.contains('lv-card')) {
-                    if (child.querySelector('#lv-incarnation-toggle')) {
-                        sections.incarnation = child;
-                    } else if (child.querySelector('#lv-wish-toggle')) {
+                    if (child.querySelector('#lv-wish-toggle')) {
                         sections.wish = child;
                     } else if (child.querySelector('#lv-advanced-toggle')) {
                         sections.advanced = child;
@@ -1085,8 +1024,8 @@
                 }
             });
 
-            // 按新顺序重新插入：目标 -> 设置 -> 化身 -> 许愿 -> 高级 -> 按钮 -> 统计 -> 日志标题 -> 日志
-            const order = ['target', 'settings', 'incarnation', 'wish', 'advanced', 'buttons', 'stats', 'logHeader', 'log'];
+            // 按新顺序重新插入：目标 -> 设置 -> 许愿 -> 高级 -> 按钮 -> 统计 -> 日志标题 -> 日志
+            const order = ['target', 'settings', 'wish', 'advanced', 'buttons', 'stats', 'logHeader', 'log'];
             order.forEach(key => {
                 if (sections[key] && sections[key].parentElement === content) {
                     content.appendChild(sections[key]);
@@ -1155,6 +1094,33 @@
                             transition: all 0.2s ease;
                             user-select: none;
                         ">×</button>
+                    </div>
+                </div>
+
+                <!-- 化身状态栏 -->
+                <div id="lv-incarnation-bar" style="
+                    background: ${v.bgSecondary};
+                    padding: 10px 20px;
+                    border-bottom: 1px solid ${v.borderLight};
+                    display: flex;
+                    align-items: center;
+                    justify-content: space-between;
+                    font-size: 12px;
+                ">
+                    <div style="display: flex; align-items: center; gap: 8px;">
+                        <span style="color: ${v.textMuted};">化身状态:</span>
+                        <span id="lv-incarnation-indicator" style="
+                            display: inline-block;
+                            width: 8px;
+                            height: 8px;
+                            border-radius: 50%;
+                            background: ${v.textMuted};
+                        "></span>
+                        <span id="lv-incarnation-text" style="color: ${v.textSecondary}; font-weight: 500;">检测中...</span>
+                    </div>
+                    <div id="lv-incarnation-info" style="display: flex; align-items: center; gap: 12px; color: ${v.textMuted};">
+                        <span id="lv-incarnation-name"></span>
+                        <span id="lv-incarnation-level"></span>
                     </div>
                 </div>
 
@@ -1263,170 +1229,6 @@
                         ">
                             刷新配方列表
                         </button>
-                    </div>
-
-                    <!-- 化身炼造区 -->
-                    <div class="lv-card" style="
-                        margin-bottom: 20px;
-                        background: ${v.bgCard};
-                        border: 1px solid ${v.borderLight};
-                        border-radius: 12px;
-                        overflow: hidden;
-                        transition: all 0.3s ease;
-                    ">
-                        <div id="lv-incarnation-toggle" style="
-                            padding: 16px;
-                            cursor: pointer;
-                            display: flex;
-                            align-items: center;
-                            justify-content: space-between;
-                            background: ${v.bgCard};
-                            transition: all 0.2s ease;
-                        " onmouseover="this.style.background='${v.bgCardHover}'" onmouseout="this.style.background='${v.bgCard}'">
-                            <div style="
-                                font-size: 13px;
-                                color: ${v.textPrimary};
-                                font-weight: 500;
-                                display: flex;
-                                align-items: center;
-                                gap: 8px;
-                            ">
-                                <span id="lv-incarnation-icon" style="color: ${v.accentBlue};">▶</span> 化身炼造
-                            </div>
-                            <span id="lv-incarnation-status" style="
-                                font-size: 11px;
-                                color: ${v.textMuted};
-                                font-weight: 400;
-                            ">检测中...</span>
-                        </div>
-
-                        <div id="lv-incarnation-content" style="display: none; padding: 16px; border-top: 1px solid ${v.borderLight};">
-                            <label style="
-                                display: flex;
-                                align-items: center;
-                                gap: 12px;
-                                margin-bottom: 16px;
-                                cursor: pointer;
-                            ">
-                                <input type="checkbox" id="lv-incarnation-enabled" style="
-                                    width: 18px;
-                                    height: 18px;
-                                    accent-color: ${v.accentBlue};
-                                ">
-                                <span style="font-size: 13px; color: ${v.textPrimary};">启用化身自动炼造</span>
-                            </label>
-
-                            <div style="margin-bottom: 12px;">
-                                <span style="font-size: 11px; color: ${v.textSecondary};">炼造类型</span>
-                                <select id="lv-incarnation-type" class="lv-select" style="
-                                    width: 100%;
-                                    margin-top: 8px;
-                                    background: ${v.bgInput};
-                                    border: 1px solid ${v.borderLight};
-                                    color: ${v.textPrimary};
-                                    padding: 10px 12px;
-                                    border-radius: 8px;
-                                    font-size: 13px;
-                                    transition: all 0.2s ease;
-                                ">
-                                    <option value="alchemy">炼丹</option>
-                                    <option value="forge">炼器</option>
-                                    <option value="talisman">制符</option>
-                                </select>
-                            </div>
-
-                            <div style="margin-bottom: 12px;">
-                                <span style="font-size: 11px; color: ${v.textSecondary};">炼造目标</span>
-                                <select id="lv-incarnation-target" class="lv-select" style="
-                                    width: 100%;
-                                    margin-top: 8px;
-                                    background: ${v.bgInput};
-                                    border: 1px solid ${v.borderLight};
-                                    color: ${v.textPrimary};
-                                    padding: 10px 12px;
-                                    border-radius: 8px;
-                                    font-size: 13px;
-                                    transition: all 0.2s ease;
-                                ">
-                                    <option value="">-- 选择目标 --</option>
-                                </select>
-                            </div>
-
-                            <!-- 化身统计信息 -->
-                            <div id="lv-incarnation-stats" style="
-                                margin-top: 16px;
-                                padding: 12px;
-                                background: ${v.isDark ? 'rgba(33,150,243,0.08)' : 'rgba(33,150,243,0.05)'};
-                                border-radius: 8px;
-                                border: 1px solid ${v.borderLight};
-                            ">
-                                <div style="font-size: 11px; color: ${v.textSecondary}; margin-bottom: 8px;">代工功劳簿</div>
-                                <div style="display: grid; grid-template-columns: repeat(3, 1fr); gap: 8px; text-align: center;">
-                                    <div>
-                                        <div id="lv-incarnation-craft-count" style="font-size: 16px; font-weight: 600; color: ${v.accentBlue};">0</div>
-                                        <div style="font-size: 10px; color: ${v.textMuted};">总代工次数</div>
-                                    </div>
-                                    <div>
-                                        <div id="lv-incarnation-mp" style="font-size: 16px; font-weight: 600; color: ${v.textJade};">0/0</div>
-                                        <div style="font-size: 10px; color: ${v.textMuted};">化身灵力</div>
-                                    </div>
-                                    <div>
-                                        <div id="lv-incarnation-spirit" style="font-size: 16px; font-weight: 600; color: ${v.textGold};">0/0</div>
-                                        <div style="font-size: 10px; color: ${v.textMuted};">化身神识</div>
-                                    </div>
-                                </div>
-                                <div id="lv-incarnation-last-craft" style="font-size: 10px; color: ${v.textSecondary}; margin-top: 8px; text-align: center;">尚未代工</div>
-
-                                <!-- 精炼进度 -->
-                                <div id="lv-incarnation-refine-section" style="margin-top: 12px; padding-top: 12px; border-top: 1px solid ${v.borderLight};">
-                                    <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 6px;">
-                                        <span style="font-size: 11px; color: ${v.textSecondary};">祭炼进度</span>
-                                        <span id="lv-incarnation-refine-level" style="font-size: 11px; color: ${v.textPrimary};">0/0</span>
-                                    </div>
-                                    <div style="width: 100%; height: 6px; background: ${v.bgSecondary}; border-radius: 3px; overflow: hidden;">
-                                        <div id="lv-incarnation-refine-bar" style="width: 0%; height: 100%; background: ${v.gradientGold}; transition: width 0.3s ease;"></div>
-                                    </div>
-                                    <div id="lv-incarnation-refine-materials" style="margin-top: 8px; font-size: 10px; color: ${v.textSecondary};"></div>
-                                    <button id="lv-btn-incarnation-refine-quick" style="
-                                        display: none;
-                                        width: 100%;
-                                        margin-top: 8px;
-                                        padding: 6px 10px;
-                                        background: ${v.accentBlue};
-                                        color: white;
-                                        border: none;
-                                        border-radius: 4px;
-                                        font-size: 11px;
-                                        cursor: pointer;
-                                    ">一键补齐材料</button>
-                                </div>
-                            </div>
-
-                            <div style="display: grid; grid-template-columns: 1fr 1fr; gap: 10px; margin-top: 16px;">
-                                <button id="lv-btn-incarnation-condense" class="lv-btn-secondary" style="
-                                    background: transparent;
-                                    border: 1px solid ${v.borderColor};
-                                    color: ${v.textSecondary};
-                                    padding: 10px;
-                                    border-radius: 8px;
-                                    cursor: pointer;
-                                    font-size: 12px;
-                                    font-weight: 500;
-                                    transition: all 0.2s ease;
-                                ">凝聚化身</button>
-                                <button id="lv-btn-incarnation-refine" class="lv-btn-secondary" style="
-                                    background: transparent;
-                                    border: 1px solid ${v.borderColor};
-                                    color: ${v.textSecondary};
-                                    padding: 10px;
-                                    border-radius: 8px;
-                                    cursor: pointer;
-                                    font-size: 12px;
-                                    font-weight: 500;
-                                    transition: all 0.2s ease;
-                                ">精炼化身</button>
-                            </div>
-                        </div>
                     </div>
 
                     <!-- 许愿锁定区 -->
@@ -1930,7 +1732,6 @@
                         gap: 12px;
                     ">
                         <span>炼造: <b id="lv-stat-crafted" style="color: ${v.accentGreen};">0</b></span>
-                        <span>化身: <b id="lv-stat-incarnation" style="color: ${v.accentPurple};">0</b></span>
                         <span>售出: <b id="lv-stat-sold" style="color: ${v.accentAmber};">0</b></span>
                         <span>花费: <b id="lv-stat-spent" style="color: ${v.accentRed};">0</b></span>
                     </div>
@@ -2064,138 +1865,8 @@
                 btn.disabled = false;
             });
 
-            $('#lv-incarnation-type')?.addEventListener('change', () => {
-                this.updateIncarnationTargetSelect();
-            });
-
             $('#lv-wish-type')?.addEventListener('change', () => {
                 this.updateWishTargetSelect();
-            });
-
-            $('#lv-btn-incarnation-condense')?.addEventListener('click', async () => {
-                const status = CACHE.incarnationStatus;
-                if (!status) {
-                    Logger.warn('化身状态未知，请稍后重试');
-                    return;
-                }
-
-                if (status.isCondensed) {
-                    Logger.warn('化身已凝聚，无需再次凝聚');
-                    return;
-                }
-
-                if (!status.realmUnlocked) {
-                    Logger.warn('化神期后方可凝聚化身');
-                    return;
-                }
-
-                // 检查材料是否足够
-                const condenseMaterials = status.condenseMaterials || [];
-                const hasEnoughMaterials = condenseMaterials.every(m => (m.have || 0) >= (m.need || 0));
-
-                if (!hasEnoughMaterials) {
-                    // 尝试一键补全材料
-                    Logger.info('化身凝聚材料不足，尝试一键补全...');
-                    try {
-                        const quickBuyRes = await API.quickBuyMats('incarnation_condense', '', null, 1);
-                        if (quickBuyRes.code === 200) {
-                            Logger.success('材料补全成功');
-                            // 重新加载状态后再次尝试凝聚
-                            await CraftManager.loadIncarnationStatus();
-                        } else {
-                            Logger.warn(`材料补全失败: ${quickBuyRes.message || '未知错误'}`);
-                            return;
-                        }
-                    } catch (e) {
-                        Logger.error(`材料补全失败: ${e.message}`);
-                        return;
-                    }
-                }
-
-                // 执行凝聚
-                try {
-                    const res = await API.condenseIncarnation();
-                    if (res.code === 200) {
-                        Logger.success('化身凝聚成功');
-                        await CraftManager.loadIncarnationStatus();
-                    } else {
-                        Logger.warn(`化身凝聚失败: ${res.message || '未知错误'}`);
-                    }
-                } catch (e) {
-                    Logger.error(`化身凝聚失败: ${e.message}`);
-                }
-            });
-
-            $('#lv-btn-incarnation-refine')?.addEventListener('click', async () => {
-                const status = CACHE.incarnationStatus;
-                if (!status || !status.isCondensed) {
-                    Logger.warn('化身未凝聚，无法精炼');
-                    return;
-                }
-
-                // 检查是否已达到上限
-                if ((status.refineLevel || 0) >= (status.maxRefineLevel || 0)) {
-                    Logger.warn('化身精炼已达上限');
-                    return;
-                }
-
-                // 检查材料是否足够
-                const refineMaterials = status.refineMaterials || [];
-                const hasEnoughMaterials = refineMaterials.every(m => (m.have || 0) >= (m.need || 0));
-
-                if (!hasEnoughMaterials) {
-                    // 尝试一键补全材料
-                    Logger.info('化身精炼材料不足，尝试一键补全...');
-                    try {
-                        const quickBuyRes = await API.quickBuyMats('incarnation_refine', '', null, 1);
-                        if (quickBuyRes.code === 200) {
-                            Logger.success('材料补全成功');
-                            // 重新加载状态后再次尝试精炼
-                            await CraftManager.loadIncarnationStatus();
-                        } else {
-                            Logger.warn(`材料补全失败: ${quickBuyRes.message || '未知错误'}`);
-                            return;
-                        }
-                    } catch (e) {
-                        Logger.error(`材料补全失败: ${e.message}`);
-                        return;
-                    }
-                }
-
-                // 执行精炼
-                try {
-                    const res = await API.refineIncarnation();
-                    if (res.code === 200) {
-                        Logger.success('化身精炼成功');
-                        await CraftManager.loadIncarnationStatus();
-                    } else {
-                        Logger.warn(`化身精炼失败: ${res.message || '未知错误'}`);
-                    }
-                } catch (e) {
-                    Logger.error(`化身精炼失败: ${e.message}`);
-                }
-            });
-
-            // 精炼材料一键补齐按钮
-            $('#lv-btn-incarnation-refine-quick')?.addEventListener('click', async () => {
-                const status = CACHE.incarnationStatus;
-                if (!status || !status.isCondensed) {
-                    Logger.warn('化身未凝聚');
-                    return;
-                }
-
-                Logger.info('正在补齐精炼材料...');
-                try {
-                    const res = await API.quickBuyMats('incarnation_refine', '', null, 1);
-                    if (res.code === 200) {
-                        Logger.success('材料补齐成功');
-                        await CraftManager.loadIncarnationStatus();
-                    } else {
-                        Logger.warn(`材料补齐失败: ${res.message || '未知错误'}`);
-                    }
-                } catch (e) {
-                    Logger.error(`材料补齐失败: ${e.message}`);
-                }
             });
 
             $('#lv-btn-start')?.addEventListener('click', () => {
@@ -2271,20 +1942,6 @@
                     content.style.display = 'block';
                     icon.textContent = '▼';
                     Logger.info('💡 修改高级设置后，点击「保存配置」按钮即可保存，或者直接点击「开始炼造」/「执行一次」');
-                } else {
-                    content.style.display = 'none';
-                    icon.textContent = '▶';
-                }
-            });
-
-            // 化身炼造折叠
-            $('#lv-incarnation-toggle')?.addEventListener('click', () => {
-                const content = $('#lv-incarnation-content');
-                const icon = $('#lv-incarnation-icon');
-                if (content.style.display === 'none') {
-                    content.style.display = 'block';
-                    icon.textContent = '▼';
-                    Logger.info('💡 修改化身炼造设置后，点击「保存配置」按钮即可保存，或者直接点击「开始炼造」/「执行一次」');
                 } else {
                     content.style.display = 'none';
                     icon.textContent = '▶';
@@ -2437,19 +2094,6 @@
             detailEl.style.display = 'block';
         },
 
-        updateIncarnationTargetSelect() {
-            const type = $('#lv-incarnation-type')?.value || 'alchemy';
-            const select = $('#lv-incarnation-target');
-            if (!select) return;
-
-            const cache = type === 'alchemy' ? CACHE.alchemy :
-                         type === 'forge' ? CACHE.forge : CACHE.talisman;
-            const nameField = type === 'alchemy' ? 'pillName' : 'name';
-
-            select.innerHTML = '<option value="">-- 选择目标 --</option>' +
-                this.generateRecipeOptions(cache, nameField, type);
-        },
-
         updateWishTargetSelect() {
             const type = $('#lv-wish-type')?.value || 'alchemy';
             const select = $('#lv-wish-target');
@@ -2578,8 +2222,6 @@
                     STATE.panelOpen = true;
                     newPanel.style.display = 'flex';
                     this.refreshRecipeSelects();
-                    this.updateIncarnationTargetSelect();
-                    this.updateIncarnationStatus();
                 }
                 return;
             }
@@ -2589,7 +2231,7 @@
 
             if (STATE.panelOpen) {
                 this.refreshRecipeSelects();
-                this.updateIncarnationTargetSelect();
+                // 打开面板时更新化身状态
                 this.updateIncarnationStatus();
             }
         },
@@ -2640,10 +2282,6 @@
                     CONFIG.targets.talisman = craftTarget;
                 }
             }
-
-            CONFIG.targets.incarnation.enabled = $('#lv-incarnation-enabled')?.checked || false;
-            CONFIG.targets.incarnation.type = $('#lv-incarnation-type')?.value || 'alchemy';
-            CONFIG.targets.incarnation.target = $('#lv-incarnation-target')?.value || '';
 
             CONFIG.autoSell.useBatchAPI = $('#lv-autosell-batch-mode')?.checked || false;
             CONFIG.autoSell.batchMaxRarity = parseInt($('#lv-autosell-batch-rarity')?.value || '2');
@@ -2764,10 +2402,6 @@
                 this.updateRecipeDetail(craftType, craftTarget);
             }
 
-            setChecked('#lv-incarnation-enabled', getVal(CONFIG.targets.incarnation, 'enabled', false));
-            setValue('#lv-incarnation-type', getVal(CONFIG.targets.incarnation, 'type', 'alchemy'));
-            setValue('#lv-incarnation-target', getVal(CONFIG.targets.incarnation, 'target', ''));
-
             setChecked('#lv-autosell-batch-mode', getVal(CONFIG.autoSell, 'useBatchAPI', false));
             setValue('#lv-autosell-batch-rarity', getVal(CONFIG.autoSell, 'batchMaxRarity', 2));
 
@@ -2838,115 +2472,6 @@
             }
         },
 
-        updateIncarnationStatus() {
-            const statusEl = $('#lv-incarnation-status');
-            const statsEl = $('#lv-incarnation-stats');
-            const condenseBtn = $('#lv-btn-incarnation-condense');
-            const refineBtn = $('#lv-btn-incarnation-refine');
-            if (!CACHE.incarnationStatus) return;
-
-            const status = CACHE.incarnationStatus;
-
-            // 更新头部状态
-            if (statusEl) {
-                if (status.isCondensed) {
-                    statusEl.textContent = `${status.name || '化身'} Lv.${status.refineLevel || 0}`;
-                    statusEl.style.color = Theme.getVars().textJade;
-                } else if (!status.realmUnlocked) {
-                    statusEl.textContent = '化神期解锁化身';
-                    statusEl.style.color = Theme.getVars().textMuted;
-                } else {
-                    statusEl.textContent = '未凝聚化身';
-                    statusEl.style.color = Theme.getVars().textMuted;
-                }
-            }
-
-            // 显示/隐藏凝聚/精炼按钮
-            if (condenseBtn) {
-                condenseBtn.style.display = status.isCondensed ? 'none' : 'block';
-            }
-            if (refineBtn) {
-                if (!status.isCondensed) {
-                    refineBtn.style.display = 'none';
-                } else {
-                    refineBtn.style.display = 'block';
-                    // 更新按钮文本和状态
-                    const refineAtMax = (status.refineLevel || 0) >= (status.maxRefineLevel || 0);
-                    refineBtn.textContent = refineAtMax ? '已至上限' : '精炼化身';
-                    refineBtn.disabled = refineAtMax || !status.canRefine;
-                }
-            }
-
-            // 更新统计面板
-            if (statsEl && status.isCondensed) {
-                statsEl.style.display = 'block';
-
-                const countEl = $('#lv-incarnation-craft-count');
-                const mpEl = $('#lv-incarnation-mp');
-                const spiritEl = $('#lv-incarnation-spirit');
-                const lastCraftEl = $('#lv-incarnation-last-craft');
-
-                if (countEl) countEl.textContent = status.craftCount || 0;
-                if (mpEl) mpEl.textContent = `${status.mp || 0}/${status.maxMp || 0}`;
-                if (spiritEl) spiritEl.textContent = `${status.spirit || 0}/${status.maxSpirit || 0}`;
-
-                if (lastCraftEl) {
-                    if (status.craftCount > 0 && status.lastCraftAt) {
-                        const lastTime = new Date(status.lastCraftAt * 1000).toLocaleString('zh-CN', {
-                            month: 'short', day: 'numeric', hour: '2-digit', minute: '2-digit'
-                        });
-                        const summary = status.lastCraftSummary || '一次代工';
-                        lastCraftEl.textContent = `最近一次：${summary} · ${lastTime}`;
-                    } else {
-                        lastCraftEl.textContent = '尚未代工';
-                    }
-                }
-
-                // 更新精炼进度
-                const refineLevelEl = $('#lv-incarnation-refine-level');
-                const refineBarEl = $('#lv-incarnation-refine-bar');
-                const refineMaterialsEl = $('#lv-incarnation-refine-materials');
-                const refineQuickBtn = $('#lv-btn-incarnation-refine-quick');
-
-                if (refineLevelEl) {
-                    const currentLevel = status.refineLevel || 0;
-                    const maxLevel = status.maxRefineLevel || 0;
-                    refineLevelEl.textContent = `${currentLevel}/${maxLevel}`;
-
-                    if (refineBarEl) {
-                        const progress = maxLevel > 0 ? (currentLevel / maxLevel * 100) : 0;
-                        refineBarEl.style.width = `${progress}%`;
-                    }
-                }
-
-                // 更新精炼材料
-                if (refineMaterialsEl) {
-                    const refineMaterials = status.refineMaterials || [];
-                    if (refineMaterials.length > 0) {
-                        const materialsText = refineMaterials.map(m => {
-                            const have = m.have || 0;
-                            const need = m.need || 0;
-                            const color = have >= need ? 'var(--text-jade, #4caf50)' : 'var(--text-red, #f44336)';
-                            return `<span style="color: ${color};">${m.name || '材料'} ${have}/${need}</span>`;
-                        }).join(' · ');
-                        refineMaterialsEl.innerHTML = materialsText;
-                    } else {
-                        refineMaterialsEl.textContent = '无需额外材料';
-                    }
-                }
-
-                // 显示/隐藏一键补齐按钮
-                if (refineQuickBtn) {
-                    const refineMaterials = status.refineMaterials || [];
-                    const hasEnoughMaterials = refineMaterials.every(m => (m.have || 0) >= (m.need || 0));
-                    const refineAtMax = (status.refineLevel || 0) >= (status.maxRefineLevel || 0);
-                    refineQuickBtn.style.display = (!hasEnoughMaterials && !refineAtMax) ? 'block' : 'none';
-                }
-            } else if (statsEl) {
-                statsEl.style.display = 'none';
-            }
-        },
-
         updateLogPanel() {
             const panel = $('#lv-log-panel');
             if (!panel) return;
@@ -2997,14 +2522,74 @@
 
         updateStats() {
             const crafted = $('#lv-stat-crafted');
-            const incarnation = $('#lv-stat-incarnation');
             const sold = $('#lv-stat-sold');
             const spent = $('#lv-stat-spent');
 
             if (crafted) crafted.textContent = STATE.stats.crafted;
-            if (incarnation) incarnation.textContent = STATE.stats.incarnationCrafted;
             if (sold) sold.textContent = STATE.stats.soldPills + STATE.stats.soldEquip;
             if (spent) spent.textContent = STATE.stats.spent;
+        },
+
+        async updateIncarnationStatus() {
+            const indicator = $('#lv-incarnation-indicator');
+            const text = $('#lv-incarnation-text');
+            const nameEl = $('#lv-incarnation-name');
+            const levelEl = $('#lv-incarnation-level');
+            const v = Theme.getVars();
+
+            if (!indicator || !text) return;
+
+            try {
+                const res = await API.getIncarnationStatus();
+                if (res.code !== 200 || !res.data) {
+                    indicator.style.background = v.textMuted;
+                    text.textContent = '未获取到状态';
+                    text.style.color = v.textMuted;
+                    nameEl.textContent = '';
+                    levelEl.textContent = '';
+                    return;
+                }
+
+                const status = res.data;
+
+                // 检查是否解锁化身
+                if (!status.realmUnlocked) {
+                    indicator.style.background = v.textMuted;
+                    text.textContent = '化神期解锁';
+                    text.style.color = v.textMuted;
+                    nameEl.textContent = '';
+                    levelEl.textContent = '';
+                    return;
+                }
+
+                // 检查是否凝聚
+                if (!status.isCondensed) {
+                    indicator.style.background = '#ff9800';
+                    text.textContent = '未凝聚化身';
+                    text.style.color = '#ff9800';
+                    nameEl.textContent = '';
+                    levelEl.textContent = '';
+                    return;
+                }
+
+                // 已凝聚化身
+                const isEnabled = status.craftEnabled;
+                indicator.style.background = isEnabled ? v.accentGreen : v.textMuted;
+                text.textContent = isEnabled ? '已启用化身炼造' : '未启用化身炼造';
+                text.style.color = isEnabled ? v.accentGreen : v.textSecondary;
+
+                nameEl.textContent = status.name || '化身';
+                nameEl.style.color = v.textPrimary;
+                levelEl.textContent = `Lv.${status.refineLevel || 0}`;
+                levelEl.style.color = v.accentBlue;
+
+            } catch (e) {
+                indicator.style.background = v.textMuted;
+                text.textContent = '获取失败';
+                text.style.color = v.textMuted;
+                nameEl.textContent = '';
+                levelEl.textContent = '';
+            }
         }
     };
 
@@ -3062,27 +2647,14 @@
             }
         },
 
-        async loadIncarnationStatus() {
-            try {
-                const res = await API.getIncarnationStatus();
-                if (res.code === 200 && res.data) {
-                    CACHE.incarnationStatus = res.data;
-                    UI.updateIncarnationStatus();
-                }
-            } catch (e) {
-                Logger.warn('化身状态加载失败: ' + e.message);
-            }
-        },
-
         start() {
             if (STATE.running) return;
 
             UI.saveConfigFromPanel();
 
             const hasTarget = CONFIG.targets.alchemy || CONFIG.targets.forge || CONFIG.targets.talisman;
-            const hasIncarnation = CONFIG.targets.incarnation.enabled && CONFIG.targets.incarnation.target;
 
-            if (!hasTarget && !hasIncarnation) {
+            if (!hasTarget) {
                 Logger.warn('请至少选择一个炼造目标');
                 return;
             }
@@ -3129,18 +2701,17 @@
 
         async executeOnce() {
             // 检查是否有设置炼造目标
-            const hasTarget = CONFIG.targets.alchemy || CONFIG.targets.forge || CONFIG.targets.talisman || CONFIG.targets.incarnation.enabled;
+            const hasTarget = CONFIG.targets.alchemy || CONFIG.targets.forge || CONFIG.targets.talisman;
             if (!hasTarget) {
                 Logger.warn('未设置炼造目标，请在面板中选择要炼制的物品');
                 return;
             }
 
-            // 检测冥想状态 - 如果化身未掌炉且本体在冥想中，则跳过
+            // 检测冥想状态
             const isMeditating = await this.isMeditating();
             STATE.monitor.isMeditating = isMeditating;
-            const incarnationCraftEnabled = CACHE.incarnationStatus?.craftEnabled;
-            if (isMeditating && !incarnationCraftEnabled) {
-                Logger.warn('冥想中无法炼造（化身未掌炉），跳过本次执行');
+            if (isMeditating) {
+                Logger.warn('冥想中无法炼造，跳过本次执行');
                 // 冥想时不停止，只是跳过本次，下次执行时重新检测
                 return;
             }
@@ -3215,29 +2786,6 @@
                         hasError = true;
                         const errorCount = STATE.recordError(e.errorType);
                         Logger.error(`制符失败: ${e.message}`);
-                    }
-                }
-
-                if (CONFIG.targets.incarnation.enabled && CONFIG.targets.incarnation.target) {
-                    try {
-                        const result = await this.craftIncarnation();
-                        if (result && result.count) {
-                            craftedCount += result.count;
-                            STATE.recordSuccess();
-                        }
-                    } catch (e) {
-                        hasError = true;
-                        const errorCount = STATE.recordError(e.errorType);
-                        Logger.error(`化身炼造失败: ${e.message}`);
-
-                        if (e.errorType === API.ErrorTypes.INSUFFICIENT &&
-                            (e.message.includes('灵石') || e.message.includes('神识') || e.message.includes('灵力'))) {
-                            const stopCheck = STATE.shouldStop();
-                            if (stopCheck.shouldStop) {
-                                this.stop(stopCheck.reason);
-                                return;
-                            }
-                        }
                     }
                 }
 
@@ -3337,7 +2885,7 @@
 
         async craftByName(type, name) {
             // 每次炼制前刷新配方数据，确保材料数量最新
-            Logger.info(`${name} 刷新配方数据...`);
+            Logger.info(`【本体】${name} 刷新配方数据...`);
             await CraftManager.loadRecipes(true);
 
             const cache = type === 'alchemy' ? CACHE.alchemy :
@@ -3349,7 +2897,7 @@
             });
 
             if (!recipe) {
-                Logger.warn(`未找到配方: ${name}`);
+                Logger.warn(`【本体】未找到配方: ${name}`);
                 return { count: 0 };
             }
 
@@ -3361,10 +2909,10 @@
 
             if (!canCraft) {
                 if (!canQuickBuy || !CONFIG.general.useQuickBuy) {
-                    Logger.warn(`${name} 不可炼制`);
+                    Logger.warn(`【本体】${name} 不可炼制`);
                     return { count: 0 };
                 }
-                Logger.info(`${name} 材料不足，将使用灵石补充`);
+                Logger.info(`【本体】${name} 材料不足，将使用灵石补充`);
             }
 
             // 使用配置的batchSize作为目标炼制次数
@@ -3385,7 +2933,7 @@
             if (needBuy && CONFIG.general.useQuickBuy) {
                 // 检查是否可以补充材料
                 if (!canQuickBuy) {
-                    Logger.warn(`${name} 材料不足且无法快速购买，跳过`);
+                    Logger.warn(`【本体】${name} 材料不足且无法快速购买，跳过`);
                     // 使用现有材料炼制
                     const adjustedRequestCount = maxCraftableCount;
                     let res;
@@ -3403,11 +2951,11 @@
                             if (match) actualCount = parseInt(match[1]);
                         }
                         actualCount = actualCount || adjustedRequestCount;
-                        Logger.success(res.data?.message || `${name} x${actualCount} 炼制成功`);
+                        Logger.success(res.data?.message || `【本体】${name} x${actualCount} 炼制成功`);
                         STATE.stats.crafted += actualCount;
                         return { count: actualCount };
                     } else {
-                        Logger.error(`${name} 炼制失败: ${res.message}`);
+                        Logger.error(`【本体】${name} 炼制失败: ${res.message}`);
                         return { count: 0 };
                     }
                 }
@@ -3423,10 +2971,10 @@
                     if (previewRes.code === 200 && previewRes.data) {
                         previewCost = previewRes.data.totalCost || previewRes.data.cost || 0;
                         quickBuyCost = Math.floor(previewCost / buyAmount);
-                        Logger.info(`${name} 预览补充费用: ${previewCost}灵石 (${buyAmount}份)`);
+                        Logger.info(`【本体】${name} 预览补充费用: ${previewCost}灵石 (${buyAmount}份)`);
                     }
                 } catch (e) {
-                    Logger.warn(`${name} 获取预览费用失败: ${e.message}`);
+                    Logger.warn(`【本体】${name} 获取预览费用失败: ${e.message}`);
                 }
                 
                 // 如果preview也获取不到，使用配方中的quickBuyCost或估算
@@ -3436,23 +2984,23 @@
                 
                 const totalCost = previewCost || (quickBuyCost * buyAmount);
                 
-                Logger.info(`${name} 需要补充: ${buyAmount}份, 预计费用: ${totalCost}灵石`);
+                Logger.info(`【本体】${name} 需要补充: ${buyAmount}份, 预计费用: ${totalCost}灵石`);
                 
                 if (totalCost > CONFIG.general.maxQuickBuyCost) {
-                    Logger.warn(`${name} 批量补充费用过高(${totalCost}灵石)，尝试单次炼制`);
+                    Logger.warn(`【本体】${name} 批量补充费用过高(${totalCost}灵石)，尝试单次炼制`);
                     return this.craftSingle(type, name);
                 }
 
-                Logger.info(`${name} 补充${buyAmount}份材料中...`);
+                Logger.info(`【本体】${name} 补充${buyAmount}份材料中...`);
                 try {
                     const buyRes = await API.quickBuyMats(type, id, buyAmount);
                     if (buyRes.code === 200) {
                         // 使用API返回的实际费用
                         const actualCost = buyRes.data?.totalCost || buyRes.data?.cost || totalCost;
                         STATE.stats.spent += actualCost;
-                        Logger.success(`${name} 材料补充成功，花费${actualCost}灵石`);
+                        Logger.success(`【本体】${name} 材料补充成功，花费${actualCost}灵石`);
                         // 补充成功后，直接使用requestCount炼制（不再检查材料）
-                        Logger.info(`${name} 材料已补充，炼制${requestCount}次...`);
+                        Logger.info(`【本体】${name} 材料已补充，炼制${requestCount}次...`);
                         let res;
                         if (type === 'alchemy') {
                             res = await API.batchCraftAlchemy(id, requestCount);
@@ -3468,16 +3016,16 @@
                                 if (match) actualCount = parseInt(match[1]);
                             }
                             actualCount = actualCount || requestCount;
-                            Logger.success(res.data?.message || `${name} x${actualCount} 炼制成功`);
+                            Logger.success(res.data?.message || `【本体】${name} x${actualCount} 炼制成功`);
                             STATE.stats.crafted += actualCount;
                             return { count: actualCount };
                         } else {
-                            Logger.error(`${name} 炼制失败: ${res.message}`);
+                            Logger.error(`【本体】${name} 炼制失败: ${res.message}`);
                             return { count: 0 };
                         }
                     } else if (buyRes.message && buyRes.message.includes('无需补充')) {
                         // 材料已经足够，直接尝试炼制
-                        Logger.info(`${name} 材料已足够，直接炼制${maxCraftableCount}次`);
+                        Logger.info(`【本体】${name} 材料已足够，直接炼制${maxCraftableCount}次`);
                         // 调整请求数量为实际可炼次数
                         const adjustedRequestCount = maxCraftableCount;
                         let res;
@@ -3495,21 +3043,21 @@
                                 if (match) actualCount = parseInt(match[1]);
                             }
                             actualCount = actualCount || adjustedRequestCount;
-                            Logger.success(res.data?.message || `${name} x${actualCount} 炼制成功`);
+                            Logger.success(res.data?.message || `【本体】${name} x${actualCount} 炼制成功`);
                             STATE.stats.crafted += actualCount;
                             return { count: actualCount };
                         } else {
-                            Logger.error(`${name} 炼制失败: ${res.message}`);
+                            Logger.error(`【本体】${name} 炼制失败: ${res.message}`);
                             return { count: 0 };
                         }
                     } else {
-                        Logger.error(`${name} 补充失败: ${buyRes.message}`);
+                        Logger.error(`【本体】${name} 补充失败: ${buyRes.message}`);
                         return { count: 0 };
                     }
                 } catch (e) {
                     if (e.message && e.message.includes('无需补充')) {
                         // 材料已经足够，直接尝试炼制
-                        Logger.info(`${name} 材料已足够，直接炼制${maxCraftableCount}次`);
+                        Logger.info(`【本体】${name} 材料已足够，直接炼制${maxCraftableCount}次`);
                         const adjustedRequestCount = maxCraftableCount;
                         let res;
                         if (type === 'alchemy') {
@@ -3526,19 +3074,19 @@
                                 if (match) actualCount = parseInt(match[1]);
                             }
                             actualCount = actualCount || adjustedRequestCount;
-                            Logger.success(res.data?.message || `${name} x${actualCount} 炼制成功`);
+                            Logger.success(res.data?.message || `【本体】${name} x${actualCount} 炼制成功`);
                             STATE.stats.crafted += actualCount;
                             return { count: actualCount };
                         } else {
-                            Logger.error(`${name} 炼制失败: ${res.message}`);
+                            Logger.error(`【本体】${name} 炼制失败: ${res.message}`);
                             return { count: 0 };
                         }
                     }
-                    Logger.error(`${name} 补充异常: ${e.message}`);
+                    Logger.error(`【本体】${name} 补充异常: ${e.message}`);
                     return { count: 0 };
                 }
             } else if (needBuy && !CONFIG.general.useQuickBuy) {
-                Logger.warn(`${name} 材料不足且自动补充已禁用`);
+                Logger.warn(`【本体】${name} 材料不足且自动补充已禁用`);
                 return { count: 0 };
             }
             try {
@@ -3563,16 +3111,16 @@
                     }
                     actualCount = actualCount || 1;
 
-                    const msg = res.data?.message || `${name} x${actualCount} 炼制成功`;
+                    const msg = res.data?.message || `【本体】${name} x${actualCount} 炼制成功`;
                     Logger.success(msg);
                     STATE.stats.crafted += actualCount;
                     return { count: actualCount };
                 } else {
-                    Logger.error(`${name} 炼制失败: ${res.message}`);
+                    Logger.error(`【本体】${name} 炼制失败: ${res.message}`);
                     return { count: 0 };
                 }
             } catch (e) {
-                Logger.error(`${name} 炼制异常: ${e.message}`);
+                Logger.error(`【本体】${name} 炼制异常: ${e.message}`);
                 return { count: 0 };
             }
         },
@@ -3587,7 +3135,7 @@
             });
 
             if (!recipe) {
-                Logger.warn(`未找到配方: ${name}`);
+                Logger.warn(`【本体】未找到配方: ${name}`);
                 return { count: 0 };
             }
 
@@ -3615,161 +3163,17 @@
                     }
                     actualCount = actualCount || 1;
 
-                    const msg = res.data?.message || `${name} x${actualCount} 单次炼制成功`;
+                    const msg = res.data?.message || `【本体】${name} x${actualCount} 单次炼制成功`;
                     Logger.success(msg);
                     STATE.stats.crafted += actualCount;
                     return { count: actualCount };
                 } else {
-                    Logger.error(`${name} 单次炼制失败: ${res.message}`);
+                    Logger.error(`【本体】${name} 单次炼制失败: ${res.message}`);
                     return { count: 0 };
                 }
             } catch (e) {
-                Logger.error(`${name} 单次炼制异常: ${e.message}`);
+                Logger.error(`【本体】${name} 单次炼制异常: ${e.message}`);
                 return { count: 0 };
-            }
-        },
-
-        async craftIncarnation() {
-            if (!CACHE.incarnationStatus?.isCondensed) {
-                if (!CACHE.incarnationStatus?.realmUnlocked) {
-                    Logger.warn('化神期解锁化身后方可炼造');
-                } else {
-                    Logger.warn('未凝聚化身，无法炼造');
-                }
-                return;
-            }
-
-            const type = CONFIG.targets.incarnation.type;
-            const targetName = CONFIG.targets.incarnation.target;
-
-            const cache = type === 'alchemy' ? CACHE.alchemy :
-                         type === 'forge' ? CACHE.forge : CACHE.talisman;
-
-            const recipe = cache.find(r => {
-                const itemName = r.pillName || r.name || '';
-                return itemName === targetName;
-            });
-
-            if (!recipe) {
-                Logger.warn(`未找到化身炼造配方: ${targetName}`);
-                return;
-            }
-
-            const idField = type === 'alchemy' ? 'pillId' : 'recipeId';
-            const id = recipe[idField];
-            const requestCount = Math.min(CONFIG.general.batchSize, 50);
-
-            // 确保化身掌炉已开启
-            if (!CACHE.incarnationStatus?.craftEnabled) {
-                try {
-                    await API.toggleIncarnationCraft(true);
-                    Logger.info('已开启化身掌炉');
-                    // 更新本地状态
-                    CACHE.incarnationStatus.craftEnabled = true;
-                } catch (e) {
-                    Logger.warn(`开启化身掌炉失败: ${e.message}`);
-                }
-            }
-
-            // 计算基于材料的最大可炼制次数
-            let maxCraftableCount = requestCount;
-            if (recipe.materials && recipe.materials.length > 0) {
-                const materialLimits = recipe.materials.map(m => {
-                    if (!m.need || m.need <= 0) return requestCount;
-                    return Math.floor((m.have || 0) / m.need);
-                });
-                maxCraftableCount = Math.min(...materialLimits, requestCount);
-            }
-
-            // 检查材料并尝试补充
-            const canCraft = recipe.canCraft || recipe.canForge;
-            const canQuickBuy = recipe.canQuickBuy !== undefined ? recipe.canQuickBuy : (recipe.quickBuyCost > 0);
-
-            if (!canCraft) {
-                if (!canQuickBuy || !CONFIG.general.useQuickBuy) {
-                    // 无法快速购买，使用现有材料炼制
-                    Logger.info(`${targetName} 材料不足，使用现有材料炼制${maxCraftableCount}次`);
-                    const adjustedRequestCount = maxCraftableCount;
-                    let res;
-                    if (type === 'alchemy') {
-                        res = await API.batchCraftAlchemy(id, adjustedRequestCount);
-                    } else if (type === 'forge') {
-                        res = await API.batchCraftForge(id, adjustedRequestCount);
-                    } else {
-                        res = await API.batchCraftTalisman(id, adjustedRequestCount);
-                    }
-                    if (res.code === 200) {
-                        let actualCount = res.data?.count || res.data?.crafted;
-                        if (!actualCount && res.data?.message) {
-                            const match = res.data.message.match(/(\d+)次/);
-                            if (match) actualCount = parseInt(match[1]);
-                        }
-                        actualCount = actualCount || adjustedRequestCount;
-                        const msg = res.data?.message || `化身炼造成功: ${targetName} x${actualCount}`;
-                        Logger.success(msg);
-                        STATE.stats.incarnationCrafted += actualCount;
-                        STATE.stats.crafted += actualCount;
-                        return { count: actualCount };
-                    } else {
-                        const error = API.parseError({ response: res });
-                        throw error;
-                    }
-                }
-                // 计算需要补充的份数
-                const buyAmount = requestCount - maxCraftableCount;
-                Logger.info(`${targetName} 材料不足，补充${buyAmount}份材料...`);
-                try {
-                    const quickBuyRes = await API.quickBuyMats(type, id, buyAmount, false);
-                    if (quickBuyRes.code !== 200) {
-                        const error = API.parseError({ response: quickBuyRes });
-                        throw error;
-                    }
-                    Logger.success('材料补全成功');
-                } catch (e) {
-                    if (e.errorType) throw e;
-                    const error = API.parseError(e);
-                    throw error;
-                }
-            }
-
-            // 执行实际炼造
-            try {
-                let res;
-                if (type === 'alchemy') {
-                    res = await API.batchCraftAlchemy(id, requestCount);
-                } else if (type === 'forge') {
-                    res = await API.batchCraftForge(id, requestCount);
-                } else {
-                    res = await API.batchCraftTalisman(id, requestCount);
-                }
-
-                if (res.code === 200) {
-                    let actualCount = res.data?.count || res.data?.crafted;
-                    if (!actualCount && res.data?.message) {
-                        const match = res.data.message.match(/(\d+)次/);
-                        if (match) actualCount = parseInt(match[1]);
-                    }
-                    actualCount = actualCount || 1;
-
-                    // 使用游戏返回的完整消息
-                    const msg = res.data?.message || `化身炼造成功: ${targetName} x${actualCount}`;
-                    Logger.success(msg);
-                    STATE.stats.incarnationCrafted += actualCount;
-                    STATE.stats.crafted += actualCount;
-                    return { count: actualCount };
-                } else {
-                    // 使用API的parseError来解析错误类型
-                    const error = API.parseError({ response: res });
-                    throw error;
-                }
-            } catch (e) {
-                // 如果已经是解析过的错误对象，直接抛出
-                if (e.errorType) {
-                    throw e;
-                }
-                // 否则包装成未知错误
-                const error = API.parseError(e);
-                throw error;
             }
         },
 
