@@ -1,7 +1,7 @@
 // ==UserScript==
 // @name         灵界 LingVerse 炼造配置面板
 // @namespace    lingverse-craft-config
-// @version      3.3.5
+// @version      3.3.6
 // @description  炼造自动化配置：支持炼丹/炼器/制符、许愿锁定、自动售卖、深色/浅色模式跟随游戏主题
 // @author       LingVerse
 // @match        https://ling.muge.info/*
@@ -1103,24 +1103,30 @@
                     padding: 10px 20px;
                     border-bottom: 1px solid ${v.borderLight};
                     display: flex;
-                    align-items: center;
-                    justify-content: space-between;
+                    flex-direction: column;
+                    gap: 6px;
                     font-size: 12px;
                 ">
-                    <div style="display: flex; align-items: center; gap: 8px;">
-                        <span style="color: ${v.textMuted};">化身状态:</span>
-                        <span id="lv-incarnation-indicator" style="
-                            display: inline-block;
-                            width: 8px;
-                            height: 8px;
-                            border-radius: 50%;
-                            background: ${v.textMuted};
-                        "></span>
-                        <span id="lv-incarnation-text" style="color: ${v.textSecondary}; font-weight: 500;">检测中...</span>
+                    <!-- 第一行：状态 + 名字 + 等级 -->
+                    <div style="display: flex; align-items: center; justify-content: space-between;">
+                        <div style="display: flex; align-items: center; gap: 8px;">
+                            <span style="color: ${v.textMuted};">化身状态:</span>
+                            <span id="lv-incarnation-indicator" style="
+                                display: inline-block;
+                                width: 8px;
+                                height: 8px;
+                                border-radius: 50%;
+                                background: ${v.textMuted};
+                            "></span>
+                            <span id="lv-incarnation-text" style="color: ${v.textSecondary}; font-weight: 500;">检测中...</span>
+                        </div>
+                        <div style="display: flex; align-items: center; gap: 12px; color: ${v.textMuted};">
+                            <span id="lv-incarnation-name"></span>
+                            <span id="lv-incarnation-level"></span>
+                        </div>
                     </div>
-                    <div id="lv-incarnation-info" style="display: flex; align-items: center; gap: 12px; color: ${v.textMuted};">
-                        <span id="lv-incarnation-name"></span>
-                        <span id="lv-incarnation-level"></span>
+                    <!-- 第二行：灵力 + 神识 -->
+                    <div style="display: flex; align-items: center; justify-content: flex-end; gap: 16px; font-size: 11px;">
                         <span id="lv-incarnation-mp" style="color: ${v.accentBlue};"></span>
                         <span id="lv-incarnation-spirit" style="color: ${v.accentPurple};"></span>
                     </div>
@@ -2250,12 +2256,18 @@
             const panel = $('#lv-craft-panel');
             const content = $('#lv-panel-content');
             const btn = $('#lv-btn-minimize');
+            const incarnationBar = $('#lv-incarnation-bar');
             if (!panel || !content || !btn) return;
 
             STATE.panelMinimized = !STATE.panelMinimized;
             content.style.display = STATE.panelMinimized ? 'none' : 'block';
             btn.textContent = STATE.panelMinimized ? '+' : '−';
-            
+
+            // 收起时隐藏化身状态栏，展开时显示
+            if (incarnationBar) {
+                incarnationBar.style.display = STATE.panelMinimized ? 'none' : 'flex';
+            }
+
             // 添加/移除收起状态类，用于移动端适配
             if (STATE.panelMinimized) {
                 panel.classList.add('lv-minimized');
