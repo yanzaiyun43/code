@@ -1,7 +1,7 @@
 // ==UserScript==
 // @name         灵界 LingVerse 炼造配置面板
 // @namespace    lingverse-craft-config
-// @version      3.2.5
+// @version      3.2.6
 // @description  炼造自动化配置：支持炼丹/炼器/制符/化身炼造、许愿锁定、自动售卖、深色/浅色模式跟随游戏主题
 // @author       LingVerse
 // @match        https://ling.muge.info/*
@@ -1415,6 +1415,30 @@
                                     </div>
                                 </div>
                                 <div id="lv-incarnation-last-craft" style="font-size: 10px; color: ${v.textSecondary}; margin-top: 8px; text-align: center;">尚未代工</div>
+
+                                <!-- 精炼进度 -->
+                                <div id="lv-incarnation-refine-section" style="margin-top: 12px; padding-top: 12px; border-top: 1px solid ${v.borderLight};">
+                                    <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 6px;">
+                                        <span style="font-size: 11px; color: ${v.textSecondary};">祭炼进度</span>
+                                        <span id="lv-incarnation-refine-level" style="font-size: 11px; color: ${v.textPrimary};">0/0</span>
+                                    </div>
+                                    <div style="width: 100%; height: 6px; background: ${v.bgSecondary}; border-radius: 3px; overflow: hidden;">
+                                        <div id="lv-incarnation-refine-bar" style="width: 0%; height: 100%; background: ${v.gradientGold}; transition: width 0.3s ease;"></div>
+                                    </div>
+                                    <div id="lv-incarnation-refine-materials" style="margin-top: 8px; font-size: 10px; color: ${v.textSecondary};"></div>
+                                    <button id="lv-btn-incarnation-refine-quick" style="
+                                        display: none;
+                                        width: 100%;
+                                        margin-top: 8px;
+                                        padding: 6px 10px;
+                                        background: ${v.accentBlue};
+                                        color: white;
+                                        border: none;
+                                        border-radius: 4px;
+                                        font-size: 11px;
+                                        cursor: pointer;
+                                    ">一键补齐材料</button>
+                                </div>
                             </div>
 
                             <div style="display: grid; grid-template-columns: 1fr 1fr; gap: 10px; margin-top: 16px;">
@@ -2191,6 +2215,28 @@
                 }
             });
 
+            // 精炼材料一键补齐按钮
+            $('#lv-btn-incarnation-refine-quick')?.addEventListener('click', async () => {
+                const status = CACHE.incarnationStatus;
+                if (!status || !status.isCondensed) {
+                    Logger.warn('化身未凝聚');
+                    return;
+                }
+
+                Logger.info('正在补齐精炼材料...');
+                try {
+                    const res = await API.quickBuyMats('incarnation_refine', '', null, 1);
+                    if (res.code === 200) {
+                        Logger.success('材料补齐成功');
+                        await CraftManager.loadIncarnationStatus();
+                    } else {
+                        Logger.warn(`材料补齐失败: ${res.message || '未知错误'}`);
+                    }
+                } catch (e) {
+                    Logger.error(`材料补齐失败: ${e.message}`);
+                }
+            });
+
             $('#lv-btn-start')?.addEventListener('click', () => {
                 if (STATE.running) {
                     CraftManager.stop();
@@ -2877,6 +2923,47 @@
                     } else {
                         lastCraftEl.textContent = '尚未代工';
                     }
+                }
+
+                // 更新精炼进度
+                const refineLevelEl = $('#lv-incarnation-refine-level');
+                const refineBarEl = $('#lv-incarnation-refine-bar');
+                const refineMaterialsEl = $('#lv-incarnation-refine-materials');
+                const refineQuickBtn = $('#lv-btn-incarnation-refine-quick');
+
+                if (refineLevelEl) {
+                    const currentLevel = status.refineLevel || 0;
+                    const maxLevel = status.maxRefineLevel || 0;
+                    refineLevelEl.textContent = `${currentLevel}/${maxLevel}`;
+
+                    if (refineBarEl) {
+                        const progress = maxLevel > 0 ? (currentLevel / maxLevel * 100) : 0;
+                        refineBarEl.style.width = `${progress}%`;
+                    }
+                }
+
+                // 更新精炼材料
+                if (refineMaterialsEl) {
+                    const refineMaterials = status.refineMaterials || [];
+                    if (refineMaterials.length > 0) {
+                        const materialsText = refineMaterials.map(m => {
+                            const have = m.have || 0;
+                            const need = m.need || 0;
+                            const color = have >= need ? 'var(--text-jade, #4caf50)' : 'var(--text-red, #f44336)';
+                            return `<span style="color: ${color};">${m.name || '材料'} ${have}/${need}</span>`;
+                        }).join(' · ');
+                        refineMaterialsEl.innerHTML = materialsText;
+                    } else {
+                        refineMaterialsEl.textContent = '无需额外材料';
+                    }
+                }
+
+                // 显示/隐藏一键补齐按钮
+                if (refineQuickBtn) {
+                    const refineMaterials = status.refineMaterials || [];
+                    const hasEnoughMaterials = refineMaterials.every(m => (m.have || 0) >= (m.need || 0));
+                    const refineAtMax = (status.refineLevel || 0) >= (status.maxRefineLevel || 0);
+                    refineQuickBtn.style.display = (!hasEnoughMaterials && !refineAtMax) ? 'block' : 'none';
                 }
             } else if (statsEl) {
                 statsEl.style.display = 'none';
@@ -3588,6 +3675,30 @@
                     CACHE.incarnationStatus.craftEnabled = true;
                 } catch (e) {
                     Logger.warn(`开启化身掌炉失败: ${e.message}`);
+                }
+            }
+
+            // 检查材料并尝试补充
+            const canCraft = recipe.canCraft || recipe.canForge;
+            const canQuickBuy = recipe.canQuickBuy !== undefined ? recipe.canQuickBuy : (recipe.quickBuyCost > 0);
+
+            if (!canCraft) {
+                if (!canQuickBuy || !CONFIG.general.useQuickBuy) {
+                    Logger.warn(`${targetName} 材料不足且无法快速购买`);
+                    return { count: 0 };
+                }
+                // 尝试补充材料
+                Logger.info(`${targetName} 材料不足，尝试一键补全...`);
+                try {
+                    const quickBuyRes = await API.quickBuyMats(type, id, null, requestCount);
+                    if (quickBuyRes.code !== 200) {
+                        Logger.warn(`材料补全失败: ${quickBuyRes.message || '未知错误'}`);
+                        return { count: 0 };
+                    }
+                    Logger.success('材料补全成功');
+                } catch (e) {
+                    Logger.error(`材料补全失败: ${e.message}`);
+                    return { count: 0 };
                 }
             }
 
