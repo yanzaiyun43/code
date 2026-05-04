@@ -1,7 +1,7 @@
 // ==UserScript==
 // @name         灵界 LingVerse 炼造配置面板
 // @namespace    lingverse-craft-config
-// @version      3.2.9
+// @version      3.3.0
 // @description  炼造自动化配置：支持炼丹/炼器/制符/化身炼造、许愿锁定、自动售卖、深色/浅色模式跟随游戏主题
 // @author       LingVerse
 // @match        https://ling.muge.info/*
@@ -1178,85 +1178,15 @@
                             炼造目标
                         </div>
 
-                        <!-- 炼丹 -->
-                        <div style="margin-bottom: 16px;">
-                            <div style="
-                                font-size: 11px;
-                                color: ${v.textSecondary};
-                                margin-bottom: 8px;
-                                font-weight: 500;
-                            ">炼丹</div>
-                            <select id="lv-target-alchemy" class="lv-select" style="
-                                width: 100%;
-                                background: ${v.bgInput};
-                                border: 1px solid ${v.borderLight};
-                                color: ${v.textPrimary};
-                                padding: 12px 14px;
-                                border-radius: 10px;
-                                font-size: 13px;
-                                outline: none;
-                                cursor: pointer;
-                                transition: all 0.2s ease;
-                            ">
-                                <option value="">-- 不自动炼丹 --</option>
-                                ${this.generateRecipeOptions(CACHE.alchemy, 'pillName', 'alchemy')}
-                            </select>
-                            <div id="lv-alchemy-desc" style="
-                                margin-top: 8px;
-                                padding: 12px;
-                                background: ${v.bgSecondary};
-                                border-radius: 8px;
-                                font-size: 12px;
-                                color: ${v.textSecondary};
-                                line-height: 1.5;
-                                display: none;
-                            "></div>
-                        </div>
-
-                        <!-- 炼器 -->
-                        <div style="margin-bottom: 16px;">
-                            <div style="
-                                font-size: 11px;
-                                color: ${v.textSecondary};
-                                margin-bottom: 8px;
-                                font-weight: 500;
-                            ">炼器</div>
-                            <select id="lv-target-forge" class="lv-select" style="
-                                width: 100%;
-                                background: ${v.bgInput};
-                                border: 1px solid ${v.borderLight};
-                                color: ${v.textPrimary};
-                                padding: 12px 14px;
-                                border-radius: 10px;
-                                font-size: 13px;
-                                outline: none;
-                                cursor: pointer;
-                                transition: all 0.2s ease;
-                            ">
-                                <option value="">-- 不自动炼器 --</option>
-                                ${this.generateRecipeOptions(CACHE.forge, 'name', 'forge')}
-                            </select>
-                            <div id="lv-forge-desc" style="
-                                margin-top: 8px;
-                                padding: 12px;
-                                background: ${v.bgSecondary};
-                                border-radius: 8px;
-                                font-size: 12px;
-                                color: ${v.textSecondary};
-                                line-height: 1.5;
-                                display: none;
-                            "></div>
-                        </div>
-
-                        <!-- 制符 -->
+                        <!-- 炼造类型和目标 -->
                         <div style="margin-bottom: 12px;">
                             <div style="
                                 font-size: 11px;
                                 color: ${v.textSecondary};
                                 margin-bottom: 8px;
                                 font-weight: 500;
-                            ">制符</div>
-                            <select id="lv-target-talisman" class="lv-select" style="
+                            ">炼造类型</div>
+                            <select id="lv-craft-type" class="lv-select" style="
                                 width: 100%;
                                 background: ${v.bgInput};
                                 border: 1px solid ${v.borderLight};
@@ -1268,19 +1198,50 @@
                                 cursor: pointer;
                                 transition: all 0.2s ease;
                             ">
-                                <option value="">-- 不自动制符 --</option>
-                                ${this.generateRecipeOptions(CACHE.talisman, 'name', 'talisman')}
+                                <option value="">-- 选择炼造类型 --</option>
+                                <option value="alchemy">炼丹</option>
+                                <option value="forge">炼器</option>
+                                <option value="talisman">制符</option>
                             </select>
-                            <div id="lv-talisman-desc" style="
-                                margin-top: 8px;
+                        </div>
+
+                        <div style="margin-bottom: 16px;">
+                            <div style="
+                                font-size: 11px;
+                                color: ${v.textSecondary};
+                                margin-bottom: 8px;
+                                font-weight: 500;
+                            ">炼造目标</div>
+                            <select id="lv-craft-target" class="lv-select" style="
+                                width: 100%;
+                                background: ${v.bgInput};
+                                border: 1px solid ${v.borderLight};
+                                color: ${v.textPrimary};
+                                padding: 12px 14px;
+                                border-radius: 10px;
+                                font-size: 13px;
+                                outline: none;
+                                cursor: pointer;
+                                transition: all 0.2s ease;
+                            " disabled>
+                                <option value="">-- 请先选择炼造类型 --</option>
+                            </select>
+                            <!-- 配方详情显示 -->
+                            <div id="lv-recipe-detail" style="
+                                margin-top: 12px;
                                 padding: 12px;
-                                background: ${v.bgSecondary};
+                                background: ${v.isDark ? 'rgba(33,150,243,0.08)' : 'rgba(33,150,243,0.05)'};
+                                border: 1px solid ${v.borderLight};
                                 border-radius: 8px;
                                 font-size: 12px;
                                 color: ${v.textSecondary};
-                                line-height: 1.5;
+                                line-height: 1.6;
                                 display: none;
-                            "></div>
+                            ">
+                                <div id="lv-recipe-stage" style="margin-bottom: 6px;"></div>
+                                <div id="lv-recipe-cost" style="margin-bottom: 6px;"></div>
+                                <div id="lv-recipe-effect"></div>
+                            </div>
                         </div>
 
                         <!-- 刷新按钮 -->
@@ -2274,15 +2235,33 @@
                 this.updateBatchSellMode();
             });
 
-            // 炼造目标选择时显示介绍
-            $('#lv-target-alchemy')?.addEventListener('change', (e) => {
-                this.updateRecipeDescription('alchemy', e.target.value);
+            // 炼造类型选择
+            $('#lv-craft-type')?.addEventListener('change', (e) => {
+                const type = e.target.value;
+                const targetSelect = $('#lv-craft-target');
+                const detailEl = $('#lv-recipe-detail');
+
+                if (!type) {
+                    targetSelect.innerHTML = '<option value="">-- 请先选择炼造类型 --</option>';
+                    targetSelect.disabled = true;
+                    detailEl.style.display = 'none';
+                    return;
+                }
+
+                targetSelect.disabled = false;
+                targetSelect.innerHTML = '<option value="">-- 选择目标 --</option>' +
+                    this.generateRecipeOptions(
+                        type === 'alchemy' ? CACHE.alchemy : type === 'forge' ? CACHE.forge : CACHE.talisman,
+                        type === 'alchemy' ? 'pillName' : 'name',
+                        type
+                    );
+                detailEl.style.display = 'none';
             });
-            $('#lv-target-forge')?.addEventListener('change', (e) => {
-                this.updateRecipeDescription('forge', e.target.value);
-            });
-            $('#lv-target-talisman')?.addEventListener('change', (e) => {
-                this.updateRecipeDescription('talisman', e.target.value);
+
+            // 炼造目标选择时显示详情
+            $('#lv-craft-target')?.addEventListener('change', (e) => {
+                const type = $('#lv-craft-type')?.value;
+                this.updateRecipeDetail(type, e.target.value);
             });
 
             $('#lv-advanced-toggle')?.addEventListener('click', () => {
@@ -2372,13 +2351,14 @@
             }
         },
 
-        updateRecipeDescription(type, selectedName) {
-            const descEl = $(`#lv-${type}-desc`);
-            if (!descEl) return;
+        updateRecipeDetail(type, selectedName) {
+            const detailEl = $('#lv-recipe-detail');
+            const stageEl = $('#lv-recipe-stage');
+            const costEl = $('#lv-recipe-cost');
+            const effectEl = $('#lv-recipe-effect');
 
-            if (!selectedName) {
-                descEl.style.display = 'none';
-                descEl.innerHTML = '';
+            if (!detailEl || !type || !selectedName) {
+                if (detailEl) detailEl.style.display = 'none';
                 return;
             }
 
@@ -2388,49 +2368,40 @@
 
             const recipe = cache.find(r => r[nameField] === selectedName);
             if (!recipe) {
-                descEl.style.display = 'none';
-                descEl.innerHTML = '';
+                detailEl.style.display = 'none';
                 return;
             }
 
             const v = Theme.getVars();
-            let html = '';
-
-            // 境界要求区域
             const realmNames = _win.REALM_NAMES || window.REALM_NAMES || ['锻体期', '练气期', '筑基期', '金丹期', '元婴期', '化神期', '炼虚期', '合道期', '大乘期', '渡劫期', '真仙境', '玄仙境', '金仙境', '太乙真仙', '大罗金仙', '仙王境', '仙尊境', '仙帝境', '道祖境', '天道境'];
+
+            // 境界要求
             const stageName = recipe.minStage > 0 ? realmNames[recipe.minStage] : (recipe.unlockStageName || '');
             if (stageName) {
-                html += `<div style="
-                    display: inline-block;
-                    padding: 4px 10px;
-                    background: ${v.isDark ? 'rgba(33,150,243,0.15)' : 'rgba(33,150,243,0.1)'};
-                    border-radius: 4px;
-                    margin-bottom: 8px;
-                    font-size: 12px;
-                    color: ${v.isDark ? '#64b5f6' : '#1976d2'};
-                    font-weight: 500;
-                ">需要境界: ${stageName}+</div>`;
+                stageEl.innerHTML = `<span style="color: ${v.isDark ? '#64b5f6' : '#1976d2'}; font-weight: 500;">需要境界: ${stageName}+</span>`;
+            } else {
+                stageEl.innerHTML = '';
             }
 
-            // 消耗信息区域
+            // 消耗信息
             const costs = [];
             if (recipe.mpCost > 0) costs.push(`消耗灵力 ${recipe.mpCost}`);
             if (recipe.spiritCost > 0) costs.push(`消耗神识 ${recipe.spiritCost}`);
             if (costs.length > 0) {
-                html += `<div style="
-                    display: flex;
-                    gap: 12px;
-                    padding: 8px 12px;
-                    background: ${v.isDark ? 'rgba(25,118,210,0.12)' : 'rgba(25,118,210,0.08)'};
-                    border-radius: 6px;
-                    margin-bottom: 8px;
-                    font-size: 12px;
-                    color: ${v.isDark ? '#90caf9' : '#1565c0'};
-                    font-weight: 500;
-                ">${costs.join('')}</div>`;
+                costEl.innerHTML = `<span style="color: ${v.isDark ? '#90caf9' : '#1565c0'};">${costs.join('')}</span>`;
+            } else {
+                costEl.innerHTML = '';
             }
 
-            // 炼器配方显示属性
+            // 效果描述
+            let effectHtml = '';
+
+            // 炼丹显示效果
+            if (type === 'alchemy' && recipe.effect) {
+                effectHtml = recipe.effect;
+            }
+
+            // 炼器显示属性
             if (type === 'forge') {
                 const stats = [];
                 if (recipe.baseAttack > 0) stats.push(`攻击 +${recipe.baseAttack}`);
@@ -2440,55 +2411,30 @@
                 if (recipe.baseCapacity > 0) stats.push(`容量 +${recipe.baseCapacity}`);
 
                 if (stats.length > 0) {
-                    html += `<div style="
-                        display: flex;
-                        flex-wrap: wrap;
-                        gap: 8px;
-                        padding: 6px 10px;
-                        background: ${v.isDark ? 'rgba(3,169,244,0.12)' : 'rgba(3,169,244,0.08)'};
-                        border-radius: 4px;
-                        margin-bottom: 8px;
-                        font-size: 12px;
-                        color: ${v.isDark ? '#4fc3f7' : '#0288d1'};
-                    ">${stats.join('')}</div>`;
+                    effectHtml = stats.join('、');
                 }
             }
 
-            // 制符显示成功率
-            if (type === 'talisman' && recipe.successRate) {
-                const rate = Math.round(recipe.successRate * 100);
-                const rateColor = rate >= 80 ? '#4caf50' : rate >= 50 ? '#ff9800' : '#f44336';
-                html += `<div style="
-                    display: inline-block;
-                    padding: 4px 10px;
-                    background: ${v.isDark ? 'rgba(33,150,243,0.15)' : 'rgba(33,150,243,0.1)'};
-                    border-radius: 4px;
-                    margin-bottom: 8px;
-                    font-size: 12px;
-                    color: ${rateColor};
-                    font-weight: 500;
-                ">成功率 ${rate}%</div>`;
+            // 制符显示成功率和描述
+            if (type === 'talisman') {
+                const parts = [];
+                if (recipe.successRate) {
+                    const rate = Math.round(recipe.successRate * 100);
+                    parts.push(`成功率 ${rate}%`);
+                }
+                if (recipe.description) {
+                    parts.push(recipe.description);
+                }
+                effectHtml = parts.join(' ');
             }
 
-            // 描述区域
-            if (recipe.description) {
-                html += `<div style="
-                    padding: 8px 10px;
-                    background: ${v.isDark ? 'rgba(255,255,255,0.05)' : 'rgba(0,0,0,0.03)'};
-                    border-radius: 4px;
-                    font-size: 12px;
-                    color: ${v.textSecondary};
-                    line-height: 1.5;
-                ">${recipe.description}</div>`;
-            }
-
-            if (html) {
-                descEl.innerHTML = html;
-                descEl.style.display = 'block';
+            if (effectHtml) {
+                effectEl.innerHTML = effectHtml;
             } else {
-                descEl.style.display = 'none';
-                descEl.innerHTML = '';
+                effectEl.innerHTML = '';
             }
+
+            detailEl.style.display = 'block';
         },
 
         updateIncarnationTargetSelect() {
@@ -2675,9 +2621,25 @@
         },
 
         saveConfigFromPanel() {
-            CONFIG.targets.alchemy = $('#lv-target-alchemy')?.value || '';
-            CONFIG.targets.forge = $('#lv-target-forge')?.value || '';
-            CONFIG.targets.talisman = $('#lv-target-talisman')?.value || '';
+            // 新的炼造类型和目标选择
+            const craftType = $('#lv-craft-type')?.value || '';
+            const craftTarget = $('#lv-craft-target')?.value || '';
+
+            // 重置所有目标
+            CONFIG.targets.alchemy = '';
+            CONFIG.targets.forge = '';
+            CONFIG.targets.talisman = '';
+
+            // 根据选择的类型设置对应目标
+            if (craftType && craftTarget) {
+                if (craftType === 'alchemy') {
+                    CONFIG.targets.alchemy = craftTarget;
+                } else if (craftType === 'forge') {
+                    CONFIG.targets.forge = craftTarget;
+                } else if (craftType === 'talisman') {
+                    CONFIG.targets.talisman = craftTarget;
+                }
+            }
 
             CONFIG.targets.incarnation.enabled = $('#lv-incarnation-enabled')?.checked || false;
             CONFIG.targets.incarnation.type = $('#lv-incarnation-type')?.value || 'alchemy';
@@ -2766,14 +2728,41 @@
             // 安全获取配置值，提供默认值
             const getVal = (obj, key, def) => obj && obj[key] !== undefined ? obj[key] : def;
 
-            setValue('#lv-target-alchemy', getVal(CONFIG.targets, 'alchemy', ''));
-            setValue('#lv-target-forge', getVal(CONFIG.targets, 'forge', ''));
-            setValue('#lv-target-talisman', getVal(CONFIG.targets, 'talisman', ''));
+            // 加载炼造类型和目标
+            const hasAlchemy = getVal(CONFIG.targets, 'alchemy', '');
+            const hasForge = getVal(CONFIG.targets, 'forge', '');
+            const hasTalisman = getVal(CONFIG.targets, 'talisman', '');
 
-            // 初始化选中物品的介绍显示
-            this.updateRecipeDescription('alchemy', getVal(CONFIG.targets, 'alchemy', ''));
-            this.updateRecipeDescription('forge', getVal(CONFIG.targets, 'forge', ''));
-            this.updateRecipeDescription('talisman', getVal(CONFIG.targets, 'talisman', ''));
+            if (hasAlchemy) {
+                setValue('#lv-craft-type', 'alchemy');
+                // 触发类型选择事件来加载目标选项
+                const typeSelect = $('#lv-craft-type');
+                if (typeSelect) {
+                    typeSelect.dispatchEvent(new Event('change'));
+                    setValue('#lv-craft-target', hasAlchemy);
+                }
+            } else if (hasForge) {
+                setValue('#lv-craft-type', 'forge');
+                const typeSelect = $('#lv-craft-type');
+                if (typeSelect) {
+                    typeSelect.dispatchEvent(new Event('change'));
+                    setValue('#lv-craft-target', hasForge);
+                }
+            } else if (hasTalisman) {
+                setValue('#lv-craft-type', 'talisman');
+                const typeSelect = $('#lv-craft-type');
+                if (typeSelect) {
+                    typeSelect.dispatchEvent(new Event('change'));
+                    setValue('#lv-craft-target', hasTalisman);
+                }
+            }
+
+            // 初始化选中物品的详情显示
+            const craftType = $('#lv-craft-type')?.value;
+            const craftTarget = $('#lv-craft-target')?.value;
+            if (craftType && craftTarget) {
+                this.updateRecipeDetail(craftType, craftTarget);
+            }
 
             setChecked('#lv-incarnation-enabled', getVal(CONFIG.targets.incarnation, 'enabled', false));
             setValue('#lv-incarnation-type', getVal(CONFIG.targets.incarnation, 'type', 'alchemy'));
@@ -2831,34 +2820,22 @@
         },
 
         refreshRecipeSelects() {
-            const alchemySelect = $('#lv-target-alchemy');
-            if (alchemySelect) {
-                const current = alchemySelect.value;
-                alchemySelect.innerHTML = '<option value="">-- 不自动炼丹 --</option>' +
-                    this.generateRecipeOptions(CACHE.alchemy, 'pillName', 'alchemy');
-                alchemySelect.value = current;
-            }
+            const craftType = $('#lv-craft-type')?.value;
+            const targetSelect = $('#lv-craft-target');
 
-            const forgeSelect = $('#lv-target-forge');
-            if (forgeSelect) {
-                const current = forgeSelect.value;
-                forgeSelect.innerHTML = '<option value="">-- 不自动炼器 --</option>' +
-                    this.generateRecipeOptions(CACHE.forge, 'name', 'forge');
-                forgeSelect.value = current;
-            }
+            if (targetSelect && craftType) {
+                const current = targetSelect.value;
+                const cache = craftType === 'alchemy' ? CACHE.alchemy :
+                             craftType === 'forge' ? CACHE.forge : CACHE.talisman;
+                const nameField = craftType === 'alchemy' ? 'pillName' : 'name';
 
-            const talismanSelect = $('#lv-target-talisman');
-            if (talismanSelect) {
-                const current = talismanSelect.value;
-                talismanSelect.innerHTML = '<option value="">-- 不自动制符 --</option>' +
-                    this.generateRecipeOptions(CACHE.talisman, 'name', 'talisman');
-                talismanSelect.value = current;
-            }
+                targetSelect.innerHTML = '<option value="">-- 选择目标 --</option>' +
+                    this.generateRecipeOptions(cache, nameField, craftType);
+                targetSelect.value = current;
 
-            // 刷新后更新介绍显示
-            this.updateRecipeDescription('alchemy', alchemySelect?.value || '');
-            this.updateRecipeDescription('forge', forgeSelect?.value || '');
-            this.updateRecipeDescription('talisman', talismanSelect?.value || '');
+                // 刷新后更新详情显示
+                this.updateRecipeDetail(craftType, targetSelect.value);
+            }
         },
 
         updateIncarnationStatus() {
@@ -3250,8 +3227,17 @@
                         }
                     } catch (e) {
                         hasError = true;
-                        STATE.recordError(e.errorType);
+                        const errorCount = STATE.recordError(e.errorType);
                         Logger.error(`化身炼造失败: ${e.message}`);
+
+                        if (e.errorType === API.ErrorTypes.INSUFFICIENT &&
+                            (e.message.includes('灵石') || e.message.includes('神识') || e.message.includes('灵力'))) {
+                            const stopCheck = STATE.shouldStop();
+                            if (stopCheck.shouldStop) {
+                                this.stop(stopCheck.reason);
+                                return;
+                            }
+                        }
                     }
                 }
 
@@ -3685,33 +3671,69 @@
                 }
             }
 
+            // 计算基于材料的最大可炼制次数
+            let maxCraftableCount = requestCount;
+            if (recipe.materials && recipe.materials.length > 0) {
+                const materialLimits = recipe.materials.map(m => {
+                    if (!m.need || m.need <= 0) return requestCount;
+                    return Math.floor((m.have || 0) / m.need);
+                });
+                maxCraftableCount = Math.min(...materialLimits, requestCount);
+            }
+
             // 检查材料并尝试补充
             const canCraft = recipe.canCraft || recipe.canForge;
             const canQuickBuy = recipe.canQuickBuy !== undefined ? recipe.canQuickBuy : (recipe.quickBuyCost > 0);
 
             if (!canCraft) {
                 if (!canQuickBuy || !CONFIG.general.useQuickBuy) {
-                    Logger.warn(`${targetName} 材料不足且无法快速购买`);
-                    return { count: 0 };
+                    // 无法快速购买，使用现有材料炼制
+                    Logger.info(`${targetName} 材料不足，使用现有材料炼制${maxCraftableCount}次`);
+                    const adjustedRequestCount = maxCraftableCount;
+                    let res;
+                    if (type === 'alchemy') {
+                        res = await API.batchCraftAlchemy(id, adjustedRequestCount);
+                    } else if (type === 'forge') {
+                        res = await API.batchCraftForge(id, adjustedRequestCount);
+                    } else {
+                        res = await API.batchCraftTalisman(id, adjustedRequestCount);
+                    }
+                    if (res.code === 200) {
+                        let actualCount = res.data?.count || res.data?.crafted;
+                        if (!actualCount && res.data?.message) {
+                            const match = res.data.message.match(/(\d+)次/);
+                            if (match) actualCount = parseInt(match[1]);
+                        }
+                        actualCount = actualCount || adjustedRequestCount;
+                        const msg = res.data?.message || `化身炼造成功: ${targetName} x${actualCount}`;
+                        Logger.success(msg);
+                        STATE.stats.incarnationCrafted += actualCount;
+                        STATE.stats.crafted += actualCount;
+                        return { count: actualCount };
+                    } else {
+                        const error = API.parseError({ response: res });
+                        throw error;
+                    }
                 }
-                // 尝试补充材料
-                Logger.info(`${targetName} 材料不足，尝试一键补全...`);
+                // 计算需要补充的份数
+                const buyAmount = requestCount - maxCraftableCount;
+                Logger.info(`${targetName} 材料不足，补充${buyAmount}份材料...`);
                 try {
-                    const quickBuyRes = await API.quickBuyMats(type, id, requestCount, false);
+                    const quickBuyRes = await API.quickBuyMats(type, id, buyAmount, false);
                     if (quickBuyRes.code !== 200) {
-                        Logger.warn(`材料补全失败: ${quickBuyRes.message || '未知错误'}`);
-                        return { count: 0 };
+                        const error = API.parseError({ response: quickBuyRes });
+                        throw error;
                     }
                     Logger.success('材料补全成功');
                 } catch (e) {
-                    Logger.error(`材料补全失败: ${e.message}`);
-                    return { count: 0 };
+                    if (e.errorType) throw e;
+                    const error = API.parseError(e);
+                    throw error;
                 }
             }
 
             // 执行实际炼造
             try {
-
                 let res;
                 if (type === 'alchemy') {
                     res = await API.batchCraftAlchemy(id, requestCount);
@@ -3736,11 +3758,18 @@
                     STATE.stats.crafted += actualCount;
                     return { count: actualCount };
                 } else {
-                    Logger.warn(`化身炼造失败: ${res.message || '未知错误'}`);
+                    // 使用API的parseError来解析错误类型
+                    const error = API.parseError({ response: res });
+                    throw error;
                 }
             } catch (e) {
-                Logger.error(`化身炼造失败: ${e.message}`);
-                throw e;
+                // 如果已经是解析过的错误对象，直接抛出
+                if (e.errorType) {
+                    throw e;
+                }
+                // 否则包装成未知错误
+                const error = API.parseError(e);
+                throw error;
             }
         },
 
