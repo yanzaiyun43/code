@@ -1,7 +1,7 @@
 // ==UserScript==
 // @name         灵界 LingVerse 炼造配置面板
 // @namespace    lingverse-craft-config
-// @version      3.3.6
+// @version      3.3.7
 // @description  炼造自动化配置：支持炼丹/炼器/制符、许愿锁定、自动售卖、深色/浅色模式跟随游戏主题
 // @author       LingVerse
 // @match        https://ling.muge.info/*
@@ -2741,6 +2741,10 @@
                 return;
             }
 
+            // 检测冥想状态（先检测本体）
+            const isMeditating = await this.isMeditating();
+            STATE.monitor.isMeditating = isMeditating;
+
             // 获取化身状态，用于区分本体/化身炼造
             let incarnationEnabled = false;
             try {
@@ -2753,27 +2757,43 @@
                 // 忽略错误
             }
 
-            // 检测冥想状态
-            const isMeditating = await this.isMeditating();
-            STATE.monitor.isMeditating = isMeditating;
-            if (isMeditating) {
+            // 如果本体在冥想，且化身未启用炼造，则跳过
+            if (isMeditating && !incarnationEnabled) {
                 Logger.warn('冥想中无法炼造，跳过本次执行');
                 // 冥想时不停止，只是跳过本次，下次执行时重新检测
                 return;
             }
 
-            const statusCheck = await this.checkPlayerStatus();
-            if (!statusCheck.canCraft) {
-                Logger.warn(`无法炼造: ${statusCheck.reason}`);
-                this.stop(statusCheck.reason);
-                return;
+            // 如果本体在冥想但化身已启用，提示使用化身炼造
+            if (isMeditating && incarnationEnabled) {
+                Logger.info('本体冥想中，使用化身炼造');
             }
 
+            // 检查玩家状态（本体状态）
+            const statusCheck = await this.checkPlayerStatus();
+            if (!statusCheck.canCraft) {
+                // 如果启用了化身炼造，跳过本体神识/冥想不足的限制
+                if (incarnationEnabled && statusCheck.reason && 
+                    (statusCheck.reason.includes('神识不足') || statusCheck.reason.includes('冥想'))) {
+                    Logger.info('化身已启用炼造，跳过本体状态限制');
+                } else {
+                    Logger.warn(`无法炼造: ${statusCheck.reason}`);
+                    this.stop(statusCheck.reason);
+                    return;
+                }
+            }
+
+            // 使用 shouldStop 的统一检测逻辑
             const stopCheck = STATE.shouldStop();
             if (stopCheck.shouldStop) {
-                Logger.warn(`自动停止: ${stopCheck.reason}`);
-                this.stop(stopCheck.reason);
-                return;
+                // 如果启用了化身炼造，跳过本体神识不足的限制
+                if (incarnationEnabled && stopCheck.reason && stopCheck.reason.includes('神识不足')) {
+                    Logger.info('化身已启用炼造，跳过本体神识检测');
+                } else {
+                    Logger.warn(`自动停止: ${stopCheck.reason}`);
+                    this.stop(stopCheck.reason);
+                    return;
+                }
             }
 
             // 设置许愿目标
@@ -2802,10 +2822,15 @@
 
                         if (e.errorType === API.ErrorTypes.INSUFFICIENT && 
                             (e.message.includes('灵石') || e.message.includes('神识'))) {
-                            const stopCheck = STATE.shouldStop();
-                            if (stopCheck.shouldStop) {
-                                this.stop(stopCheck.reason);
-                                return;
+                            // 如果启用了化身炼造，跳过本体神识不足的限制
+                            if (incarnationEnabled && e.message.includes('神识')) {
+                                Logger.info('【化身】神识不足，跳过本体检测');
+                            } else {
+                                const stopCheck = STATE.shouldStop();
+                                if (stopCheck.shouldStop) {
+                                    this.stop(stopCheck.reason);
+                                    return;
+                                }
                             }
                         }
                     }
