@@ -1,7 +1,7 @@
 // ==UserScript==
 // @name         灵界 LingVerse 炼造配置面板
 // @namespace    lingverse-craft-config
-// @version      3.2.7
+// @version      3.2.8
 // @description  炼造自动化配置：支持炼丹/炼器/制符/化身炼造、许愿锁定、自动售卖、深色/浅色模式跟随游戏主题
 // @author       LingVerse
 // @match        https://ling.muge.info/*
@@ -3694,7 +3694,7 @@
                 // 尝试补充材料
                 Logger.info(`${targetName} 材料不足，尝试一键补全...`);
                 try {
-                    const quickBuyRes = await API.quickBuyMats(type, id, null, requestCount);
+                    const quickBuyRes = await API.quickBuyMats(type, id, requestCount, false);
                     if (quickBuyRes.code !== 200) {
                         Logger.warn(`材料补全失败: ${quickBuyRes.message || '未知错误'}`);
                         return { count: 0 };
